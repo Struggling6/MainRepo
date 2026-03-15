@@ -49,7 +49,7 @@ class PowerGridCSVHandler(BaseDatasetHandler):
             return {
                 "input_dim": self.features.shape[1],
                 "num_classes": len(self.label_to_idx),
-                "num_samples": len(self.features)
+                "num_samples": len(self.features),
                 "label_mapping": self.label_to_idx
             }
 
@@ -68,5 +68,31 @@ class PowerGridCSVHandler(BaseDatasetHandler):
                 else start + samples_per_client
             )
 
+            x_client = self.features[start:end]
+            y_client = self.labels[start:end]
+
+            x_tensor = torch.tensor(x_client)
+            y_tensor = torch.tensor(y_client)
+
+            dataset = TensorDataset(x_tensor, y_tensor)
+
+            test_size = int(len(dataset) * self.test_split)
+            train_size = len(dataset) - test_size
+
+            train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+
+            trainloader = DataLoader(
+                train_dataset,
+                batch_size=self.batch_size,
+                shuffle=True,
+            )
+
+            testloader = DataLoader(
+                test_dataset,
+                batch_size=self.batch_size,
+                shuffle=False,
+            )
+
+            return trainloader, testloader
 
             
