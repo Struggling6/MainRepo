@@ -45,54 +45,54 @@ class PowerGridCSVHandler(BaseDatasetHandler):
             std[std == 0] = 1.0
             self.features = (self.features - mean) / std
         
-        def get_metadata(self):
-            return {
-                "input_dim": self.features.shape[1],
-                "num_classes": len(self.label_to_idx),
-                "num_samples": len(self.features),
-                "label_mapping": self.label_to_idx
-            }
+    def get_metadata(self):
+        return {
+            "input_dim": self.features.shape[1],
+            "num_classes": len(self.label_to_idx),
+            "num_samples": len(self.features),
+            "label_mapping": self.label_to_idx
+        }
 
-        def get_dataloaders(self, config:dict):
+    def get_dataloaders(self, config:dict):
 
-            if partition_id < 0 or partition_id >= self.num_clients:
-                raise ValueError(f"Invalid partition_id")
-            
-            total_samples = len(self.features)
-            samples_per_client = total_samples // self.num_clients
+        if partition_id < 0 or partition_id >= self.num_clients:
+            raise ValueError(f"Invalid partition_id")
+        
+        total_samples = len(self.features)
+        samples_per_client = total_samples // self.num_clients
 
-            start = partition_id * samples_per_client
-            end = (
-                total_samples
-                if partition_id == self.num_clients - 1
-                else start + samples_per_client
-            )
+        start = partition_id * samples_per_client
+        end = (
+            total_samples
+            if partition_id == self.num_clients - 1
+            else start + samples_per_client
+        )
 
-            x_client = self.features[start:end]
-            y_client = self.labels[start:end]
+        x_client = self.features[start:end]
+        y_client = self.labels[start:end]
 
-            x_tensor = torch.tensor(x_client)
-            y_tensor = torch.tensor(y_client)
+        x_tensor = torch.tensor(x_client)
+        y_tensor = torch.tensor(y_client)
 
-            dataset = TensorDataset(x_tensor, y_tensor)
+        dataset = TensorDataset(x_tensor, y_tensor)
 
-            test_size = int(len(dataset) * self.test_split)
-            train_size = len(dataset) - test_size
+        test_size = int(len(dataset) * self.test_split)
+        train_size = len(dataset) - test_size
 
-            train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+        train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
 
-            trainloader = DataLoader(
-                train_dataset,
-                batch_size=self.batch_size,
-                shuffle=True,
-            )
+        trainloader = DataLoader(
+            train_dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+        )
 
-            testloader = DataLoader(
-                test_dataset,
-                batch_size=self.batch_size,
-                shuffle=False,
-            )
+        testloader = DataLoader(
+            test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+        )
 
-            return trainloader, testloader
+        return trainloader, testloader
 
             

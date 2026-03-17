@@ -5,7 +5,7 @@ DATASET_REGISTRY = {
 }
 
 def create_dataset_handler(data_config):
-    dataset_name = config.get("dataset_name")
+    dataset_name = data_config.get("name")
     
     if dataset_name not in DATASET_REGISTRY:
         raise ValueError(f"Dataset '{dataset_name}' is not registered.")
