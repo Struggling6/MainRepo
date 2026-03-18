@@ -1,42 +1,38 @@
 import torch
 
-def train_model(model, trainloader, epochs, lr,  device):
+def train_model(model, trainloader, task, training_config: dict ,  device):
     model.to(device)
     model.train()
 
-    criterion = torch.nn.CrossEntropyLoss()
+    epochs = training_config.get("local_epochs", 10)
+    lr = training_config.get("learning_rate", 0.001)
+
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     total_loss = 0.0
+    total_correct = 0
     total_examples = 0
-    correct = 0
+    
 
     for _ in range (epochs):
-        for x_batch, y_batch in trainloader:
-            x_batch = x_batch.to(device)
-            y_batch = y_batch.to(device)
-
+        for batch in trainloader:
             optimizer.zero_grad()
 
-            outputs = model(x_batch)
-            loss = criterion(outputs, y_batch)
-
+            loss, outputs, targets = task.compute_loss(model, batch, device)
             loss.backward()
             optimizer.step()
 
-            batch_size = y_batch.size(0)
+            metrics = task.compute_metrics(outputs, targets)
+
+            batch_size = targets.size(0)
             total_loss += loss.item() * batch_size
+            total_correct += metrics["correct"]
             total_examples += batch_size
 
-            preds = torch.argmax(outputs, dim=1)
-            correct += (preds == y_batch).sum().item()
-
-    avg_loss = total_loss / total_examples if total_examples > 0 else 0.0
-    accuracy = correct / total_examples if total_examples > 0 else 0.0
 
     return {
-        "loss": avg_loss,
-        "accuracy": accuracy,
+        "loss": total_loss / total_examples,
+        "accuracy": total_correct / total_examples,
         "num_examples": total_examples,
     }
 

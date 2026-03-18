@@ -1,27 +1,33 @@
 CONFIG = {
+    "task": {
+        "name": "classification",
+    },
+
     "model": {
-        "name":"cnn", #input model type here
+        "name": "mlp",
         "hidden_dim": 64,
-        "num_heads": 4,
-        "num_layers": 2,
         "dropout": 0.2,
     },
-    "data":{
-        "name":"SWAT",#input dataset name here
+
+    "data": {
+        "name": "powergrid_csv",
+        "file_path": "datasets/data1.csv",
+        "label_column": "marker",
         "batch_size": 32,
         "num_clients": 3,
-        "sequence_length": 50,
-        "num_features": 51,
-        "num_classes": 2,
-        "samples_per_client": 1000,
+        "test_split": 0.2,
+        "normalize": True,
+        "seed": 42,
     },
-    "training":{
+
+    "training": {
         "learning_rate": 0.001,
         "local_epochs": 5,
     },
-    "federation":{
+
+    "federation": {
         "num_rounds": 10,
-        "fraction_train":1.0,
-        "fraction_eval":1.0,
+        "fraction_fit": 1.0,
+        "fraction_evaluate": 1.0,
     },
 }

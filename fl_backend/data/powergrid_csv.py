@@ -45,6 +45,12 @@ class PowerGridCSVHandler(BaseDatasetHandler):
         self.features = feature_df.values.astype("float32")
         self.labels = labels_encoded.values.astype("int64")
 
+        self.features = np.nan_to_num(
+            self.features,
+            nan = 0.0,
+            posinf = 0.0,
+            neginf = 0.0,
+        )
         if self.normalize:
             mean = self.features.mean(axis=0)
             std = self.features.std(axis=0)
