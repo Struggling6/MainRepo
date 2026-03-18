@@ -11,12 +11,12 @@ def evaluate_model(model, testloader, device):
     correct = 0
 
     with torch.no_grad():
-        for x_batch, y_batch in tesloader:
+        for x_batch, y_batch in testloader:
             x_batch = x_batch.to(device)
             y_batch = y_batch.to(device)
             
             outputs = model(x_batch)
-            loss = criterion(outputs, Y_batch)
+            loss = criterion(outputs, y_batch)
 
             batch_size = y_batch.size(0)
             total_loss += loss.item() * batch_size

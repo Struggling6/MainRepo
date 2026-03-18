@@ -2,7 +2,7 @@ import torch
 
 def train_model(model, trainloader, epochs, lr,  device):
     model.to(device)
-    model.train
+    model.train()
 
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
