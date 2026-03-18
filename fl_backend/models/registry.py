@@ -2,13 +2,13 @@
 #something like this:
 # from .cnn.py import CNNModel
 #from .transformer.py import TransformerModel
-from .mlp import MPLModel
+from .mlp import MLPModel
 
 
 MODEL_REGISTRY = {
     #"cnn": CNNModel,
     #"transformer": TransformerModel,
-    "mlp": MPLModel,
+    "mlp": MLPModel,
 }
 
 def create_model(model_config: dict, data_metadata: dict):
