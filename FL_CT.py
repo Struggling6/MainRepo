@@ -205,7 +205,7 @@ from sklearn.model_selection import train_test_split
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Load data
-path = Path("datasets/EPIC/Scenario_1/EpicLog_Scenario 1_19_Oct_2018_14_44.csv")
+path = Path("datasets/EPIC/Scenario_1/EpicLog_noisy.csv")
 df = pd.read_csv(path)
 df = df.drop(columns=["Timestamp"])
 
