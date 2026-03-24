@@ -194,11 +194,13 @@ def set_model_parameters(model: nn.Module, parameters):
     model.load_state_dict(new_state_dict, strict=True)
 
 
-#Lokal klientkode 
+
+#"Lokal klientkode", så baisically main koden  
 import torch
 import torch.optim as optim
 import pandas as pd
 from pathlib import Path
+from sklearn.model_selection import train_test_split
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -210,9 +212,12 @@ df = df.drop(columns=["Timestamp"])
 # Preprocess
 X = preprocess_dataframe(df)
 
+# Split the data into training and test sets
+X_train, X_test = train_test_split(X, test_size=0.2, random_state=42, shuffle=False)
+
 # Dataloaders
-train_loader = make_autoencoder_dataloader(X, batch_size=32, shuffle=True)
-eval_loader = make_autoencoder_dataloader(X, batch_size=32, shuffle=False)
+train_loader = make_autoencoder_dataloader(X_train, batch_size=32, shuffle=False)
+eval_loader = make_autoencoder_dataloader(X_test, batch_size=32, shuffle=False)
 
 # Model
 model = CNNTransformer(
@@ -279,14 +284,40 @@ print(scores[:10])
 #For at kører : python FL_CT.py
 
 
+#Plotting resultatet
 import matplotlib.pyplot as plt
 
 plt.plot(scores.numpy())
 plt.title("Anomaly Scores")
 plt.xlabel("Sample Index")
 plt.ylabel("Score")
-plt.show()
+#plt.show()
 
 threshold = scores.mean() + 3 * scores.std()  # Eksempel: 3 standardafvigelser over gennemsnittet
 anomalies = scores > threshold
 print(f"Number of anomalies: {anomalies.sum()}")
+
+anomaly_indices = torch.nonzero(anomalies, as_tuple=True)[0].tolist()
+print(anomaly_indices)
+
+train_size = len(X_train)
+
+# Hent de anomale rækker fra original dataframe
+original_anomaly_indices = [train_size + idx for idx in anomaly_indices]
+anomalous_rows = df.iloc[original_anomaly_indices]
+
+print(f"Total samples: {len(X)}")
+print(f"Training samples: {len(X_train)}")
+print(f"Test samples: {len(X_test)}")
+print(f"Number of batches in eval_loader: {len(eval_loader)}")
+print(f"Anomaly scores shape: {scores.shape}")
+
+# Vis anomaly scores for disse rækker
+for i, idx in enumerate(anomaly_indices):
+    print(f"\nAnomaly {i+1}:")
+    print(f"  Test index: {idx}")
+    print(f"  Original index: {len(X_train)+idx}")
+    print(f"  Anomaly score: {scores[idx]:.6f}")
+    #print(f"  Data: {anomalous_rows.iloc[i].to_dict()}")
+
+#SUman sagde at datasettet faktisk var normalt, så du skal inject dine egne anomalies!!!
