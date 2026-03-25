@@ -14,7 +14,7 @@ CONFIG = {
         "file_path": "datasets/data1.csv",
         "label_column": "marker",
         "batch_size": 32,
-        "num_clients": 10,
+        "num_clients": 2,
         "test_split": 0.2,
         "normalize": True,
         "seed": 42,
