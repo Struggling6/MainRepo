@@ -20,3 +20,16 @@ publisher = "local"
 [tool.flwr.app.components]
 clientapp = "client_app:app"
 serverapp = "server_app:app"
+
+
+[tool.hatch.build.targets.wheel]
+only-include = [
+  "client_app.py",
+  "server_app.py",
+  "config.py",
+  "main.py",
+  "data",
+  "models",
+  "tasks",
+  "training",
+]
