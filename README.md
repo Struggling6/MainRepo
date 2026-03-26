@@ -40,6 +40,13 @@ What it does:
 - Shows your Flower config file location
 - Shows available connections
 
+add this to your flwr config.toml
+```
+[superlink.local-deployment]
+address = "127.0.0.1:9093"
+insecure = true
+```
+
 flwr run . local-deployment --stream
  What it does:
 - Runs your Flower app (`.` = current folder)
