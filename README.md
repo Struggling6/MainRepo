@@ -20,3 +20,29 @@ if you install new packages be sure to update ``requirements.txt`` using the com
 
 This was done to be sure to have the correct version of the libraries and is apparently standard practice
 
+
+
+## Docker compose:
+rebuild + start Docker Compose commands
+Run:
+docker compose down
+docker compose up --build -d
+What this does:
+- down = stops/removes old containers
+- up --build -d = rebuilds using our pyproject.toml and starts everything again
+
+docker compose ps
+- Shows running containers
+
+## Flower CLI commands:
+flwr config list
+What it does:
+- Shows your Flower config file location
+- Shows available connections
+
+flwr run . local-deployment --stream
+ What it does:
+- Runs your Flower app (`.` = current folder)
+- Connects to Docker backend (`local-deployment`)
+- `-stream` = shows logs live
+- remember to cd fl_backend
