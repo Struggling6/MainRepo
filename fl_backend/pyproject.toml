@@ -23,7 +23,7 @@ serverapp = "server_app:app"
 
 
 [tool.hatch.build.targets.wheel]
-only-include = [
+include = [
   "client_app.py",
   "server_app.py",
   "config.py",
