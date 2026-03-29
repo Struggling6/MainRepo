@@ -2,6 +2,23 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+#Preprocessing data
+import pandas as pd
+import torch
+from fl_backend.data.EPIC import preprocess_dataframe, make_autoencoder_dataloader
+from torch.utils.data import TensorDataset, DataLoader
+
+#Training
+import torch
+import torch.nn as nn
+import torch
+import torch.optim as optim
+import pandas as pd
+from pathlib import Path
+from sklearn.model_selection import train_test_split
+from dataInjection import inject_noise
+import matplotlib.pyplot as plt
+
 class CNNTransformer(nn.Module):
     def __init__(
         self,
@@ -62,45 +79,6 @@ class CNNTransformer(nn.Module):
             align_corners=False,
         )
         return x_hat
-    
-
-
-#Preprocessing data
-import pandas as pd
-import torch
-
-def preprocess_dataframe(df: pd.DataFrame) -> torch.Tensor:
-    df_numeric = df.apply(pd.to_numeric, errors="coerce")
-    df_numeric = df_numeric.astype(float)
-    df_numeric = df_numeric.fillna(0.0)
-
-    mean = df_numeric.mean()
-    std = df_numeric.std().replace(0, 1)
-
-    df_numeric = (df_numeric - mean) / std
-    df_numeric = df_numeric.fillna(0.0)
-
-    X = torch.tensor(df_numeric.values, dtype=torch.float32)
-    X = X.unsqueeze(1)   # [num_samples, 1, num_features]
-    return X
-
-
-
-#Dataloader funktion
-from torch.utils.data import TensorDataset, DataLoader
-
-def make_autoencoder_dataloader(
-    X: torch.Tensor,
-    batch_size: int = 32,
-    shuffle: bool = True,
-) -> DataLoader:
-    dataset = TensorDataset(X)
-    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=0)
-
-
-#Train funktion
-import torch
-import torch.nn as nn
 
 def train_one_epoch(
     model: nn.Module,
@@ -196,128 +174,95 @@ def set_model_parameters(model: nn.Module, parameters):
 
 
 #"Lokal klientkode", så baisically main koden  
-import torch
-import torch.optim as optim
-import pandas as pd
-from pathlib import Path
-from sklearn.model_selection import train_test_split
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def detect_anomalies(
+    model: nn.Module,
+    eval_loader,
+    df: pd.DataFrame,
+    train_size: int,
+    device: torch.device,
+    threshold_std: float = 3.0,
+):
+    scores = get_anomaly_scores(model, eval_loader, device)
 
-# Load data
-path = Path("datasets/EPIC/Scenario_1/EpicLog_noisy.csv")
-df = pd.read_csv(path)
-df = df.drop(columns=["Timestamp"])
+    #Plotting resultatet
+    plt.plot(scores.numpy())
+    plt.title("Anomaly Scores")
+    plt.xlabel("Sample Index")
+    plt.ylabel("Score")
+    plt.show()
 
-# Preprocess
-X = preprocess_dataframe(df)
+    # Calculate threshold
+    threshold = scores.mean() + threshold_std * scores.std()
+    anomalies = scores > threshold
 
-# Split the data into training and test sets
-X_train, X_test = train_test_split(X, test_size=0.2, random_state=42, shuffle=False)
+    anomaly_indices = torch.nonzero(anomalies, as_tuple=True)[0].tolist()
+    original_anomaly_indices = [train_size + idx for idx in anomaly_indices]
+    anomalous_rows = df.iloc[original_anomaly_indices]
 
-# Dataloaders
-train_loader = make_autoencoder_dataloader(X_train, batch_size=32, shuffle=False)
-eval_loader = make_autoencoder_dataloader(X_test, batch_size=32, shuffle=False)
+    print(f"Number of anomalies detected: {anomalies.sum()}")
+    print(f"Anomaly threshold: {threshold:.6f}")
+    print(f"Anomaly scores shape: {scores.shape}")
+    print(f"\nAnomalies at indices: {anomaly_indices}")
 
-# Model
-model = CNNTransformer(
-    in_channels=1,
-    embed_dim=128,
-    num_heads=4,
-    num_layers=2,
-    dropout=0.1,
-).to(device)
+    # Vis anomaly scores for disse rækker
+    print("\n" + "="*60)
+    for i, idx in enumerate(anomaly_indices):
+        print(f"\nAnomaly {i+1}:")
+        print(f"  Test index: {idx}")
+        print(f"  Original index: {train_size + idx}")
+        print(f"  Anomaly score: {scores[idx]:.6f}")
+    
 
-optimizer = optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
+def run_test_func():
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-epochs = 10
+    # Load data
+    clean_path = Path("datasets/EPIC/Scenario_1/EpicLog_Scenario 1_19_Oct_2018_14_44.csv")
+    path = Path("datasets/EPIC/Scenario_1/EpicLog_noisy.csv")
 
-for epoch in range(epochs):
-    train_loss = train_one_epoch(model, train_loader, optimizer, device)
-    eval_loss = evaluate(model, eval_loader, device)
+    inject_noise(clean_path, path, noise_level=0.7)
 
-    print(
-        f"Epoch {epoch+1}/{epochs}, "
-        f"Train Loss: {train_loss:.6f}, "
-        f"Eval Loss: {eval_loss:.6f}"
-    )
+    df = pd.read_csv(path)
+    df = df.drop(columns=["Timestamp"])
 
-scores = get_anomaly_scores(model, eval_loader, device)
-print(scores[:10])
+    # Preprocess
+    X = preprocess_dataframe(df)
 
+    # Split the data into training and test sets
+    X_train, X_test = train_test_split(X, test_size=0.2, random_state=42, shuffle=False)
 
+    # Dataloaders
+    train_loader = make_autoencoder_dataloader(X_train, batch_size=32, shuffle=False)
+    eval_loader = make_autoencoder_dataloader(X_test, batch_size=32, shuffle=False)
 
+    # Model
+    model = CNNTransformer(
+        in_channels=1,
+        embed_dim=128,
+        num_heads=4,
+        num_layers=2,
+        dropout=0.1,
+    ).to(device)
 
-#Example på output
-#Epoch 1/20, Train Loss: 0.198603, Eval Loss: 0.166171
-#Epoch 2/20, Train Loss: 0.155465, Eval Loss: 0.144920
-#Epoch 3/20, Train Loss: 0.141268, Eval Loss: 0.136764
-#Epoch 4/20, Train Loss: 0.134611, Eval Loss: 0.131075
-#Epoch 5/20, Train Loss: 0.130228, Eval Loss: 0.128099
-#Epoch 6/20, Train Loss: 0.128087, Eval Loss: 0.126918
-#Epoch 7/20, Train Loss: 0.127096, Eval Loss: 0.126269
-#Epoch 8/20, Train Loss: 0.126491, Eval Loss: 0.125835
-#Epoch 9/20, Train Loss: 0.126150, Eval Loss: 0.125592
-#Epoch 10/20, Train Loss: 0.125878, Eval Loss: 0.125500
-#Epoch 11/20, Train Loss: 0.125664, Eval Loss: 0.125209
-#Epoch 12/20, Train Loss: 0.125519, Eval Loss: 0.125073
-#Epoch 13/20, Train Loss: 0.125385, Eval Loss: 0.125093
-#Epoch 14/20, Train Loss: 0.125333, Eval Loss: 0.124945
-#Epoch 15/20, Train Loss: 0.125196, Eval Loss: 0.124854
-#Epoch 16/20, Train Loss: 0.125114, Eval Loss: 0.124818
-#Epoch 17/20, Train Loss: 0.125053, Eval Loss: 0.124786
-#Epoch 18/20, Train Loss: 0.125006, Eval Loss: 0.124740
-#Epoch 19/20, Train Loss: 0.124981, Eval Loss: 0.124724
-#Epoch 20/20, Train Loss: 0.124936, Eval Loss: 0.124684
-#tensor([0.5257, 0.5269, 0.5313, 0.5480, 0.5480, 0.5295, 0.5298, 0.5298, 0.5599,0.5270])
+    optimizer = optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
 
-#Train loss : gennemsnittet af fejl mellem input og output fra modellen under træning. En lavere værdi betyder at modellen bliver bedre til at genskabe input data. 
-#Eval loss : Dette er rekonstruktionsfejlen på evaluerings dats (Så data som modellen ikke træner på), Lav eval loss vetyder at modellen generaliserer godt på unseen data. 
-#Så siden vores loss værdier stabiliserer ved 0.124... betyder det at modellen har lært at genkende dataen godt uden at over tilpasse. 
-#Anomoly score : Representerer "rekustruktionsfejlen" for hver datapunkt i eval dataet. En høj score betyder modellen havde det svært ved at genkende datapunktet, hvilket betyder det er en anomaly. 
+    epochs = 10
 
-# Så pointen er at modellen skal træne på datapunkter som er normale, så den kan genkende hvilke mønstrer er normale
-# Ideen er så at hvis den kan konsturerer et resultat som minder som de patterns vi har fundet fra train data, så burde anomoly score være lav, fordi de er ens
-# men hvis den ikke kan konstruerer et resultat som minder om vores patterns, så betyder det at det er en anomaly.
+    for epoch in range(epochs):
+        train_loss = train_one_epoch(model, train_loader, optimizer, device)
+        eval_loss = evaluate(model, eval_loader, device)
 
-
-#For at kører : python FL_CT.py
-
-
-#Plotting resultatet
-import matplotlib.pyplot as plt
-
-plt.plot(scores.numpy())
-plt.title("Anomaly Scores")
-plt.xlabel("Sample Index")
-plt.ylabel("Score")
-#plt.show()
-
-threshold = scores.mean() + 3 * scores.std()  # Eksempel: 3 standardafvigelser over gennemsnittet
-anomalies = scores > threshold
-print(f"Number of anomalies: {anomalies.sum()}")
-
-anomaly_indices = torch.nonzero(anomalies, as_tuple=True)[0].tolist()
-print(anomaly_indices)
-
-train_size = len(X_train)
-
-# Hent de anomale rækker fra original dataframe
-original_anomaly_indices = [train_size + idx for idx in anomaly_indices]
-anomalous_rows = df.iloc[original_anomaly_indices]
-
-print(f"Total samples: {len(X)}")
-print(f"Training samples: {len(X_train)}")
-print(f"Test samples: {len(X_test)}")
-print(f"Number of batches in eval_loader: {len(eval_loader)}")
-print(f"Anomaly scores shape: {scores.shape}")
-
-# Vis anomaly scores for disse rækker
-for i, idx in enumerate(anomaly_indices):
-    print(f"\nAnomaly {i+1}:")
-    print(f"  Test index: {idx}")
-    print(f"  Original index: {len(X_train)+idx}")
-    print(f"  Anomaly score: {scores[idx]:.6f}")
-    #print(f"  Data: {anomalous_rows.iloc[i].to_dict()}")
-
-#SUman sagde at datasettet faktisk var normalt, så du skal inject dine egne anomalies!!!
+        print(
+            f"Epoch {epoch+1}/{epochs}, "
+            f"Train Loss: {train_loss:.6f}, "
+            f"Eval Loss: {eval_loss:.6f}"
+        )
+    
+    detect_anomalies(
+        model=model,
+        eval_loader=eval_loader,
+        df=df,
+        train_size=len(X_train),
+        device=device,
+        threshold_std=3.0)
