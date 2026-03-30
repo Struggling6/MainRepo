@@ -1,10 +1,11 @@
 import torch
+import torch.nn as nn
 
 def train_one_epoch(
-    model: nn.Module,
+    model,
     dataloader,
     optimizer,
-    device: torch.device,
+    device,
     max_norm: float = 1.0,
 ):
     model.train()
@@ -46,8 +47,7 @@ def train(model, optimizer, device):
     optimizer = optim.Adam(model.parameters(),lr , weight_decay=1e-5)
 
     for _ in range(epochs):
-        train_loss = train_one_epoch(model, train_loader, optimizer, device)
-        eval_loss = evaluate(model, eval_loader, device)
+        train_loss, eval_loss = compute_loss(model, train_loader, eval_loader, optimizer, device)
 
     detect_anomalies(
         model=model,

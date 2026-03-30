@@ -1,9 +1,10 @@
 import torch
+import torch.nn as nn
 
 def evaluate(
-    model: nn.Module,
+    model,
     dataloader,
-    device: torch.device,
+    device,
 ):
     model.eval()
     criterion = nn.MSELoss()
