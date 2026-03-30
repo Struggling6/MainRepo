@@ -52,5 +52,19 @@ def main():
     print(f"Evaluation results: {eval_results}")
 
 
+    # Detect anomalies
+    print("\n--- Anomaly Detection ---")
+    anomalies, scores, threshold = task.detect_anomalies(
+        model=model,
+        eval_loader=testloader,
+        df=dataset_handler.df,
+        train_size=len(trainloader.dataset),
+        device=device,
+        threshold_std=1.0
+    )
+    print(f"Anomalies detected: {anomalies.sum()}")
+    print(f"Anomaly threshold: {threshold:.6f}")
+
+
 if __name__ == "__main__":
     main()
