@@ -1,10 +1,10 @@
 CONFIG = {
     "task": {
-        "name": "classification", #anomaly_detection
+        "name": "anomaly_detection",
     },
 
     "model": {
-        "name": "mlp", #cnn_transformer
+        "name": "unsupcnntrans", 
         "hidden_dim": 64,
         "dropout": 0.2,
         "in_channels": 1,
@@ -14,8 +14,8 @@ CONFIG = {
     },
 
     "data": {
-        "name": "powergrid_csv", #epic_csv
-        "file_path": "datasets/data1.csv", #datasets/EPIC/Scenario_1/EpicLog_noisy.csv
+        "name": "epic_csv", 
+        "file_path": "datasets/EPIC/Scenario_1/EpicLog_noisy.csv", 
         "clean_path": "datasets/EPIC/Scenario_1/EpicLog_Scenario 1_19_Oct_2018_14_44.csv", 
         "label_column": "marker",
         "batch_size": 32,
