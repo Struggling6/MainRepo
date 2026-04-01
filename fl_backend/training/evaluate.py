@@ -20,14 +20,9 @@ def evaluate_model(model, testloader, task, device):
             total_correct += metrics["correct"]
             total_examples += batch_size
 
-        avg_loss = total_loss / max(total_examples, 1)
-
-
-        results =  {
-            "loss": avg_loss,
+        return {
+            "loss": total_loss / total_examples,
             "accuracy": total_correct / total_examples,   
             "num_examples": total_examples,
         }
-
-        return results
     
