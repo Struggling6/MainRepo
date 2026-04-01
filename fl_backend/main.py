@@ -53,6 +53,7 @@ def main():
 
 
     # Detect anomalies
+    '''
     print("\n--- Anomaly Detection ---")
     anomalies, scores, threshold = task.detect_anomalies(
         model=model,
@@ -62,9 +63,7 @@ def main():
         device=device,
         threshold_std=1.0
     )
-    print(f"Anomalies detected: {anomalies.sum()}")
-    print(f"Anomaly threshold: {threshold:.6f}")
-
+    '''
 
 if __name__ == "__main__":
     main()
