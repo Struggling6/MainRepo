@@ -2,8 +2,8 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch
 import pandas as pd
-from training.unsupervised.unSup_evaluate import evaluate
-from training.unsupervised.unSup_train import train_one_epoch
+from training.evaluate import evaluate_model
+from training.train import train_one_epoch
 
 
 class AnomalyDetectionTask:

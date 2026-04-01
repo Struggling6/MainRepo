@@ -5,7 +5,7 @@ def evaluate_model(model, testloader, task, device):
     model.eval()
 
     total_loss = 0.0
-    #total_correct = 0
+    total_correct = 0
     total_examples = 0
     
 
@@ -14,17 +14,20 @@ def evaluate_model(model, testloader, task, device):
      
             loss, outputs, targets = task.compute_loss(model, batch, device)    
           
-            #metrics = task.compute_metrics(outputs, targets)
+            metrics = task.compute_metrics(outputs, targets)
             batch_size = targets.size(0)
             total_loss += loss.item() * batch_size
-            #total_correct += metrics["correct"]
+            total_correct += metrics["correct"]
             total_examples += batch_size
 
         avg_loss = total_loss / max(total_examples, 1)
 
-        return {
+
+        results =  {
             "loss": avg_loss,
-            "accuracy": 0.0, #total_correct / total_examples,   
+            "accuracy": total_correct / total_examples,   
             "num_examples": total_examples,
         }
+
+        return results
     
