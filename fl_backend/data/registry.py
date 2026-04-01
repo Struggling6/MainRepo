@@ -1,10 +1,13 @@
 from .powergrid_csv import PowerGridCSVHandler
 from .epic_csv import EpicCSVHandler
+from .lead_csv import LeadCSVHandler
+
 
 
 DATASET_REGISTRY = {
     "powergrid_csv": PowerGridCSVHandler,
-    "epic_csv" : EpicCSVHandler
+    "epic_csv" : EpicCSVHandler,
+    "lead_csv" : LeadCSVHandler,
 }
 
 def create_dataset_handler(data_config):
