@@ -7,6 +7,7 @@ from training.train import train_one_epoch
 
 
 class AnomalyDetectionTask:
+    #Skal også inkluerer compute loss og måske rename til anomalyPrediction task og have alt loss og alt muligt her inde??
     """Task class for anomaly detection using reconstruction error."""
     
     def __init__(self):

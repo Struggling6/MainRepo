@@ -8,11 +8,12 @@ from models.registry import create_model
 from tasks.registry import create_task
 from training.train import train_model
 from training.evaluate import evaluate_model
+from models.utils import get_device
 
 def main():
     config = CONFIG
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = get_device()
     print(f"Using device: {device}")
 
     # Create dataset handler

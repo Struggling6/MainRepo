@@ -3,11 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-#TO-DO 
-    #Put config værdier ind i dette istedet
-    #Er outputtet korrekt?? Ser der en specifik form for output som modellen skal have
-    
-class CNNTransformer(nn.Module):
+class USCNNTransformer(nn.Module):
     def __init__(self, model_config: dict, data_metadata: dict):
         super().__init__()
 
