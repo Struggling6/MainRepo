@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch
 import pandas as pd
 from training.evaluate import evaluate_model
-from training.train import train_one_epoch
+#from training.train import train_one_epoch
 
 
 class AnomalyDetectionTask:
@@ -12,11 +12,6 @@ class AnomalyDetectionTask:
     
     def __init__(self):
         self.name = "anomaly_detection"
-    
-    #def compute_loss(self, model, train_loader, eval_loader, optimizer, device):
-        #train_loss = train_one_epoch(model, train_loader, optimizer, device)
-        #eval_loss = evaluate(model, eval_loader, device)
-        #return train_loss, eval_loss
 
     def compute_loss(self, model, batch, device):
         """Compute reconstruction error loss for a batch."""
@@ -32,10 +27,21 @@ class AnomalyDetectionTask:
         return loss, x_hat, x_batch
 
     def compute_metrics(self, outputs, targets):
-        """Compute metrics for anomaly detection."""
-        # For autoencoder, we don't have accuracy in traditional sense
-        # Return empty metrics for now
-        return {"correct": 0}
+        # Beregn reconstruction error per sample
+        reconstruction_errors = ((outputs - targets) ** 2).mean(dim=(1, 2))
+        
+        # Brug samme threshold som detect_anomalies
+        threshold = reconstruction_errors.mean() + 3.0 * reconstruction_errors.std()
+        anomalies = reconstruction_errors > threshold
+        
+        # Antal anomalies = "correct"
+        num_anomalies = anomalies.sum().item()
+        total_samples = len(reconstruction_errors)
+        
+        return {
+            "correct": num_anomalies,
+            "total": total_samples,
+        }
     
     def get_anomaly_scores(self, model, dataloader, device):
         """Get anomaly scores for samples."""
@@ -64,8 +70,6 @@ class AnomalyDetectionTask:
         threshold = scores.mean() + threshold_std * scores.std()
         anomalies = scores > threshold
         anomaly_indices = torch.nonzero(anomalies, as_tuple=True)[0].tolist()
-        original_anomaly_indices = [train_size + idx for idx in anomaly_indices]
-        anomalous_rows = df.iloc[original_anomaly_indices]
 
         print(f"Number of anomalies detected: {anomalies.sum()}")
         print(f"Anomaly threshold: {threshold:.6f}")

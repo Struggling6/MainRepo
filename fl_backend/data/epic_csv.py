@@ -15,7 +15,7 @@ class EpicCSVHandler(BaseDatasetHandler):
         self.file_path = config["file_path"]
         self.clean_path = config["clean_path"]
         self.batch_size = config.get("batch_size", 32)
-        self.num_clients = config.get("num_clients", 1)
+        self.num_clients = config.get("num_clients", 10)
         self.test_split = config.get("test_split", 0.2)
         self.noise_level = config.get("noise_level", 0.7)
         self.normalize = config.get("normalize", True)
