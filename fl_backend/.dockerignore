@@ -1,0 +1,15 @@
+.venv
+__pycache__
+*.pyc
+.git
+.gitignore
+notebooks
+logs
+outputs
+checkpoints
+tests
+*.parquet
+*.pt
+*.pth
+*.csv
+*.json
