@@ -16,6 +16,7 @@ class PowerGridCSVHandler(BaseDatasetHandler):
         self.normalize = config.get("normalize", True)
         self.seed = config.get("seed", 42)
         self.label_column = config.get("label_column", "marker")
+     
 
         self.df = pd.read_csv(self.file_path)
 
