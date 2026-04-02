@@ -54,17 +54,16 @@ def main():
 
 
     # Detect anomalies
-    '''
-    print("\n--- Anomaly Detection ---")
-    anomalies, scores, threshold = task.detect_anomalies(
-        model=model,
-        eval_loader=testloader,
-        df=dataset_handler.df,
-        train_size=len(trainloader.dataset),
-        device=device,
-        threshold_std=1.0
-    )
-    '''
+    if(task.name =="anomaly_detection" ):
+        print("\n--- Anomaly Detection ---")
+        task.detect_anomalies(
+            model=model,
+            eval_loader=testloader,
+            df=dataset_handler.df,
+            train_size=len(trainloader.dataset),
+            device=device,
+            threshold_std=1.0
+        )
 
 if __name__ == "__main__":
     main()

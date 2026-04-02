@@ -27,8 +27,8 @@ CONFIG = {
     },
 
     "training": {
-        "learning_rate": 1e-4,
-        "local_epochs": 5,
+        "learning_rate": 0.0001,
+        "local_epochs": 30,
     },
 
     "federation": {
