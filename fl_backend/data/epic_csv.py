@@ -103,7 +103,6 @@ class EpicCSVHandler(BaseDatasetHandler):
         # Dataloaders
         train_loader = self.make_autoencoder_dataloader(X_train, batch_size=32)
         test_loader = self.make_autoencoder_dataloader(X_test, batch_size=32)
-        
         return train_loader, test_loader
 
     def get_num_partitions(self) -> int:
