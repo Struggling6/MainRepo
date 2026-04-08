@@ -3,16 +3,12 @@
 # from .cnn.py import CNNModel
 #from .transformer.py import TransformerModel
 from .mlp import MLPModel
-from .unsupCnnTrans import USCNNTransformer
-#from .supervised_cnn_transformer import SupervisedTansformerCNN
 
 
 MODEL_REGISTRY = {
     #"cnn": CNNModel,
     #"transformer": TransformerModel,
     "mlp": MLPModel,
-    "unsupcnntrans": USCNNTransformer,
-    #"supervisedcnntransformer": SupervisedTansformerCNN,
 }
 
 def create_model(model_config: dict, data_metadata: dict):
