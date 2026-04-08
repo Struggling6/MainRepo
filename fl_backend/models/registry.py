@@ -4,7 +4,7 @@
 #from .transformer.py import TransformerModel
 from .mlp import MLPModel
 from .unsupCnnTrans import USCNNTransformer
-from .supervised_cnn_transformer import SupervisedTansformerCNN
+#from .supervised_cnn_transformer import SupervisedTansformerCNN
 
 
 MODEL_REGISTRY = {
@@ -12,7 +12,7 @@ MODEL_REGISTRY = {
     #"transformer": TransformerModel,
     "mlp": MLPModel,
     "unsupcnntrans": USCNNTransformer,
-    "supervisedcnntransformer": SupervisedTansformerCNN,
+    #"supervisedcnntransformer": SupervisedTansformerCNN,
 }
 
 def create_model(model_config: dict, data_metadata: dict):
