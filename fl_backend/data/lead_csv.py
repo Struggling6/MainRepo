@@ -222,7 +222,7 @@ class LeadCSVHandler(BaseDatasetHandler):
 
         dataset = TensorDataset(x_tensor, y_tensor)
 
-        test_size = 
+        test_size = 0.2
         train_size = len(dataset) - test_size
 
         generator = torch.Generator().manual_seed(self.seed)

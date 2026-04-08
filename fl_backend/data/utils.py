@@ -1,3 +1,5 @@
+import pandas as pd
+
 import numpy as np
 
 def create_windowed_data(df, feature_cols, window_size, stride, target):
@@ -17,11 +19,11 @@ def create_windowed_data(df, feature_cols, window_size, stride, target):
     return np.array(X_windows), np.array(y_windows)
 
 def temporal_grouped_split(
-    df,
-    feature_cols,
-    window_size,
-    stride,
-    node_col,
+    df: pd.DataFrame,
+    feature_cols: list,
+    window_size: int,
+    stride: int,
+    node_col: str,
     time_col="timestamp",
     train_ratio=0.8,
     gap_hours = 0, # In case of no lag features, set gap_hours=0.
@@ -47,6 +49,7 @@ def temporal_grouped_split(
     nid_train        : node_id for each training window (useful for analysis)
     nid_test         : node_id for each test window
     """
+
     df = df.sort_values([node_col, time_col])
 
     # Single global cutoff — the timestamp at the train_ratio position
