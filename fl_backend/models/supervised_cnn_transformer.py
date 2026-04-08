@@ -1,3 +1,4 @@
+'''
 # Machine learning libraries
 import torch
 import torch.nn as nn #neural network module
@@ -30,3 +31,4 @@ class SupervisedTansformerCNN(BaseModel):
         x = self.classifier(x)                                 # (batch, num_classes)
 
         return x.squeeze(-1)
+        '''
