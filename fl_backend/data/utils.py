@@ -8,7 +8,7 @@ def create_windowed_data(df, feature_cols, window_size, stride, target):
     data   = df[feature_cols].values   # shape: (n_rows, n_features)
     labels = df[target].values         # shape: (n_rows,)
 
-    # range(start, stop, step):
+    # range(start, stop, step):P
     #   start = 0               → begin at first row
     #   stop  = len-window_size → last valid start so window doesn't fall off the end
     #   step  = stride          → how far to shift each iteration
@@ -67,7 +67,7 @@ def temporal_grouped_split(
 
         # Split at cutoff, with a gap after cutoff to avoid lag leakage
         train_df = group[group[time_col] <= cutoff]
-        test_df  = group[group[time_col] >  cutoff + pd.Timedelta(hours=gap_hours)] # use pandas' Timedelta class to add hours to a timestamp
+        test_df  = group[group[time_col] >  pd.Timestamp(cutoff) + pd.Timedelta(hours=gap_hours)] # use pandas' Timedelta class to add hours to a timestamp
 
         # Only proceed if the split has enough rows for at least one full window
         if len(train_df) > window_size:

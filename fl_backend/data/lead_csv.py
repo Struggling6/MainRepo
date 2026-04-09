@@ -4,29 +4,21 @@ import pandas as pd
 from data.base import BaseDatasetHandler
 from data.utils import temporal_grouped_split
 
-# Machine learning libraries
-import torch
-from torch.utils.data import TensorDataset, DataLoader #Dataset is an abstract class representing a dataset, and DataLoader is a utility that provides an iterable over the given dataset.
-
 class LeadCSVHandler(BaseDatasetHandler):
     def __init__(self, config):    # config: LeadCSVConfig
-        super().__init__(config)
 
         super().__init__(config)
         self.file_path    = config.file_path
-        self.label_column = config.label_column
+        self.target       = config.target
         self.batch_size   = config.batch_size
-        self.num_clients  = config.num_clients
         self.test_split   = config.test_split
+        self.num_clients  = config.num_clients
         self.seed         = config.seed
+        self.feature_cols = None  # will be set after loading data  
 
-        self.df = pd.read_csv(self.file_path)
+        self.df = self._prepare_data()
 
-        if self.label_column not in self.df.columns:
-            raise ValueError(
-                f"CSV file must contain '{self.label_column}' as the target label column."
-            )
-        self.features, self.labels = self._prepare_data()  # called once ← bug fix
+        self.features = []
         self._prepare_partitions()
 
     def _prepare_data(self):
@@ -68,7 +60,7 @@ class LeadCSVHandler(BaseDatasetHandler):
     #  Features                                                            #
     # ------------------------------------------------------------------ #
 
-        features = [
+        self.features = [
             "meter_reading",
             "site_id",
             "square_feet",
@@ -154,27 +146,26 @@ class LeadCSVHandler(BaseDatasetHandler):
             if col.startswith("primary_use_"):
                 primary_use_cols.append(col)
 
-        feature_cols = features + primary_use_cols
+        self.feature_cols = self.features + primary_use_cols
 
-        X = df[feature_cols] # the features (input variables) for the model
-        y = df["anomaly"] # the target variable (what we want to predict)
 
-        return X, y
+        return df
         
     # ------------------------------------------------------------------ #
     #  Run The Split                                                       #
     # ------------------------------------------------------------------ #
 
-    def run_split(self, feature_cols):
+        
+    def run_split(self):
         return temporal_grouped_split(
             self.df,
-            feature_cols=feature_cols,
+            feature_cols=self.feature_cols,
             node_col="building_id",
             time_col="timestamp",       
-            train_ratio=0.8,
-            gap_hours=73,               # matches longest lag feature (lag73)
-            window_size=168,            # 1 week of hourly data
-            stride=24,                  # one window per day
+            train_ratio=1.0 - self.test_split,  # e.g. 0.8 means 80% train, 20% test
+            gap_hours=73,                       # matches longest lag feature (lag73)
+            window_size=168,                    # 1 week of hourly data
+            stride=24,                          # one window per day
             target="anomaly",
         )        
     

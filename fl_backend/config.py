@@ -44,8 +44,8 @@ class LeadCSVConfig:
     file_path:    Path = Path("datasets/LEAD/train_features.csv")
     target:       str  = "anomaly"
     batch_size:   int  = 64
-    num_clients:  int  = 1
     test_split:   float = 0.2
+    num_clients:  int  = 1
     seed:         int  = 42
 
 @dataclass
