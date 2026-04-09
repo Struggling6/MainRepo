@@ -22,7 +22,7 @@ def get_device():
     
     return device
 
-print(torch.cuda.is_available())
+print("GPU available:", torch.cuda.is_available())
 
 def get_model_parameters(model):
     return [val.cpu().numpy() for _, val in model.state_dict().items()]

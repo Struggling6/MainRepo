@@ -1,4 +1,6 @@
 import optuna
+import os
+os.environ["TORCH_BLAS_PREFER_HIPBLASLT"] = "0" # Silence ROCm warning
 import torch
 import torch.nn as nn
 from models.supervised_cnn_transformer import SupervisedTansformerCNN
@@ -10,6 +12,9 @@ class OptunaOptimizer(AnomalyTrainerBase):
     epoch logic from AnomalyTrainerBase. Builds a fresh model and
     Trainer for each trial.
     """
+        
+    # Silence Optuna's default one-line trial logger
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
 
     def __init__(
         self,
@@ -43,7 +48,12 @@ class OptunaOptimizer(AnomalyTrainerBase):
             direction="maximize",
             pruner=optuna.pruners.MedianPruner(n_warmup_steps=5)
         )
-        study.optimize(self._objective, n_trials=self.n_trials)
+        study.optimize(
+            self._objective, 
+            n_trials=self.n_trials, 
+            callbacks=[self._pretty_trial_callback],
+            show_progress_bar=True
+        )
         self._print_results(study)
         return study
 
@@ -52,6 +62,7 @@ class OptunaOptimizer(AnomalyTrainerBase):
     # ------------------------------------------------------------------ #
 
     def _objective(self, trial):
+        print(f"\n▶ Trial {trial.number + 1}/{self.n_trials} starting...")
         # Sample hyperparameters for this trial
         d_model        = trial.suggest_categorical("d_model",        [32, 64, 128])
         nhead          = trial.suggest_categorical("nhead",          [2, 4])
@@ -114,3 +125,22 @@ class OptunaOptimizer(AnomalyTrainerBase):
         print("  Params:")
         for k, v in study.best_trial.params.items():
             print(f"    {k}: {v}")
+
+
+
+    def _pretty_trial_callback(self,study: optuna.Study, trial: optuna.trial.FrozenTrial):
+        """Print each finished trial in a readable multi-line block."""
+        is_best = study.best_trial.number == trial.number
+        marker  = "★ NEW BEST" if is_best else ""
+        duration = trial.duration.total_seconds() if trial.duration else 0.0
+
+        print(f"\n── Trial {trial.number:>3}  {marker}")
+        print(f"   value    : {trial.value:.6f}")
+        print(f"   duration : {duration:6.1f}s")
+        print(f"   params   :")
+        for k, v in trial.params.items():
+            if isinstance(v, float):
+                print(f"     {k:<16} = {v:.6g}")
+            else:
+                print(f"     {k:<16} = {v}")
+        print("─" * 40 + "\n")

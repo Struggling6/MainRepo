@@ -160,3 +160,56 @@ class MyDatasetHandler(BaseDatasetHandler):
         return self.num_clients
 
 ```
+## `training.optimize` — Optuna Hyperparameter Optimization
+
+This script runs [Optuna](https://optuna.org/) hyperparameter search over a model, then updates the global `CONFIG` object with the best trial's parameters so downstream training uses them automatically.
+
+### How it works
+
+1. **Parses CLI flags** for epochs, trials, and patience (see below).
+2. **Loads the dataset** via `LeadCSVHandler(CONFIG.data)` and splits it into train/validation tensors using `run_split()`. The split is temporal and grouped by `node_id`, so no node leaks between train and val. (node refers to building, sensor, device, etc.)
+3. **Instantiates `OptunaOptimizer`** with the training/validation tensors and the chosen trial budget.
+4. **Runs the study.** Each Optuna trial samples a hyperparameter combination (model width, number of heads, layers, dropout, learning rate, weight decay, batch size, pos-weight cap) and trains a fresh model for up to `--epochs` number of epochs with early stopping controlled by `--patience`.
+5. **Writes the best trial's parameters back into `CONFIG`** — specifically `CONFIG.model`, `CONFIG.training`, and `CONFIG.data.batch_size` — and prints the updated config to stdout.
+
+### Prerequisites
+
+- You must run the script **from the `fl_backend/` directory**. The imports (`data.lead_csv`, `models.supervised_cnn_transformer`, `config`) resolve relative to that folder.
+- The virtual environment must be activated and all dependencies installed (PyTorch, Optuna, pandas, numpy, etc.).
+- `CONFIG.data.file_path` must as of now point to LEAD CSV file.
+
+### Running
+
+Because `training` is a Python package (a module with an `__init__.py`), run the script with `-m` so relative imports inside `training/` resolve correctly:
+
+```bash
+cd fl_backend
+python -m training.optimize
+```
+
+### Command-line arguments
+
+All three flags are optional. If omitted, the defaults shown below are used.
+
+| Flag              | Short | Type | Default | Description                                                                 |
+|-------------------|-------|------|---------|-----------------------------------------------------------------------------|
+| `--epochs`        | `-e`  | int  | `10`    | Maximum number of training epochs per Optuna trial.                          |
+| `--trials`        | `-t`  | int  | `50`    | Number of Optuna trials to run in the study.                                 |
+| `--patience`      | `-p`  | int  | `10`    | Early-stopping patience (epochs without val improvement before a trial stops). |
+
+Run `python -m training.optimize --help` to see this same information at the command line.
+
+## Hyperparameters searched
+
+The `OptunaOptimizer` samples and returns values for the following keys in `study.best_trial.params`:
+
+- `d_model` — transformer model dimension
+- `nhead` — number of attention heads
+- `num_layers` — number of transformer encoder layers
+- `dropout` — dropout rate
+- `pos_weight_cap` — cap on the positive-class weight in the loss
+- `lr` — learning rate
+- `weight_decay` — AdamW weight decay
+- `batch_size` — training batch size
+
+See `training/training_utils/OptunaOptimizer.py` for the exact search spaces.
