@@ -8,13 +8,14 @@ from models.utils import get_model_parameters, set_model_parameters
 from tasks.registry import create_task
 from training.train import train_model
 from training.evaluate import evaluate_model
+from models.utils import get_device
 
 
 class FlowerClient(NumPyClient):
     def __init__(self, partition_id: int):
         self.config = CONFIG
         self.partition_id = partition_id
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = get_device()
 
         self.dataset_handler = create_dataset_handler(self.config.data)
         self.data_metadata = self.dataset_handler.get_metadata()
