@@ -2,7 +2,8 @@ import optuna
 import torch
 import torch.nn as nn
 from models.supervised_cnn_transformer import SupervisedTansformerCNN
-from training.AnormalyTrainerBase import AnomalyTrainerBase
+from training.training_utils.AnomalyTrainerBase import AnomalyTrainerBase
+
 class OptunaOptimizer(AnomalyTrainerBase):
     """
     Runs an Optuna hyperparameter search using the shared train/val
@@ -18,8 +19,8 @@ class OptunaOptimizer(AnomalyTrainerBase):
         model = SupervisedTansformerCNN,
         loss_fn=None,
         n_trials=50,
-        epochs=30,
-        patience=7,
+        epochs=10,
+        patience=10,
     ):
         super().__init__(epochs, patience, num_classes=1)
         self.X_train     = X_train
@@ -28,9 +29,9 @@ class OptunaOptimizer(AnomalyTrainerBase):
         self.y_val       = y_val
         self.in_channels = in_channels
         self.n_trials    = n_trials
-        self.raw_pw      = self._compute_pos_weight(y_train)  # computed once, reused every trial
         self.loss_fn     = loss_fn
         self.model       = model
+        self.raw_pw      = self._compute_pos_weight(y_train)  # computed once, reused every trial
 
     # ------------------------------------------------------------------ #
     #  Public API                                                          #
@@ -61,14 +62,12 @@ class OptunaOptimizer(AnomalyTrainerBase):
         batch_size     = trial.suggest_categorical("batch_size",     [32, 64, 128])
         pos_weight_cap = trial.suggest_float(      "pos_weight_cap", 5.0, 20.0)
 
-        # Build loss, model, and dataloaders for this trial
-        loss_fn  = self._build_loss(pos_weight_cap)
-        model    = self._build_model(d_model, nhead, num_layers, dropout)
-        train_dl = self._build_dataloader(self.X_train, self.y_train, batch_size, shuffle=True)
-        val_dl   = self._build_dataloader(self.X_val,   self.y_val,   batch_size, shuffle=False)
+        loss_fn   = self._build_loss(pos_weight_cap)
+        model     = self._build_model(d_model, nhead, num_layers, dropout)
+        train_dl  = self._build_dataloader(self.X_train, self.y_train, batch_size, shuffle=True)
+        val_dl    = self._build_dataloader(self.X_val,   self.y_val,   batch_size, shuffle=False)
         optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
 
-        # Run training loop for this trial
         best_f1, no_improve = 0.0, 0
 
         for epoch in range(1, self.epochs + 1):
@@ -88,23 +87,22 @@ class OptunaOptimizer(AnomalyTrainerBase):
                 if no_improve >= self.patience:
                     break
 
-        return best_f1
+        return float(best_f1)  # explicit cast to Python float for Optuna
 
     def _build_loss(self, pos_weight_cap):
-        if (self.loss_fn == None):
-
+        if (self.loss_fn is None):
             pw = min(self.raw_pw, pos_weight_cap)
             return nn.BCEWithLogitsLoss(
                 pos_weight=torch.tensor([pw], device=self.device)
             )
-        else:
-            return self.loss_fn
+        
+        return self.loss_fn
 
-    def _build_model(self, d_model, nhead, num_layers, dropout):
+    def _build_model(self, d_model, num_heads, num_layers, dropout):
         return self.model(
             in_channels=self.in_channels,
             d_model=d_model,
-            nhead=nhead,
+            num_heads=num_heads,
             num_layers=num_layers,
             num_classes=1,
             dropout=dropout,

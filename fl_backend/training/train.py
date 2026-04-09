@@ -1,37 +1,63 @@
 import torch
+import torch.nn as nn
+from training.training_utils.Trainer import Trainer
 
-def train_model(model, trainloader, task, training_config: dict ,  device):
-    model.to(device)
-    model.train()
 
-    epochs = training_config.get("local_epochs", 10)
-    lr = training_config.get("learning_rate", 0.001)
+def train_model(model, trainloader, task, training_config, device):
+    """
+    Entry point for Flower's client training loop.
+    Delegates to Trainer for the actual training logic.
+    """
+    pos_weight = Trainer._compute_pos_weight(
+        None,  # static-style call — no instance needed
+        y_train=_extract_labels(trainloader),
+        cap=getattr(training_config, "pos_weight_cap", 10.0),
+    )
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    loss_fn = nn.BCEWithLogitsLoss(
+        pos_weight=torch.tensor([pos_weight], device=device)
+    )
 
-    total_loss = 0.0
-    total_correct = 0
-    total_examples = 0
-    
+    trainer = Trainer(
+        model=model,
+        loss_fn=loss_fn,
+        lr=training_config.learning_rate,
+        weight_decay=training_config.weight_decay,
+        batch_size=trainloader.batch_size,
+        epochs=training_config.local_epochs,
+        patience=training_config.patience,
+        num_classes=1,
+    )
 
-    for _ in range (epochs):
-        for batch in trainloader:
-            optimizer.zero_grad()
+    # Flower passes pre-built dataloaders — extract arrays for Trainer
+    X_train, y_train = _dataloader_to_arrays(trainloader)
+    X_val,   y_val   = _dataloader_to_arrays(trainloader)  # use same for now — Flower handles eval separately
 
-            loss, outputs, targets = task.compute_loss(model, batch, device)
-            loss.backward()
-            optimizer.step()
+    trained_model = trainer.train(X_train, y_train, X_val, y_val)
 
-            metrics = task.compute_metrics(outputs, targets)
-
-            batch_size = targets.size(0)
-            total_loss += loss.item() * batch_size
-            total_correct += metrics["correct"]
-            total_examples += batch_size
-
+    total_examples = len(trainloader.dataset)
 
     return {
-        "loss": total_loss / total_examples,
-        "accuracy": total_correct / total_examples,
+        "loss":         trainer.history[-1]["train_loss"],
+        "val_f1":       trainer.history[-1]["val_f1"],
         "num_examples": total_examples,
     }
+
+
+def _dataloader_to_arrays(loader):
+    """Extract all features and labels from a DataLoader into numpy arrays."""
+    import numpy as np
+    all_x, all_y = [], []
+    for x, y in loader:
+        all_x.append(x.numpy())
+        all_y.append(y.numpy())
+    return np.concatenate(all_x), np.concatenate(all_y)
+
+
+def _extract_labels(loader):
+    """Extract only labels from a DataLoader for pos_weight computation."""
+    import numpy as np
+    all_y = []
+    for _, y in loader:
+        all_y.append(y.numpy())
+    return np.concatenate(all_y)
