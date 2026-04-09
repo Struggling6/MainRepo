@@ -1,35 +1,24 @@
 # Data manipulation and visualization libraries
-import math
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from pathlib import Path
 from data.base import BaseDatasetHandler
 from data.utils import temporal_grouped_split
 
 # Machine learning libraries
 import torch
-import torch.nn as nn #neural network module
-import torch.nn.functional as F #functional module contains functions that don't have parameters, like activation functions and loss functions
 from torch.utils.data import TensorDataset, DataLoader #Dataset is an abstract class representing a dataset, and DataLoader is a utility that provides an iterable over the given dataset.
-from transformers import AutoConfig, AutoModel # AutoConfig is used to load the configuration of a pre-trained model, and AutoModel is used to load the pre-trained model itself.
-from sklearn.model_selection import train_test_split #train_test_split is a function from scikit-learn that splits arrays or matrices into random train and test subsets.
-from sklearn.preprocessing import StandardScaler # StandsardScaler is a class from scikit-learn that standardizes features by removing the mean and scaling to unit variance.
-from sklearn.model_selection import TimeSeriesSplit # TimeSeriesSplit is a class from scikit-learn that provides train/test indices to split time series data samples that are observed at fixed time intervals.
-from sklearn.preprocessing import LabelEncoder # LabelEncoder is a class from scikit-learn that encodes target labels with value between 0 and n_classes-1, where n is the number of distinct labels.
-from sklearn.metrics import f1_score, classification_report
 
 class LeadCSVHandler(BaseDatasetHandler):
-    def __init__(self, config: dict):
+    def __init__(self, config):    # config: LeadCSVConfig
         super().__init__(config)
 
-        self.file_path = config["file_path"]
-        self.batch_size = config.get("batch_size")
-        self.num_clients = config.get("num_clients")
-        self.test_split = config.get("test_split")
-        self.normalize = config.get("normalize")
-        self.seed = config.get("seed", 42)
-        self.label_column = config.get("label_column", "marker")
+        super().__init__(config)
+        self.file_path    = config.file_path
+        self.label_column = config.label_column
+        self.batch_size   = config.batch_size
+        self.num_clients  = config.num_clients
+        self.test_split   = config.test_split
+        self.seed         = config.seed
 
         self.df = pd.read_csv(self.file_path)
 
@@ -37,10 +26,8 @@ class LeadCSVHandler(BaseDatasetHandler):
             raise ValueError(
                 f"CSV file must contain '{self.label_column}' as the target label column."
             )
-        self._prepare_data()
+        self.features, self.labels = self._prepare_data()  # called once ← bug fix
         self._prepare_partitions()
-        self.features, self.labels = self._prepare_data()
-        self.client_indices = np.array_split(indices, self.num_clients)
 
     def _prepare_data(self):
 
@@ -209,34 +196,6 @@ class LeadCSVHandler(BaseDatasetHandler):
     def get_dataloaders(self, partition_id):
         if partition_id < 0 or partition_id >= self.num_clients:
             raise ValueError(f"Invalid partition_id: {partition_id}")
-
-        idx = self.client_indices[partition_id]
-
-        features, labels = self.run_split(feature_cols=self.features.columns.tolist())
-
-        x_client = features[idx]
-        y_client = labels[idx]
-
-        x_tensor = torch.tensor(x_client, dtype=torch.float32)
-        y_tensor = torch.tensor(y_client, dtype=torch.long)
-
-        dataset = TensorDataset(x_tensor, y_tensor)
-
-        test_size = 0.2
-        train_size = len(dataset) - test_size
-
-        generator = torch.Generator().manual_seed(self.seed)
-
-        train_dataset, test_dataset = random_split(
-            dataset,
-            [train_size, test_size],
-            generator=generator,
-        )
-
-        trainloader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
-        testloader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False)
-
-        return trainloader, testloader
 
 
     def get_num_partitions(self) -> int:

@@ -16,11 +16,11 @@ class FlowerClient(NumPyClient):
         self.partition_id = partition_id
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-        self.dataset_handler = create_dataset_handler(self.config["data"])
+        self.dataset_handler = create_dataset_handler(self.config.data)
         self.data_metadata = self.dataset_handler.get_metadata()
 
-        self.model = create_model(self.config["model"], self.data_metadata)
-        self.task = create_task(self.config["task"])
+        self.model = create_model(self.config.model, self.data_metadata)
+        self.task = create_task(self.config.task)
 
         self.trainloader, self.testloader = self.dataset_handler.get_dataloaders(
             partition_id=self.partition_id
@@ -36,7 +36,7 @@ class FlowerClient(NumPyClient):
             model=self.model,
             trainloader=self.trainloader,
             task=self.task,
-            training_config=self.config["training"],
+            training_config=self.config.training,
             device=self.device,
         )
 

@@ -4,11 +4,11 @@ from abc import ABC, abstractmethod
 # so each Data handler has these methods implemented, 
 # and the rest of the code can call these methods without worrying about the implementation details of each data handler
 class BaseDatasetHandler(ABC):
-    def __init__(self, config:dict):
+    def __init__(self, config):
         self.config = config
 
     @abstractmethod
-    def get_dataloaders(self, partion_id:int):
+    def get_dataloaders(self, partion_id: int):
         pass
 
     @abstractmethod
