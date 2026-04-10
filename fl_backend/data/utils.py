@@ -59,8 +59,8 @@ def temporal_grouped_split(
     cutoff    = all_times.iloc[int(len(all_times) * train_ratio)]
 
     X_train_list, y_train_list = [], []
-    X_test_list,  y_test_list  = [], []
-    nid_train, nid_test        = [], []
+    X_val_list,  y_val_list  = [], []
+    nid_train, nid_val        = [], []
 
     for node, group in df.groupby(node_col):
         group = group.sort_values(time_col)
@@ -78,17 +78,17 @@ def temporal_grouped_split(
 
         if len(test_df) > window_size:
             Xte, yte = create_windowed_data(test_df, feature_cols, window_size, stride, target)
-            X_test_list.append(Xte)
-            y_test_list.append(yte)
-            nid_test.extend([node] * len(Xte))
+            X_val_list.append(Xte)
+            y_val_list.append(yte)
+            nid_val.extend([node] * len(Xte))
     
     # Concatenate all windows from all buildings into single arrays for train and test sets.
     X_train = np.concatenate(X_train_list, axis=0)
     y_train = np.concatenate(y_train_list, axis=0)
-    X_test  = np.concatenate(X_test_list,  axis=0)
-    y_test  = np.concatenate(y_test_list,  axis=0)
+    X_val  = np.concatenate(X_val_list,  axis=0)
+    y_val  = np.concatenate(y_val_list,  axis=0)
 
-    return X_train, y_train, X_test, y_test, np.array(nid_train), np.array(nid_test)
+    return X_train, y_train, X_val, y_val, np.array(nid_train), np.array(nid_val)
 
 def estimate_split_mem_usage(df, feature_cols):
     total_rows = len(df)
