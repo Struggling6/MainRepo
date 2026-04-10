@@ -152,7 +152,7 @@ class LeadCSVHandler(BaseDatasetHandler):
         return df
         
     # ------------------------------------------------------------------ #
-    #  Run The Split                                                       #
+    #  Helper functions                                                    #
     # ------------------------------------------------------------------ #
 
         
