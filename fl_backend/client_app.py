@@ -5,7 +5,6 @@ from config import CONFIG
 from data.registry import create_dataset_handler
 from models.registry import create_model
 from models.utils import get_model_parameters, set_model_parameters
-from tasks.registry import create_task
 from training.train import train_model
 from training.evaluate import evaluate_model
 from models.utils import get_device
@@ -13,15 +12,14 @@ from models.utils import get_device
 
 class FlowerClient(NumPyClient):
     def __init__(self, partition_id: int):
-        self.config = CONFIG
-        self.partition_id = partition_id
-        self.device = get_device()
-
+        self.config          = CONFIG
+        self.partition_id    = partition_id
+        self.device          = get_device()
         self.dataset_handler = create_dataset_handler(self.config.data)
-        self.data_metadata = self.dataset_handler.get_metadata()
+        self.data_metadata   = self.dataset_handler.get_metadata()
 
+        # Model created from config — architecture and loss both come from config
         self.model = create_model(self.config.model, self.data_metadata)
-        self.task = create_task(self.config.task)
 
         self.trainloader, self.testloader = self.dataset_handler.get_dataloaders(
             partition_id=self.partition_id
@@ -36,8 +34,8 @@ class FlowerClient(NumPyClient):
         results = train_model(
             model=self.model,
             trainloader=self.trainloader,
-            task=self.task,
-            training_config=self.config.training,
+            training_config=self.config.training,  # TrainingConfig
+            model_config=self.config.model,         # CNNTransformerConfig — contains loss_fn
             device=self.device,
         )
 
@@ -49,13 +47,10 @@ class FlowerClient(NumPyClient):
         results = evaluate_model(
             model=self.model,
             testloader=self.testloader,
-            task=self.task,
             device=self.device,
         )
 
-        return results["loss"], results["num_examples"], {
-            "accuracy": results["accuracy"]
-        }
+        return results["loss"], results["num_examples"], {"f1": results["f1"]}
 
 
 def client_fn(context):
