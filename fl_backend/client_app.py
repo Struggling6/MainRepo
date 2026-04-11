@@ -1,4 +1,5 @@
 import torch
+from copy import deepcopy
 from flwr.client import ClientApp, NumPyClient
 
 from config import CONFIG
@@ -11,10 +12,29 @@ from training.evaluate import evaluate_model
 
 
 class FlowerClient(NumPyClient):
-    def __init__(self, partition_id: int):
-        self.config = CONFIG
+    def __init__(
+        self,
+        partition_id: int,
+        facility_id: str | None = None,
+        data_path: str | None = None,
+    ):
+        self.config = deepcopy(CONFIG)
         self.partition_id = partition_id
+        self.facility_id = facility_id or f"client-{partition_id}"
+
+        if data_path is not None:
+            self.config["data"]["file_path"] = data_path
+            self.config["data"]["partition_mode"] = "local"
+
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+        print(
+            f"[Client Init] facility_id={self.facility_id}, "
+            f"partition_id={self.partition_id}, "
+            f"data_path={self.config['data']['file_path']}, "
+            f"partition_mode={self.config['data'].get('partition_mode', 'shared')}, "
+            f"device={self.device}"
+        )
 
         self.dataset_handler = create_dataset_handler(self.config["data"])
         self.data_metadata = self.dataset_handler.get_metadata()
@@ -58,8 +78,15 @@ class FlowerClient(NumPyClient):
 
 
 def client_fn(context):
-    partition_id = int(context.node_config["partition-id"])
-    return FlowerClient(partition_id=partition_id).to_client()
+    partition_id = int(context.node_config.get("partition-id", 0))
+    facility_id = context.node_config.get("facility-id", f"client-{partition_id}")
+    data_path = context.node_config.get("data-path")
+
+    return FlowerClient(
+        partition_id=partition_id,
+        facility_id=facility_id,
+        data_path=data_path,
+    ).to_client()
 
 
 app = ClientApp(client_fn=client_fn)

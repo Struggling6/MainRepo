@@ -16,7 +16,7 @@ class PowerGridCSVHandler(BaseDatasetHandler):
         self.normalize = config.get("normalize", True)
         self.seed = config.get("seed", 42)
         self.label_column = config.get("label_column", "marker")
-     
+        self.partition_mode = config.get("partition_mode", "shared")
 
         self.df = pd.read_csv(self.file_path)
 
@@ -48,10 +48,11 @@ class PowerGridCSVHandler(BaseDatasetHandler):
 
         self.features = np.nan_to_num(
             self.features,
-            nan = 0.0,
-            posinf = 0.0,
-            neginf = 0.0,
+            nan=0.0,
+            posinf=0.0,
+            neginf=0.0,
         )
+
         if self.normalize:
             mean = self.features.mean(axis=0)
             std = self.features.std(axis=0)
@@ -59,6 +60,17 @@ class PowerGridCSVHandler(BaseDatasetHandler):
             self.features = (self.features - mean) / std
 
     def _prepare_partitions(self):
+        if self.partition_mode == "local":
+            self.client_indices = [np.arange(len(self.features))]
+            self.num_clients = 1
+            return
+
+        if self.partition_mode != "shared":
+            raise ValueError(
+                f"Unsupported partition_mode: {self.partition_mode}. "
+                f"Expected 'shared' or 'local'."
+            )
+
         rng = np.random.default_rng(self.seed)
         indices = np.arange(len(self.features))
         rng.shuffle(indices)
@@ -76,7 +88,7 @@ class PowerGridCSVHandler(BaseDatasetHandler):
         }
 
     def get_dataloaders(self, partition_id: int):
-        if partition_id < 0 or partition_id >= self.num_clients:
+        if partition_id < 0 or partition_id >= len(self.client_indices):
             raise ValueError(f"Invalid partition_id: {partition_id}")
 
         idx = self.client_indices[partition_id]
@@ -92,6 +104,19 @@ class PowerGridCSVHandler(BaseDatasetHandler):
         test_size = int(len(dataset) * self.test_split)
         train_size = len(dataset) - test_size
 
+        if len(dataset) == 0:
+            raise ValueError("Dataset partition is empty.")
+
+        if train_size == 0:
+            raise ValueError(
+                "Train split is empty. Reduce test_split or provide more samples."
+            )
+
+        if test_size == 0:
+            raise ValueError(
+                "Test split is empty. Reduce test_split or provide more samples."
+            )
+
         generator = torch.Generator().manual_seed(self.seed)
 
         train_dataset, test_dataset = random_split(
@@ -106,4 +131,4 @@ class PowerGridCSVHandler(BaseDatasetHandler):
         return trainloader, testloader
 
     def get_num_partitions(self) -> int:
-        return self.num_clients
+        return len(self.client_indices)

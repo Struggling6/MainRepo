@@ -18,6 +18,7 @@ CONFIG = {
         "test_split": 0.2,
         "normalize": True,
         "seed": 42,
+        "partition_mode": "shared",
     },
 
     "training": {
