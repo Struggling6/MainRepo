@@ -10,18 +10,16 @@ MODEL_REGISTRY = {
     "supervised_cnn_transformer": SupervisedTransformerCNN,
 }
 
-def create_model(model_config, data_metadata: dict):
-    model_name = model_config.name.lower()  # .name not ["name"] — dataclass attribute
-
-    if model_name not in MODEL_REGISTRY:
-        raise ValueError(
-            f"Model '{model_name}' not found in registry. "
-            f"Available models: {list(MODEL_REGISTRY.keys())}"
-        )
-
-    model_cls = MODEL_REGISTRY[model_name]
+def create_model(model_config, data_metadata):
+    model_cls = MODEL_REGISTRY.get(model_config.name)
+    if model_cls is None:
+        raise ValueError(f"Model '{model_config.name}' is not registered.")
 
     return model_cls(
-        model_config=model_config,
-        data_metadata=data_metadata,
+        in_channels=data_metadata["input_dim"],  # comes from dataset, not model config
+        d_model=model_config.d_model,
+        num_heads=model_config.num_heads,        # note: model uses num_heads not nhead
+        num_layers=model_config.num_layers,
+        num_classes=model_config.num_classes,
+        dropout=model_config.dropout,
     )

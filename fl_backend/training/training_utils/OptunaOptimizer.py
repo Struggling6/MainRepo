@@ -3,11 +3,12 @@ import os
 os.environ["TORCH_BLAS_PREFER_HIPBLASLT"] = "0" # Silence ROCm warning
 import torch
 import torch.nn as nn
-from models.supervised_cnn_transformer import SupervisedTansformerCNN
-from training.training_utils.AnomalyTrainerBase import AnomalyTrainerBase
+from models.supervised_cnn_transformer import SupervisedTransformerCNN
+from fl_backend.training.training_utils.TrainEvalBase import TrainEvalBase
+from training.training_utils.utils import compute_pos_weight
 from config import CONFIG
 
-class OptunaOptimizer(AnomalyTrainerBase):
+class OptunaOptimizer(TrainEvalBase):
     """
     Runs an Optuna hyperparameter search using the shared train/val
     epoch logic from AnomalyTrainerBase. Builds a fresh model and
@@ -35,7 +36,7 @@ class OptunaOptimizer(AnomalyTrainerBase):
         self.n_trials    = n_trials
         self.loss_fn     = config.model.loss_fn
         self.model       = config.model.name
-        self.raw_pw      = self._compute_pos_weight(y_train)  # computed once, reused every trial
+        self.raw_pw      = compute_pos_weight(y_train)  # computed once, reused every trial
 
     # ------------------------------------------------------------------ #
     #  Public API                                                          #

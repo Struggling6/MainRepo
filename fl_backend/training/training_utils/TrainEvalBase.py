@@ -4,7 +4,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from sklearn.metrics import f1_score, average_precision_score
 from models.utils import get_device
 
-class AnomalyTrainerBase:
+class TrainEvalBase:
     """
     Shared base class for Trainer and OptunaOptimizer.
     Holds common state and utility methods so neither subclass
@@ -13,8 +13,8 @@ class AnomalyTrainerBase:
 
     def __init__(
             self,
-            epochs:      int, 
-            patience:    int, 
+            epochs:      int = 1, 
+            patience:    int = 1, 
             num_classes: int = 1
             ):
         self.device      = get_device()
@@ -34,10 +34,6 @@ class AnomalyTrainerBase:
         )
         dataset = TensorDataset(feature_tensor, label_tensor)
         return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
-
-    def _compute_pos_weight(self, y_train, cap=None):
-        raw_pw = float((y_train == 0).sum() / (y_train == 1).sum())
-        return min(raw_pw, cap) if cap else raw_pw
 
     def _train_epoch(self, model, loader, optimizer, loss_fn):
         model.train()

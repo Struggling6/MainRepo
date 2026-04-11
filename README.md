@@ -26,7 +26,6 @@ This was done to be sure to have the correct version of the libraries and is app
 rebuild + start Docker Compose commands
 Run:
 docker compose down
-docker compose up --build -d
 What this does:
 - down = stops/removes old containers
 - up --build -d = rebuilds using our pyproject.toml and starts everything again

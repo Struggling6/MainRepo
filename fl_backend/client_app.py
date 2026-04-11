@@ -1,14 +1,14 @@
 import torch
 from flwr.client import ClientApp, NumPyClient
 
+
 from config import CONFIG
 from data.registry import create_dataset_handler
 from models.registry import create_model
 from models.utils import get_model_parameters, set_model_parameters
-from training.train import train_model
-from training.evaluate import evaluate_model
+from training.train import train_model, evaluate_model
 from models.utils import get_device
-
+from training.training_utils.Evaluator import Evaluator
 
 class FlowerClient(NumPyClient):
     def __init__(self, partition_id: int):
@@ -24,6 +24,7 @@ class FlowerClient(NumPyClient):
         self.trainloader, self.testloader = self.dataset_handler.get_dataloaders(
             partition_id=self.partition_id
         )
+        self.evaluator = Evaluator(model_config=self.config.model)
 
     def get_parameters(self, config):
         return get_model_parameters(self.model)
@@ -43,15 +44,12 @@ class FlowerClient(NumPyClient):
 
     def evaluate(self, parameters, config):
         set_model_parameters(self.model, parameters)
-
-        results = evaluate_model(
-            model=self.model,
-            testloader=self.testloader,
-            device=self.device,
-        )
-
-        return results["loss"], results["num_examples"], {"f1": results["f1"]}
-
+        results = self.evaluator.evaluate_round(self.model, self.testloader)
+        return results["loss"], results["num_examples"], {
+            "f1":        results["val_f1"],
+            "pr_auc":    results["pr_auc"],
+            "threshold": results["best_threshold"],
+        }
 
 def client_fn(context):
     partition_id = int(context.node_config["partition-id"])
