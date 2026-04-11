@@ -6,7 +6,7 @@ from .supervised_utils.featureExtractor import FeatureExtractor
 from .supervised_utils.Classifier import Classifier
 from .base import BaseModel
 
-class SupervisedTansformerCNN(BaseModel):
+class SupervisedTransformerCNN(BaseModel):
     def __init__(self, in_channels, d_model, num_heads, num_layers, num_classes=1, dropout=0.3):
         super().__init__()
         

@@ -1,8 +1,11 @@
 # Data manipulation and visualization libraries
 import numpy as np
 import pandas as pd
+import torch
+
 from data.base import BaseDatasetHandler
 from data.utils import temporal_grouped_split
+
 
 class LeadCSVHandler(BaseDatasetHandler):
     def __init__(self, config):    # config: LeadCSVConfig
@@ -14,11 +17,10 @@ class LeadCSVHandler(BaseDatasetHandler):
         self.test_split   = config.test_split
         self.num_clients  = config.num_clients
         self.seed         = config.seed
-        self.feature_cols = None  # will be set after loading data  
-
-        self.df = self._prepare_data()
-
         self.features = []
+        self.feature_cols = []
+        self.df = pd.read_csv(self.file_path)
+        self._prepare_data()
         self._prepare_partitions()
 
     def _prepare_data(self):
@@ -31,7 +33,7 @@ class LeadCSVHandler(BaseDatasetHandler):
         NODE_ID = "building_id"
         TIMESTAMP = "timestamp"
 
-        df = pd.read_csv(self.file_path)
+        df = self.df.copy()
 
         df[TIMESTAMP] = pd.to_datetime(df[TIMESTAMP])
         df = df.sort_values(by=[NODE_ID, TIMESTAMP])
@@ -141,6 +143,11 @@ class LeadCSVHandler(BaseDatasetHandler):
         df = pd.get_dummies(df, columns=["primary_use"], drop_first=True) # one-hot encoding
         df = df.dropna() # drop rows with NaN values
 
+        # pandas 2.x get_dummies returns bool columns; cast to float32 so the
+        # feature matrix stays a single numeric dtype when converted to numpy.
+        bool_cols = df.select_dtypes(include="bool").columns
+        df[bool_cols] = df[bool_cols].astype("float32")
+
         primary_use_cols = []
         for col in df.columns:
             if col.startswith("primary_use_"):
@@ -148,8 +155,12 @@ class LeadCSVHandler(BaseDatasetHandler):
 
         self.feature_cols = self.features + primary_use_cols
 
+        self.df = df
 
-        return df
+        X = df[self.feature_cols].values.astype(np.float32)  # DataFrame → NumPy array
+        y = df[self.target].values.astype(np.float32)    # Series → NumPy array
+
+        return X, y
         
     # ------------------------------------------------------------------ #
     #  Helper functions                                                    #
@@ -166,7 +177,7 @@ class LeadCSVHandler(BaseDatasetHandler):
             gap_hours=73,                       # matches longest lag feature (lag73)
             window_size=168,                    # 1 week of hourly data
             stride=24,                          # one window per day
-            target="anomaly",
+            target=self.target,
         )        
     
     def _prepare_partitions(self):
@@ -177,16 +188,36 @@ class LeadCSVHandler(BaseDatasetHandler):
         
     def get_metadata(self):
         return {
-            "input_dim": self.features.shape[1],
+            "input_dim"  : len(self.features),
             "num_classes": 1,
-            "num_samples": len(self.features),
-            "task_type": "binary_classification",
+            "num_samples": self.df.shape[0], 
+            "task_type"  : "binary_classification",
             "data_format": "tabular",
         }
 
-    def get_dataloaders(self, partition_id):
+    def get_dataloaders(self, partition_id: int):
         if partition_id < 0 or partition_id >= self.num_clients:
             raise ValueError(f"Invalid partition_id: {partition_id}")
+
+        X_train, y_train, X_val, y_val, _, _ = self.run_split()
+
+        train_dataset = torch.utils.data.TensorDataset(
+            torch.tensor(X_train, dtype=torch.float32),
+            torch.tensor(y_train, dtype=torch.float32),
+        )
+        val_dataset = torch.utils.data.TensorDataset(
+            torch.tensor(X_val, dtype=torch.float32),
+            torch.tensor(y_val, dtype=torch.float32),
+        )
+
+        trainloader = torch.utils.data.DataLoader(
+            train_dataset, batch_size=self.batch_size, shuffle=True
+        )
+        valloader = torch.utils.data.DataLoader(
+            val_dataset, batch_size=self.batch_size, shuffle=False
+        )
+
+        return trainloader, valloader
 
 
     def get_num_partitions(self) -> int:

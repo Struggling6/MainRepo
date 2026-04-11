@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from training.training_utils.AnomalyTrainerBase import AnomalyTrainerBase
+from fl_backend.training.training_utils.TrainEvalBase import TrainEvalBase
 
 
-class Trainer(AnomalyTrainerBase):
+class Trainer(TrainEvalBase):
     """
     Trains a single model with fixed hyperparameters.
     Inherits dataloader, train/val epoch logic from AnomalyTrainerBase.
