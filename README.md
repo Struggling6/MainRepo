@@ -159,7 +159,77 @@ class MyDatasetHandler(BaseDatasetHandler):
         return self.num_clients
 
 ```
-## `training.optimize` — Optuna Hyperparameter Optimization
+## Federated Learning with Flower
+
+This project uses Flower to implement a federated learning system with a custom client and server.
+
+### Overview
+
+The system follows the standard federated learning workflow:
+
+1. The server sends a global model to clients  
+2. Clients train the model on their local data partitions  
+3. Clients return updated model parameters  
+4. The server aggregates updates using FedAvg  
+5. The process repeats for multiple rounds  
+
+---
+
+### Client
+
+The client is implemented by extending `NumPyClient`.
+
+Each client:
+- Loads its assigned data partition  
+- Builds the model and task  
+- Trains locally on its data  
+- Evaluates the global model  
+
+#### Methods
+
+- `get_parameters`: Returns current model parameters  
+- `fit`: Trains the model locally and returns updated parameters and metrics  
+- `evaluate`: Evaluates the model on local test data  
+
+The `client_fn` function creates a client using a partition ID provided by Flower.
+
+---
+
+### Server
+
+The server defines the training strategy and number of rounds.
+
+#### Strategy
+
+FedAvg is used to aggregate client updates:
+
+- Model parameters from clients are averaged  
+- Each client’s contribution is weighted by its number of training examples  
+
+#### Configuration
+
+- `fraction_fit`: Fraction of clients used for training each round  
+- `fraction_evaluate`: Fraction of clients used for evaluation  
+- `min_*`: Minimum number of clients required  
+
+---
+
+### Data
+
+- The dataset is split into partitions  
+- Each client trains only on its own partition  
+- No raw data is shared between clients or server  
+
+---
+
+### What is Context?
+
+`context` is a Flower-provided object that contains runtime information about the current client or server.
+
+- In the client, it is used to determine which data partition to load  
+- In the server, it can be used for configuration if needed
+
+## Optuna Hyperparameter Optimization
 
 This script runs [Optuna](https://optuna.org/) hyperparameter search over a model, then updates the global `CONFIG` object with the best trial's parameters so downstream training uses them automatically.
 

@@ -1,3 +1,4 @@
+#Flower tools for building the server.
 from flwr.server import ServerApp, ServerConfig, ServerAppComponents
 from flwr.server.strategy import FedAvg
 from flwr.common import ndarrays_to_parameters, parameters_to_ndarrays
@@ -12,6 +13,7 @@ def server_fn(context):
     fed_config = CONFIG.federation
     num_clients = CONFIG.data.num_clients
 
+    #Creates the FL strategy. 
     strategy = FedAvg(
         fraction_fit=fed_config.fraction_fit,
         fraction_evaluate=fed_config.fraction_evaluate,
