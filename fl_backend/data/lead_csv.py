@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from data.base import BaseDatasetHandler
-from data.utils import temporal_grouped_split
+from fl_backend.data.time_series_utils import temporal_grouped_split
 
 # Machine learning libraries
 import torch

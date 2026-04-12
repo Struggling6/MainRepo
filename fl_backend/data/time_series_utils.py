@@ -1,12 +1,13 @@
 import pandas as pd
-
 import numpy as np
 
+#Creates sliding windows for a time series dataset.
 def create_windowed_data(df, feature_cols, window_size, stride, target):
 
+    #X = past observations in a window, y = the target value just after the window
     X_windows, y_windows = [], []
-    data   = df[feature_cols].values   # shape: (n_rows, n_features)
-    labels = df[target].values         # shape: (n_rows,)
+    data   = df[feature_cols].values   # input features for all rows, shape: (n_rows, n_features)
+    labels = df[target].values         # target labels for each row, shape: (n_rows,)
 
     # range(start, stop, step):
     #   start = 0               → begin at first row
@@ -34,7 +35,7 @@ def temporal_grouped_split(
     ----------
     df           : pre-processed DataFrame
     feature_cols : list of feature column names
-    node_col     : column name for node identifier
+    node_col     : column name for node identifier. column name for node identifier. A node is one separate time series in the dataset (for example, building A and building B).
     time_col     : column name for timestamp
     train_ratio  : fraction of time to use for training (e.g. 0.8 = 80%)
     gap_hours    : hours to skip between train end and test start
@@ -49,7 +50,7 @@ def temporal_grouped_split(
     nid_train        : node_id for each training window (useful for analysis)
     nid_test         : node_id for each test window
     """
-
+    #Ensures rows are ordered correctly within each node over time
     df = df.sort_values([node_col, time_col])
 
     # Single global cutoff — the timestamp at the train_ratio position
@@ -62,27 +63,28 @@ def temporal_grouped_split(
     X_test_list,  y_test_list  = [], []
     nid_train, nid_test        = [], []
 
+    #Process each node seperately so different time series are not mixed together
     for node, group in df.groupby(node_col):
         group = group.sort_values(time_col)
 
         # Split at cutoff, with a gap after cutoff to avoid lag leakage
-        train_df = group[group[time_col] <= cutoff]
-        test_df  = group[group[time_col] >  cutoff + pd.Timedelta(hours=gap_hours)] # use pandas' Timedelta class to add hours to a timestamp
+        train_df = group[group[time_col] <= cutoff] #Older data for training
+        test_df  = group[group[time_col] >  cutoff + pd.Timedelta(hours=gap_hours)] #Newer data for testing, after optinal gap
 
         # Only proceed if the split has enough rows for at least one full window
         if len(train_df) > window_size:
             Xtr, ytr = create_windowed_data(train_df, feature_cols, window_size, stride, target)
             X_train_list.append(Xtr)
             y_train_list.append(ytr)
-            nid_train.extend([node] * len(Xtr))
+            nid_train.extend([node] * len(Xtr)) #Store which node each window came from
 
         if len(test_df) > window_size:
             Xte, yte = create_windowed_data(test_df, feature_cols, window_size, stride, target)
             X_test_list.append(Xte)
             y_test_list.append(yte)
-            nid_test.extend([node] * len(Xte))
+            nid_test.extend([node] * len(Xte)) #Store which node each window came from
     
-    # Concatenate all windows from all buildings into single arrays for train and test sets.
+    #Combine windows from all nodes into one train set and one test set
     X_train = np.concatenate(X_train_list, axis=0)
     y_train = np.concatenate(y_train_list, axis=0)
     X_test  = np.concatenate(X_test_list,  axis=0)
@@ -90,6 +92,7 @@ def temporal_grouped_split(
 
     return X_train, y_train, X_test, y_test, np.array(nid_train), np.array(nid_test)
 
+## Rough memory estimate for windowed feature arrays
 def estimate_split_mem_usage(df, feature_cols):
     total_rows = len(df)
     approx_windows = total_rows / 24  # stride=24
