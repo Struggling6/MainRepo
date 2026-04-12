@@ -4,7 +4,7 @@ from Trainer import Trainer
 from utils import get_device
 import torch
 import torch.nn as nn
-from data.utils import temporal_grouped_split
+from fl_backend.data.time_series_utils import temporal_grouped_split
 
 # LEAD DATASET
 X_train, y_train, X_test, y_test, nid_train, nid_test = temporal_grouped_split(
