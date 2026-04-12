@@ -6,6 +6,7 @@ import torch.nn as nn
 from models.supervised_cnn_transformer import SupervisedTransformerCNN
 from training.training_utils.TrainEvalBase import TrainEvalBase
 from training.training_utils.utils import compute_pos_weight
+from models.utils import get_device
 from config import CONFIG
 
 class OptunaOptimizer(TrainEvalBase):
@@ -38,19 +39,6 @@ class OptunaOptimizer(TrainEvalBase):
         self.model       = self._resolve_model(config.model.name)
         self.raw_pw      = compute_pos_weight(y_train)  # computed once, reused every trial
 
-    def _resolve_model(self, model_name):
-        """Resolve a configured model identifier to a callable model class."""
-        if callable(model_name):
-            return model_name
-
-        model_registry = {
-            "SupervisedTransformerCNN": SupervisedTransformerCNN,
-        }
-
-        if model_name in model_registry:
-            return model_registry[model_name]
-
-        raise ValueError(f"Unsupported model name: {model_name}")
     # ------------------------------------------------------------------ #
     #  Public API                                                          #
     # ------------------------------------------------------------------ #
@@ -73,6 +61,20 @@ class OptunaOptimizer(TrainEvalBase):
     # ------------------------------------------------------------------ #
     #  Private helpers                                                     #
     # ------------------------------------------------------------------ #
+
+    def _resolve_model(self, model_name):
+        """Resolve a configured model identifier to a callable model class."""
+        if callable(model_name):
+            return model_name
+
+        model_registry = {
+            "SupervisedTransformerCNN": SupervisedTransformerCNN,
+        }
+
+        if model_name in model_registry:
+            return model_registry[model_name]
+
+        raise ValueError(f"Unsupported model name: {model_name}")
 
     def _objective(self, trial):
         print(f"\n▶ Trial {trial.number + 1}/{self.n_trials} starting...")
@@ -117,7 +119,7 @@ class OptunaOptimizer(TrainEvalBase):
     def _build_loss(self, pos_weight_cap):
         pw = min(self.raw_pw, pos_weight_cap)
         return self.config.model.loss_fn(
-            pos_weight=torch.tensor([pw], device=self.device)
+            pos_weight=torch.tensor([pw], device=get_device())
         )
 
     def _build_model(self, d_model, nhead, num_layers, dropout):
@@ -128,11 +130,11 @@ class OptunaOptimizer(TrainEvalBase):
             num_layers=num_layers,
             num_classes=1,
             dropout=dropout,
-        ).to(self.device)
+        ).to(get_device())
 
     def _print_results(self, study):
         print("\n=== Best Trial ===")
-        print(f"  F1:     {study.best_trial.value:.4f}")
+        print(f"  PR-AUC:     {study.best_trial.value:.4f}")
         print("  Params:")
         for k, v in study.best_trial.params.items():
             print(f"    {k}: {v}")
