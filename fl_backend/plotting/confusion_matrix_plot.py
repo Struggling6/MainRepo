@@ -1,25 +1,7 @@
-'''
-Ideen med dette plot er at vise et scatter plot.
-- Så vi plotter bare hvad 'marker' viser i sammenligning med hvad vores model predicter
-
-Input : En array med indexer af hvor det var korrekt(1) og hvor det var forkert (0) predictet
-ELLER 
-Input : En array af afstanden af hvor sikker modellen var på sin prediction ift hvad det rigtige marker var, så marker er vores regression linje? 
-
-x aksen = De rigtige værdier
-y aksen = Predictions
-
-Hver datapunkt  = En observation.
-- Så i vores MLP er det bare en række
-- Men hvis vi havde sliding windows, ville det så være ét view af det sliding window? 
-
-'''
-
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, precision_recall_curve
 import seaborn as sns
-
 
 def confusion_matrix_plot(y_true, y_pred):
 
@@ -42,7 +24,6 @@ def confusion_matrix_plot(y_true, y_pred):
     plt.ylabel("True")
     plt.title("Confusion Matrix")
 
-    #plt.show()
     plt.savefig("fl_backend/plotting/saved_plots/confusion_matrix.png")
     plt.close()
 
@@ -58,10 +39,11 @@ def confusion_matrix_plot(y_true, y_pred):
     print(accuracy)
 
 
-    #Kombination af precision OG recall, fordi hver for sig ser du kun de seperate eksempleer
-    #Men med kombinationen af begge, ser vi en mere præcis measurement af hvor mange predictions vi faktisk får korrekt.
-    #Så jo højere den er, jo bedere er modellen er til både at finde positives og undgå fejl
-
+    '''
+    - Kombination af precision OG recall, fordi hver for sig ser du kun de seperate eksempleer
+    - Men med kombinationen af begge, ser vi en mere præcis measurement af hvor mange predictions vi faktisk får korrekt.
+    - Så jo højere den er, jo bedere er modellen er til både at finde positives og undgå fejl
+    '''
     f1_score = 2 * (precision*recall)/(precision + recall)
 
     print("F1 score : ", f1_score)
@@ -97,4 +79,27 @@ How to interpret :
         - Vi kan SE at modellen er meget ubalanceret baseret på matricen
         - så derfor kan vi antage at det er datasettet der har for mange positives
         - så den er alt for god til at finde positives, men ikke gode til at finde negatives. 
+        - MEN siden vores model er til anomaly detection, er dette ikke nødvendigvis en dårlig ting.
+        - Ofte mener folk at, i dette scenarie, at false positives er bedere end false negatives
+        - Så hvis FN var meget høj, ville det være et STORT problem for os
 '''
+
+
+'''
+- Det her virker virker kun med probabilies, ikke 0/1 predictions
+- Men det skal vise trade-off mellem precision og recall
+- Det skal hjælpe dig med at adjust til threshhold til hvornår modellen predicter noget er en anomaly
+- Så HVIS :
+    - Recall er høj og precision er lav, skal threshholden være lavere
+    - Recall er lav og precision er høj, skal thredhold være højere
+    - Kurven skal så være meget høj, falde meget langsomt og dække et stort område
+'''
+def precision_recall_plot(y_true, y_pred):
+    precision, recall, thresholds = precision_recall_curve(y_true, y_pred)
+
+    plt.plot(recall, precision)
+    plt.xlabel("Recall")
+    plt.ylabel("Precision")
+    plt.title("Precision-Recall Curve")
+    plt.savefig("fl_backend/plotting/saved_plots/percision_recall_plot.png")
+    plt.close()
