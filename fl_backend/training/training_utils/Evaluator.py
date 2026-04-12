@@ -7,7 +7,7 @@ from sklearn.metrics import (
     confusion_matrix,
     roc_auc_score,
 )
-from fl_backend.training.training_utils.TrainEvalBase import TrainEvalBase
+from training.training_utils.TrainEvalBase import TrainEvalBase
 from training.training_utils.utils import compute_pos_weight
 from models.registry import create_model
 
@@ -25,7 +25,7 @@ class Evaluator(TrainEvalBase):
     def __init__(
         self,
         model_config,
-        num_classes: int = 1,
+        num_classes: int,
     ):
         # epochs and patience are irrelevant for evaluation
         # but required by AnomalyTrainerBase.__init__
@@ -119,11 +119,7 @@ class Evaluator(TrainEvalBase):
         built from self.model_config.
         """
 
-        data_metadata = {
-            "input_dim":   self.model_config.in_channels,
-            "num_classes": self.model_config.num_classes,
-        }
-        model = create_model(self.model_config, data_metadata)
+        model = create_model(self.model_config, self.input_dim)
 
         checkpoint = torch.load(path, map_location=self.device)
         model.load_state_dict(checkpoint["model_state_dict"])

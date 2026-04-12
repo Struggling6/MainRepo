@@ -1,15 +1,13 @@
-from flwr.server import ServerApp, ServerConfig, ServerAppComponents
 from flwr.server.strategy import FedAvg
-from flwr.common import ndarrays_to_parameters, parameters_to_ndarrays, FitRes, Parameters
+from flwr.common import parameters_to_ndarrays, FitRes, Parameters
 from flwr.server.client_proxy import ClientProxy
-import numpy as np
 import torch
 import torch.nn as nn
 from pathlib import Path
 from typing import Union, Optional
 from config import CONFIG
 from models.registry import create_model
-from models.utils import save_model, get_device
+from models.utils import get_device
 
 
 class FedAvgWithSave(FedAvg):
@@ -17,41 +15,6 @@ class FedAvgWithSave(FedAvg):
     FedAvg strategy that saves the aggregated model to disk
     after the final federation round completes.
     """
-
-    def save_model(
-    model:      nn.Module,
-    path:       Path,
-    config:     object = None,
-    threshold:  float  = 0.5,
-    metrics:    dict   = None,
-):
-        """
-        Save model weights, architecture config, best threshold,
-        and training metrics to a single checkpoint file.
-
-        Parameters
-        ----------
-        model     : nn.Module — the trained model
-        path      : Path      — where to save the checkpoint (.pt file)
-        config    : dataclass — model config (CNNTransformerConfig etc.)
-        threshold : float     — best decision threshold found during training
-        metrics   : dict      — final training metrics to store alongside weights
-        """
-    
-        if isinstance(path, Path):
-            path.parent.mkdir(parents=True, exist_ok=True)  # create checkpoints/ dir if it doesn't exist
-
-            checkpoint = {
-                "model_state_dict": model.state_dict(), # PyTorch convention for saving/loading weights
-                "model_config":     config,
-                "threshold":        threshold,
-                "metrics":          metrics or {},
-            }
-            torch.save(checkpoint, path)
-            print(f"Model saved to {path}")
-
-        else:
-            raise ValueError("Path must be a pathlib.Path object")
 
     def aggregate_fit(
         self,
@@ -79,7 +42,7 @@ class FedAvgWithSave(FedAvg):
             state_dict  = {k: torch.tensor(v) for k, v in params_dict}
             model.load_state_dict(state_dict, strict=True)
 
-            save_model(
+            self._save_model(
                 model=model,
                 path=CONFIG.evaluation.model_path,
                 config=CONFIG.model,
@@ -87,4 +50,30 @@ class FedAvgWithSave(FedAvg):
 
         return aggregated_parameters, metrics
     
+    @staticmethod
+    def _save_model(
+        model:      nn.Module,
+        path:       Path,
+        config:     object = None,
+        threshold:  float  = 0.5,
+        metrics:    dict   = None,
+    ):
+        """
+        Save model weights, architecture config, best threshold,
+        and training metrics to a single checkpoint file.
+        """
     
+        if isinstance(path, Path):
+            path.parent.mkdir(parents=True, exist_ok=True)  # create checkpoints/ dir if it doesn't exist
+
+            checkpoint = {
+                "model_state_dict": model.state_dict(), # PyTorch convention for saving/loading weights
+                "model_config":     config,
+                "threshold":        threshold,
+                "metrics":          metrics or {},
+            }
+            torch.save(checkpoint, path)
+            print(f"Model saved to {path}")
+
+        else:
+            raise ValueError("Path must be a pathlib.Path object")

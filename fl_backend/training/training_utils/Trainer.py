@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from fl_backend.training.training_utils.TrainEvalBase import TrainEvalBase
+from training.training_utils.TrainEvalBase import TrainEvalBase
 
 
 class Trainer(TrainEvalBase):
