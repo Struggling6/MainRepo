@@ -66,3 +66,8 @@ Plotting-systemet er endnu ikke fuldt udviklet, men tanken er :
 
 ```python
 plot_methods/
+
+- Genererede diagrammer vil dermed gemmes i mappen:
+
+```python
+saved_plots/
