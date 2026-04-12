@@ -8,7 +8,9 @@ from models.registry import create_model
 from tasks.registry import create_task
 from training.train import train_model
 from training.evaluate import evaluate_model
-from plotting.confusion_matrix_plot import confusion_matrix_plot, precision_recall_plot
+from plotting.confusion_matrix_plot import confusion_matrix_plot
+from plotting.precision_recall_plot import precision_recall_plot
+
 
 def main():
     config = CONFIG
