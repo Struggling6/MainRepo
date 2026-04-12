@@ -8,7 +8,7 @@ from models.registry import create_model
 from tasks.registry import create_task
 from training.train import train_model
 from training.evaluate import evaluate_model
-from plotting.confusion_matrix_plot import confusion_matrix_plot
+from plotting.confusion_matrix_plot import confusion_matrix_plot, precision_recall_plot
 
 def main():
     config = CONFIG
@@ -53,6 +53,7 @@ def main():
     print(f"Evaluation results: {eval_results}")
 
     confusion_matrix_plot(eval_results["targets"], eval_results["preds"])
+    precision_recall_plot(eval_results["targets"], eval_results["preds"])
 
 if __name__ == "__main__":
     main()
