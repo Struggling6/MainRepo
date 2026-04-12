@@ -8,7 +8,7 @@ class BaseDatasetHandler(ABC):
         self.config = config
 
     @abstractmethod
-    def get_dataloaders(self, partion_id: int):
+    def get_dataloaders(self, partition_id: int):
         pass
 
     @abstractmethod

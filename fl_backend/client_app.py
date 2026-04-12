@@ -6,7 +6,7 @@ from config import CONFIG
 from data.registry import create_dataset_handler
 from models.registry import create_model
 from models.utils import get_model_parameters, set_model_parameters
-from training.train import train_model, evaluate_model
+from training.train import train_model
 from models.utils import get_device
 from training.training_utils.Evaluator import Evaluator
 #Creating a class FlowerCLient that is based on NumpyClient which is a built-in class from Flower that defines the interface for clients in FL.

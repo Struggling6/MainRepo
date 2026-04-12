@@ -20,7 +20,7 @@ class AnomalyDetectionConfig:
 class CNNTransformerConfig:
     name:           str   = "supervised_cnn_transformer"
     d_model:        int   = 128
-    num_heads:      int   = 4
+    nhead:          int   = 4 # number of attention heads (nhead is PyTorch's parameter name)
     num_layers:     int   = 2
     dropout:        float = 0.3
     in_channels:    int   = 1

@@ -4,7 +4,7 @@ os.environ["TORCH_BLAS_PREFER_HIPBLASLT"] = "0" # Silence ROCm warning
 import torch
 import torch.nn as nn
 from models.supervised_cnn_transformer import SupervisedTransformerCNN
-from fl_backend.training.training_utils.TrainEvalBase import TrainEvalBase
+from training.training_utils.TrainEvalBase import TrainEvalBase
 from training.training_utils.utils import compute_pos_weight
 from config import CONFIG
 
@@ -35,9 +35,22 @@ class OptunaOptimizer(TrainEvalBase):
         self.in_channels = config.model.in_channels
         self.n_trials    = n_trials
         self.loss_fn     = config.model.loss_fn
-        self.model       = config.model.name
+        self.model       = self._resolve_model(config.model.name)
         self.raw_pw      = compute_pos_weight(y_train)  # computed once, reused every trial
 
+    def _resolve_model(self, model_name):
+        """Resolve a configured model identifier to a callable model class."""
+        if callable(model_name):
+            return model_name
+
+        model_registry = {
+            "SupervisedTransformerCNN": SupervisedTransformerCNN,
+        }
+
+        if model_name in model_registry:
+            return model_registry[model_name]
+
+        raise ValueError(f"Unsupported model name: {model_name}")
     # ------------------------------------------------------------------ #
     #  Public API                                                          #
     # ------------------------------------------------------------------ #
@@ -78,13 +91,7 @@ class OptunaOptimizer(TrainEvalBase):
         model     = self._build_model(d_model, nhead, num_layers, dropout)
         train_dl  = self._build_dataloader(self.X_train, self.y_train, batch_size, shuffle=True)
         val_dl    = self._build_dataloader(self.X_val,   self.y_val,   batch_size, shuffle=False)
-        optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
-           
-        # Build loss from task config — no longer hardcoded to BCE
-        pw      = min(self.raw_pw, pos_weight_cap)
-        loss_fn = create_loss(self.config.task, pw, self.device)
-       
-       
+        optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)       
        
         best_pr_auc, no_improve = 0.0, 0
         
@@ -113,11 +120,11 @@ class OptunaOptimizer(TrainEvalBase):
             pos_weight=torch.tensor([pw], device=self.device)
         )
 
-    def _build_model(self, d_model, num_heads, num_layers, dropout):
+    def _build_model(self, d_model, nhead, num_layers, dropout):
         return self.model(
             in_channels=self.in_channels,
             d_model=d_model,
-            num_heads=num_heads,
+            nhead=nhead,
             num_layers=num_layers,
             num_classes=1,
             dropout=dropout,

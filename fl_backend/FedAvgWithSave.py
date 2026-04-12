@@ -1,0 +1,90 @@
+from flwr.server import ServerApp, ServerConfig, ServerAppComponents
+from flwr.server.strategy import FedAvg
+from flwr.common import ndarrays_to_parameters, parameters_to_ndarrays, FitRes, Parameters
+from flwr.server.client_proxy import ClientProxy
+import numpy as np
+import torch
+import torch.nn as nn
+from pathlib import Path
+from typing import Union, Optional
+from config import CONFIG
+from models.registry import create_model
+from models.utils import save_model, get_device
+
+
+class FedAvgWithSave(FedAvg):
+    """
+    FedAvg strategy that saves the aggregated model to disk
+    after the final federation round completes.
+    """
+
+    def save_model(
+    model:      nn.Module,
+    path:       Path,
+    config:     object = None,
+    threshold:  float  = 0.5,
+    metrics:    dict   = None,
+):
+        """
+        Save model weights, architecture config, best threshold,
+        and training metrics to a single checkpoint file.
+
+        Parameters
+        ----------
+        model     : nn.Module — the trained model
+        path      : Path      — where to save the checkpoint (.pt file)
+        config    : dataclass — model config (CNNTransformerConfig etc.)
+        threshold : float     — best decision threshold found during training
+        metrics   : dict      — final training metrics to store alongside weights
+        """
+    
+        if isinstance(path, Path):
+            path.parent.mkdir(parents=True, exist_ok=True)  # create checkpoints/ dir if it doesn't exist
+
+            checkpoint = {
+                "model_state_dict": model.state_dict(), # PyTorch convention for saving/loading weights
+                "model_config":     config,
+                "threshold":        threshold,
+                "metrics":          metrics or {},
+            }
+            torch.save(checkpoint, path)
+            print(f"Model saved to {path}")
+
+        else:
+            raise ValueError("Path must be a pathlib.Path object")
+
+    def aggregate_fit(
+        self,
+        server_round: int,
+        results: list[tuple[ClientProxy, FitRes]],
+        failures: list[Union[tuple[ClientProxy, FitRes], BaseException]],
+    ) -> tuple[Optional[Parameters], dict]:
+
+        # Run standard FedAvg aggregation first
+        aggregated_parameters, metrics = super().aggregate_fit(
+            server_round, results, failures
+        )
+
+        # Save only after the final round
+        if aggregated_parameters is not None and server_round == CONFIG.federation.num_rounds:
+            print(f"Final round {server_round} complete, saving aggregated model...")
+
+            device        = get_device()
+            data_metadata = {"input_dim": CONFIG.model.in_channels, "num_classes": CONFIG.model.num_classes}
+            model         = create_model(CONFIG.model, data_metadata).to(device)
+
+            # Convert Flower parameters back to numpy arrays, then load into model
+            ndarrays    = parameters_to_ndarrays(aggregated_parameters)
+            params_dict = zip(model.state_dict().keys(), ndarrays)
+            state_dict  = {k: torch.tensor(v) for k, v in params_dict}
+            model.load_state_dict(state_dict, strict=True)
+
+            save_model(
+                model=model,
+                path=CONFIG.evaluation.model_path,
+                config=CONFIG.model,
+            )
+
+        return aggregated_parameters, metrics
+    
+    
