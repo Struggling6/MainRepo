@@ -8,7 +8,7 @@ def create_windowed_data(df, feature_cols, window_size, stride, target):
     data   = df[feature_cols].values   # shape: (n_rows, n_features)
     labels = df[target].values         # shape: (n_rows,)
 
-    # range(start, stop, step):P
+    # range(start, stop, step):
     #   start = 0               → begin at first row
     #   stop  = len-window_size → last valid start so window doesn't fall off the end
     #   step  = stride          → how far to shift each iteration

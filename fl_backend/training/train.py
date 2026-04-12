@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import numpy as np
 from config import TrainingConfig, CNNTransformerConfig
-from fl_backend.training.training_utils.TrainEvalBase import TrainEvalBase
 from training.training_utils.utils import compute_pos_weight
 
 def train_model(
@@ -19,7 +18,7 @@ def train_model(
 
     # Compute pos_weight from training labels
     y_train    = _extract_labels(trainloader)
-    pos_weight = TrainEvalBase._compute_pos_weight(y_train, cap=model_config.pos_weight_cap)
+    pos_weight = compute_pos_weight(y_train, cap=model_config.pos_weight_cap)
 
     # Loss function comes from model config — not hardcoded
     loss_fn = model_config.loss_fn(

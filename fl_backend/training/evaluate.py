@@ -15,9 +15,9 @@ def evaluate(config: ExperimentConfig):
     evaluator    = Evaluator(model_config=config.model)
     _, _, X_test, y_test, _, _ = test_handler.run_split()
     
-    testloader = evaluator._build_dataloader(X_test, y_test, config.evaluation.batch_size)
+    testloader = evaluator._build_dataloader(X_test, y_test, config.evaluation.batch_size, shuffle=False)
 
     model            = create_model(config.model, test_handler.get_metadata())
-    model, thresh, _ = load_model(model, path=config.evaluation.model_path, device=device)
+    model, thresh, _ = load_model(model, path=config.evaluation.model_path)
 
     return evaluator.evaluate_final(model, testloader, threshold=thresh)

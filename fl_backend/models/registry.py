@@ -18,7 +18,7 @@ def create_model(model_config, data_metadata):
     return model_cls(
         in_channels=data_metadata["input_dim"],  # comes from dataset, not model config
         d_model=model_config.d_model,
-        num_heads=model_config.num_heads,        # note: model uses num_heads not nhead
+        nhead=model_config.nhead,
         num_layers=model_config.num_layers,
         num_classes=model_config.num_classes,
         dropout=model_config.dropout,

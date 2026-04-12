@@ -27,7 +27,7 @@ optimizer = OptunaOptimizer(
     y_train=y_train,
     X_val=X_val,
     y_val=y_val,
-    in_channels=X_train.shape[2],
+    config=CONFIG,
     n_trials=args.trials,
     epochs=args.epochs,
     patience=args.patience,
@@ -39,7 +39,7 @@ study = optimizer.run()
 best = study.best_trial.params
 
 CONFIG.model.d_model        = best["d_model"]
-CONFIG.model.num_heads      = best["nhead"]
+CONFIG.model.nhead          = best["nhead"]
 CONFIG.model.num_layers     = best["num_layers"]
 CONFIG.model.dropout        = best["dropout"]
 CONFIG.model.pos_weight_cap = best["pos_weight_cap"]

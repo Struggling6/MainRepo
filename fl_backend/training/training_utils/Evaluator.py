@@ -3,15 +3,13 @@ import torch.nn as nn
 import numpy as np
 from pathlib import Path
 from sklearn.metrics import (
-    f1_score,
-    average_precision_score,
     classification_report,
     confusion_matrix,
     roc_auc_score,
 )
-
 from fl_backend.training.training_utils.TrainEvalBase import TrainEvalBase
-from models.utils import load_model
+from training.training_utils.utils import compute_pos_weight
+from models.registry import create_model
 
 
 class Evaluator(TrainEvalBase):
@@ -61,32 +59,29 @@ class Evaluator(TrainEvalBase):
         }
 
     def evaluate_final(
-            self, 
-            model: nn.Module, 
-            testloader: torch.utils.data.DataLoader, 
-            threshold: float = None
-        ):
+        self,
+        model_path: Path,
+        testloader: torch.utils.data.DataLoader,
+        threshold:  float = None,
+    ):
         """
         Full evaluation on the held-out test set.
-        Produces a detailed diagnostic report including classification
-        report, confusion matrix, ROC-AUC and PR-AUC.
-        Run once after federation completes for final honest assessment.
+        Loads the model from disk, runs inference, and produces a detailed
+        diagnostic report. Run once after federation completes.
 
         Parameters
         ----------
-        model      : nn.Module  — trained model
+        model_path : Path      — path to the saved checkpoint (.pt file)
         testloader : DataLoader — held-out test set, never used during training
-        threshold  : float      — override decision threshold (uses best found
-                                  during _val_epoch if None)
+        threshold  : float     — override decision threshold. If None, uses
+                                    the threshold found during _val_epoch.
         """
-        loss_fn = self._build_loss(testloader)
-
+        model            = self._load_model(model_path)
+        loss_fn          = self._build_loss(testloader)
         loss, f1, best_thresh, pr_auc = self._val_epoch(model, testloader, loss_fn)
 
-        # Use provided threshold override if given
         threshold = threshold if threshold is not None else best_thresh
 
-        # Collect raw probabilities for detailed metrics
         all_probs, all_labels = self._collect_probs(model, testloader)
         all_preds = (all_probs >= threshold).astype(float)
 
@@ -118,10 +113,33 @@ class Evaluator(TrainEvalBase):
     #  Private helpers                                                     #
     # ------------------------------------------------------------------ #
 
+    def _load_model(self, path: Path) -> nn.Module:
+        """
+        Load model weights from a checkpoint file into a fresh model
+        built from self.model_config.
+        """
+
+        data_metadata = {
+            "input_dim":   self.model_config.in_channels,
+            "num_classes": self.model_config.num_classes,
+        }
+        model = create_model(self.model_config, data_metadata)
+
+        checkpoint = torch.load(path, map_location=self.device)
+        model.load_state_dict(checkpoint["model_state_dict"])
+        model.to(self.device)
+        model.eval()
+
+        self._loaded_threshold = checkpoint.get("threshold", 0.5)
+        self._loaded_metrics   = checkpoint.get("metrics",   {})
+
+        print(f"Model loaded from {path}  (threshold={self._loaded_threshold:.2f})")
+        return model
+
     def _build_loss(self, testloader):
         """Build loss function using pos_weight computed from test labels."""
         y      = self._extract_labels(testloader)
-        pw     = self._compute_pos_weight(y, cap=self.model_config.pos_weight_cap)
+        pw     = compute_pos_weight(y, cap=self.model_config.pos_weight_cap)
         return self.model_config.loss_fn(
             pos_weight=torch.tensor([pw], device=self.device)
         )
