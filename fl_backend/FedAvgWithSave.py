@@ -34,9 +34,7 @@ class FedAvgWithSave(FedAvg):
             print(f"Final round {server_round} complete, saving aggregated model...")
 
             device = get_device()
-
             metadata = create_dataset_handler(CONFIG.data).get_metadata()
-
             model = create_model(CONFIG.model, metadata).to(device)
 
             # Convert Flower parameters back to numpy arrays, then load into model

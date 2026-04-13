@@ -1,9 +1,9 @@
 #Flower tools for building the server.
 from flwr.server import ServerApp, ServerConfig, ServerAppComponents
 from config import CONFIG
-from fl_backend.FedAvgWithSave import FedAvgWithSave
+from FedAvgWithSave import FedAvgWithSave
 from models.registry import create_model
-from models.utils import save_model, get_device
+from models.utils import get_device
 
 def server_fn(context):
     fed_config  = CONFIG.federation

@@ -16,10 +16,10 @@ class FlowerClient(NumPyClient):
         self.partition_id    = partition_id #Store which data partition belongs to the client
         self.device          = get_device()
         self.dataset_handler = create_dataset_handler(self.config.data) #Create the dataset handler from the data configuration
-        self.data_metadata   = self.dataset_handler.get_metadata()
+        self.metadata        = self.dataset_handler.get_metadata()
 
         # Model created from config — architecture and loss both come from config
-        self.model = create_model(self.config.model, self.data_metadata)
+        self.model = create_model(self.config.model, self.metadata)
 
         #Loads the training and testing data for the client’s partition.
         self.trainloader, self.testloader = self.dataset_handler.get_dataloaders(

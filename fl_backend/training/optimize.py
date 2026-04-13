@@ -18,9 +18,7 @@ from config import CONFIG
 
 
 datahandler = LeadCSVHandler(CONFIG.data)
-X_train, y_train, X_val, y_val, nid_train, nid_val = datahandler.run_split()
-
-
+X_train, y_train, X_val, y_val = datahandler.run_split()
 
 optimizer = OptunaOptimizer(
     X_train=X_train,

@@ -27,10 +27,7 @@ def evaluate(config: ExperimentConfig):
         shuffle=False,
     )
 
-    evaluator = Evaluator(
-        model_config=config.model,
-        input_dim=data_metadata["input_dim"],
-    )
+    evaluator = Evaluator(model_config=config.model)
 
     return evaluator.evaluate_final(
         model_path=config.evaluation.model_path,

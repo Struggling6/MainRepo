@@ -14,13 +14,14 @@ def main():
     config = CONFIG
     device = get_device()
 
-# ── Dataset ──────────────────────────────────────────────────────── #
+    # ── Dataset ──────────────────────────────────────────────────────── #
     dataset_handler = create_dataset_handler(config.data)
-    data_metadata   = dataset_handler.get_metadata()
-    print(f"Dataset metadata: {data_metadata}")
+    metadata   = dataset_handler.get_metadata()
+    CONFIG.evaluation.input_dim = metadata["input_dim"]
+    print(f"Dataset metadata: {metadata}")
 
     # ── Model ─────────────────────────────────────────────────────────── #
-    model = create_model(config.model, data_metadata)
+    model = create_model(config.model, metadata)
     print(f"Model created: {config.model.name}")
 
     # ── DataLoaders ───────────────────────────────────────────────────── #
@@ -40,7 +41,7 @@ def main():
     # ── Evaluation ───────────────────────────────────────────────────── #
     evaluator = Evaluator(
         model_config=config.model,
-        input_dim=data_metadata["input_dim"],
+        input_dim=metadata["input_dim"],
     )
     eval_results = evaluator.evaluate_round(model, valloader)
     print(f"Evaluation results: {eval_results}")

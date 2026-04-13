@@ -89,6 +89,7 @@ class EvaluationConfig:
     target:       str   = "anomaly"
     batch_size:   int   = 64
     threshold:    float = 0.5   # decision threshold — override with best_thresh from training
+    input_dim:    int   = 0     # set after data loading
 
 # ── Top-level experiment config ───────────────────────────────────────── #
 
