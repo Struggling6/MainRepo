@@ -10,6 +10,21 @@ from models.registry import create_model
 from models.utils import get_device
 
 
+def _infer_input_dim(ndarrays: list, fallback: int) -> int:
+    """Return the model's input feature count from the aggregated parameter arrays.
+
+    Conv1d weights are the only 3-D tensors in the CNN-Transformer architecture
+    (shape: out_channels, in_channels, kernel_size); transformer attention weights
+    are all 2-D.  We read `in_channels` from the *first* 3-D array found, which
+    corresponds to the first convolutional layer.
+
+    Args:
+        ndarrays: Flat list of numpy arrays from ``parameters_to_ndarrays``.
+        fallback: Value to return when no 3-D array is found (e.g., a non-CNN model).
+    """
+    return next((int(a.shape[1]) for a in ndarrays if a.ndim == 3), fallback)
+
+
 class FedAvgWithSave(FedAvg):
     """
     FedAvg strategy that saves the aggregated model to disk
@@ -32,12 +47,19 @@ class FedAvgWithSave(FedAvg):
         if aggregated_parameters is not None and server_round == CONFIG.federation.num_rounds:
             print(f"Final round {server_round} complete, saving aggregated model...")
 
-            device        = get_device()
-            data_metadata = {"input_dim": CONFIG.model.in_channels, "num_classes": CONFIG.model.num_classes}
+            device   = get_device()
+            ndarrays = parameters_to_ndarrays(aggregated_parameters)
+
+            # Infer input_dim from the first Conv1d weight in the aggregated parameters.
+            # Conv1d weights have shape (out_ch, in_ch, kernel_size) — the only 3-D arrays in
+            # this architecture (transformer weights are all 2-D).  This ensures the server
+            # reconstructs a model whose first layer matches whatever feature count the clients
+            # actually trained with, preventing load_state_dict shape mismatches.
+            input_dim = _infer_input_dim(ndarrays, fallback=CONFIG.model.in_channels)
+            data_metadata = {"input_dim": input_dim, "num_classes": CONFIG.model.num_classes}
             model         = create_model(CONFIG.model, data_metadata).to(device)
 
             # Convert Flower parameters back to numpy arrays, then load into model
-            ndarrays    = parameters_to_ndarrays(aggregated_parameters)
             params_dict = zip(model.state_dict().keys(), ndarrays)
             state_dict  = {k: torch.tensor(v) for k, v in params_dict}
             model.load_state_dict(state_dict, strict=True)
