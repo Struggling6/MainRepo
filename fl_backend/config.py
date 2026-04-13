@@ -23,7 +23,6 @@ class CNNTransformerConfig:
     nhead:          int   = 4 # number of attention heads (nhead is PyTorch's parameter name)
     num_layers:     int   = 2
     dropout:        float = 0.3
-    in_channels:    int   = 1
     pos_weight_cap: float = 10.0
     num_classes:    int   = 1  # binary classification
     loss_fn:        type  = nn.BCEWithLogitsLoss  # default loss function for binary classification
@@ -34,7 +33,6 @@ class LSTMConfig:
     hidden_size: int   = 128
     num_layers:  int   = 2
     dropout:     float = 0.3
-    in_channels: int   = 1
     loss_fn:     type  = nn.BCEWithLogitsLoss
 
 
