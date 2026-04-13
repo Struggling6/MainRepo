@@ -1,5 +1,4 @@
 import torch.nn as nn #neural network module
-from base import BaseModel
 
 class FeatureExtractor(nn.Module):
     def __init__(self, in_channels, d_model, dropout):

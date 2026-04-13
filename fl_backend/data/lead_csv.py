@@ -1,87 +1,110 @@
 # Data manipulation and visualization libraries
-import math
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from pathlib import Path
-from data.base import BaseDatasetHandler
+import torch
+
+from sqlalchemy import TIMESTAMP
+from data.BaseDataHandler import BaseDatasetHandler
 from data.utils import temporal_grouped_split
 
-# Machine learning libraries
-import torch
-import torch.nn as nn #neural network module
-import torch.nn.functional as F #functional module contains functions that don't have parameters, like activation functions and loss functions
-from torch.utils.data import TensorDataset, DataLoader #Dataset is an abstract class representing a dataset, and DataLoader is a utility that provides an iterable over the given dataset.
-from transformers import AutoConfig, AutoModel # AutoConfig is used to load the configuration of a pre-trained model, and AutoModel is used to load the pre-trained model itself.
-from sklearn.model_selection import train_test_split #train_test_split is a function from scikit-learn that splits arrays or matrices into random train and test subsets.
-from sklearn.preprocessing import StandardScaler # StandsardScaler is a class from scikit-learn that standardizes features by removing the mean and scaling to unit variance.
-from sklearn.model_selection import TimeSeriesSplit # TimeSeriesSplit is a class from scikit-learn that provides train/test indices to split time series data samples that are observed at fixed time intervals.
-from sklearn.preprocessing import LabelEncoder # LabelEncoder is a class from scikit-learn that encodes target labels with value between 0 and n_classes-1, where n is the number of distinct labels.
-from sklearn.metrics import f1_score, classification_report
 
 class LeadCSVHandler(BaseDatasetHandler):
-    def __init__(self, config: dict):
+    """
+    Dataset handler for the LEAD building energy dataset.
+
+    The gap between train and validation is set to 73 hours to match
+    the longest lag feature (air_temperature_*_lag73), preventing those
+    features from leaking across the train/val boundary.
+    """
+    # Override base class default — matches longest lag feature
+    _gap_hours = 73
+
+    def __init__(self, config):    # config: LeadCSVConfig
+
         super().__init__(config)
+        self.file_path    = config.file_path
+        self.target       = config.target
+        self.batch_size   = config.batch_size
+        self.test_split   = config.test_split
+        self.num_clients  = config.num_clients
+        self.seed         = config.seed
+        self._node_col    = "building_id"
+        self._time_col    = "timestamp"
 
-        self.file_path = config["file_path"]
-        self.batch_size = config.get("batch_size")
-        self.num_clients = config.get("num_clients")
-        self.test_split = config.get("test_split")
-        self.normalize = config.get("normalize")
-        self.seed = config.get("seed", 42)
-        self.label_column = config.get("label_column", "marker")
-
+        # Load raw CSV into self.df so _prepare_data can use it
         self.df = pd.read_csv(self.file_path)
 
-        if self.label_column not in self.df.columns:
-            raise ValueError(
-                f"CSV file must contain '{self.label_column}' as the target label column."
-            )
-        self._prepare_data()
-        self._prepare_partitions()
+        # _prepare_data must run before _prepare_partitions because
+        # _prepare_partitions needs self.df to have building IDs
         self.features, self.labels = self._prepare_data()
-        self.client_indices = np.array_split(indices, self.num_clients)
-
-    def _prepare_data(self):
+        self._prepare_partitions()
 
     # ------------------------------------------------------------------ #
-    #  Load & Sort                                                         #
+    #  Template Method implementations                                     #
     # ------------------------------------------------------------------ #
 
+    def _preprocess(self, df):
+        """
+        Apply LEAD-specific feature engineering to any raw DataFrame.
+        Called by both _prepare_data (training) and load_test_set (testing)
+        so the exact same cleaning steps are applied to both.
+        """
 
-        NODE_ID = "building_id"
-        TIMESTAMP = "timestamp"
+        df[self._time_col] = pd.to_datetime(df[self._time_col])
+        df = df.sort_values(by=[self._node_col, self._time_col])
 
-        df = pd.read_csv(self.file_path)
-
-        df[TIMESTAMP] = pd.to_datetime(df[TIMESTAMP])
-        df = df.sort_values(by=[NODE_ID, TIMESTAMP])
-
-        #OPTIMIZATION: Reduce memory usage by downcasting data types
-        # Float64 → float32 (half the memory)
+        # Memory optimisation — halves RAM usage for large datasets
         float_cols = df.select_dtypes(include="float64").columns
         df[float_cols] = df[float_cols].astype("float32")
-
-        # Int64 → int32 (half the memory)
         int_cols = df.select_dtypes(include="int64").columns
         df[int_cols] = df[int_cols].astype("int32")
-
-        # Object (string) → category (much less memory if there are many repeated values)
-        str_cols = df.select_dtypes(include="str").columns
+        str_cols = df.select_dtypes(include="object").columns
         df[str_cols] = df[str_cols].astype("category")
 
-        # Check memory usage after optimization
-        print(df.info(memory_usage="deep"))
+        # Lag features — computed per building so no cross-building leakage
+        groups = df.groupby(self._node_col)
+        df["meter_lag1"]  = groups["meter_reading"].shift(1)   # 1 hour ago
+        df["meter_lag24"] = groups["meter_reading"].shift(24)  # 24 hours ago
 
-        for col in df.select_dtypes(include="str").columns:
-            print(f"{col}: {df[col].memory_usage(deep=True) / 1e6:.1f} MB")
+        # Rolling statistics over the last 24 hours
+        # min_periods=1 ensures values are produced near the start of the series
+        df["meter_roll_mean_24"] = groups["meter_reading"].transform(
+            lambda x: x.rolling(window=24, min_periods=1).mean()
+        )
+        df["meter_roll_std_24"] = groups["meter_reading"].transform(
+            lambda x: x.rolling(window=24, min_periods=1).std()
+        )
 
+        # Difference features — how much has consumption changed?
+        df["meter_diff_1"]  = df["meter_reading"] - df["meter_lag1"]
+        df["meter_diff_24"] = df["meter_reading"] - df["meter_lag24"]
 
-    # ------------------------------------------------------------------ #
-    #  Features                                                            #
-    # ------------------------------------------------------------------ #
+        # Z-score — how many std devs is current reading from 24hr mean?
+        # +1e-6 prevents division by zero when std is 0 (flat signal)
+        df["meter_zscore_24"] = (
+            (df["meter_reading"] - df["meter_roll_mean_24"])
+            / (df["meter_roll_std_24"] + 1e-6)
+        )
 
-        features = [
+        # One-hot encode primary_use — drop_first avoids dummy variable trap
+        df = pd.get_dummies(df, columns=["primary_use"], drop_first=True)
+
+        # pandas 2.x returns bool columns from get_dummies — cast to float32
+        # so the feature matrix stays a single numeric dtype
+        bool_cols = df.select_dtypes(include="bool").columns
+        df[bool_cols] = df[bool_cols].astype("float32")
+
+        return df.dropna()
+
+    def _prepare_data(self):
+        """
+        Preprocess the training DataFrame and populate self.df and
+        self.feature_cols. Returns X, y as numpy arrays for use by
+        get_metadata and _prepare_partitions.
+        """
+        df = self._preprocess(self.df)
+
+        base_features = [
             "meter_reading",
             "site_id",
             "square_feet",
@@ -118,125 +141,82 @@ class LeadCSVHandler(BaseDatasetHandler):
             "meter_zscore_24",
         ]
 
-    # ------------------------------------------------------------------ #
-    #  Preprocessing                                                       #
-    # ------------------------------------------------------------------ #
+        # Collect any one-hot columns created from primary_use
+        primary_use_cols  = [col for col in df.columns if col.startswith("primary_use_")]
+        self.feature_cols = base_features + primary_use_cols
 
-        # These must be computed per building (via groupby) and BEFORE the train/test
-        # split — they are feature engineering, not data leakage, because each value
-        # only looks backwards in time within its own building.
+        # Store the fully processed DataFrame so run_split and
+        # get_dataloaders can use it with correct timestamps and features
+        self.df = df
 
-        groups = df.groupby(NODE_ID)  # group the data by node so we can compute features separately for each node
-
-        # copy a past value into the current row so the model can see history.
-        df["meter_lag1"]  = groups["meter_reading"].shift(1)  #what was the meter reading 1 hour ago?
-        df["meter_lag24"] = groups["meter_reading"].shift(24) #what was the meter reading 24 hours ago?
-
-
-        # Rolling mean over the last 24 hours — captures the building's "normal" baseline.
-        # min_periods=1 means it still produces a value even near the start of the series.
-        df["meter_roll_mean_24"] = groups["meter_reading"].transform(
-            lambda x: x.rolling(window=24, min_periods=1).mean()
-        )
-
-        # Rolling std over the last 24 hours — captures how volatile the recent period was.
-        # A low std means stable consumption; a high std means erratic behaviour.
-        df["meter_roll_std_24"] = groups["meter_reading"].transform(
-            lambda x: x.rolling(window=24, min_periods=1).std()
-        )
-
-        # Differences — how much has consumption changed since N steps ago?
-        # We add new columns for the change since 1 hour ago and since 24 hours ago.
-        df["meter_diff_1"]  = df["meter_reading"] - df["meter_lag1"]   # change in last hour
-        df["meter_diff_24"] = df["meter_reading"] - df["meter_lag24"]  # change since yesterday
-
-        # Z-score — how many standard deviations the current reading is from the 24-hour mean.
-        # e.g. zscore=0.3 → normal, zscore=7.0 → very likely anomalous.
-        # +1e-6 avoids division by zero when std is 0 (flat signal with no variation).
-        df["meter_zscore_24"] = (
-            (df["meter_reading"] - df["meter_roll_mean_24"])
-            / (df["meter_roll_std_24"] + 1e-6)
-        )
-
-        # ONE-HOT ENCODING: Convert the categorical "primary_use" column into multiple binary columns.
-        df = pd.get_dummies(df, columns=["primary_use"], drop_first=True) # one-hot encoding
-        df = df.dropna() # drop rows with NaN values
-
-        primary_use_cols = []
-        for col in df.columns:
-            if col.startswith("primary_use_"):
-                primary_use_cols.append(col)
-
-        feature_cols = features + primary_use_cols
-
-        X = df[feature_cols] # the features (input variables) for the model
-        y = df["anomaly"] # the target variable (what we want to predict)
-
+        X = df[self.feature_cols].values.astype(np.float32)
+        y = df[self.config.target].values.astype(np.float32)
         return X, y
-        
-    # ------------------------------------------------------------------ #
-    #  Run The Split                                                       #
-    # ------------------------------------------------------------------ #
-
-    def run_split(self, feature_cols):
-        return temporal_grouped_split(
-            self.df,
-            feature_cols=feature_cols,
-            node_col="building_id",
-            time_col="timestamp",       
-            train_ratio=0.8,
-            gap_hours=73,               # matches longest lag feature (lag73)
-            window_size=168,            # 1 week of hourly data
-            stride=24,                  # one window per day
-            target="anomaly",
-        )        
     
+    # ------------------------------------------------------------------ #
+    #  Partitioning                                                        #
+    # ------------------------------------------------------------------ #
+
     def _prepare_partitions(self):
-        rng = np.random.default_rng(self.seed)
-        indices = np.arange(len(self.features))
-        rng.shuffle(indices)
-
+        """Split sample indices into num_clients equal partitions, shuffled."""
+        rng     = np.random.default_rng(self.seed)
+        buildings = self.df["building_id"].unique()
+        rng.shuffle(buildings)
+        self.client_indices = np.array_split(buildings, self.num_clients)
         
-    def get_metadata(self):
-        return {
-            "input_dim": self.features.shape[1],
-            "num_classes": 1,
-            "num_samples": len(self.features),
-            "task_type": "binary_classification",
-            "data_format": "tabular",
-        }
-
-    def get_dataloaders(self, partition_id):
+    # ------------------------------------------------------------------ #
+    #  BaseDatasetHandler interface                                        #
+    # ------------------------------------------------------------------ #
+    
+    def get_dataloaders(self, partition_id: int):
         if partition_id < 0 or partition_id >= self.num_clients:
             raise ValueError(f"Invalid partition_id: {partition_id}")
 
-        idx = self.client_indices[partition_id]
+        # Filter to only the buildings assigned to this client
+        client_df = self.df[
+            self.df[self._node_col].isin(self.client_indices[partition_id])
+        ]
 
-        features, labels = self.run_split(feature_cols=self.features.columns.tolist())
-
-        x_client = features[idx]
-        y_client = labels[idx]
-
-        x_tensor = torch.tensor(x_client, dtype=torch.float32)
-        y_tensor = torch.tensor(y_client, dtype=torch.long)
-
-        dataset = TensorDataset(x_tensor, y_tensor)
-
-        test_size = 0.2
-        train_size = len(dataset) - test_size
-
-        generator = torch.Generator().manual_seed(self.seed)
-
-        train_dataset, test_dataset = random_split(
-            dataset,
-            [train_size, test_size],
-            generator=generator,
+        # Temporal split on this client's buildings only — each client
+        # trains on its own time-ordered slice of the data
+        X_train, y_train, X_val, y_val = temporal_grouped_split(
+            client_df,
+            feature_cols=self.feature_cols,
+            node_col=self._node_col,
+            time_col=self._time_col,
+            train_ratio=1.0 - self.test_split,
+            gap_hours=self._gap_hours,
+            window_size=self._window_size,
+            stride=self._stride,
+            target=self.config.target,
         )
 
-        trainloader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
-        testloader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False)
+        train_dataset = torch.utils.data.TensorDataset(
+            torch.tensor(X_train, dtype=torch.float32),
+            torch.tensor(y_train, dtype=torch.float32),
+        )
+        val_dataset = torch.utils.data.TensorDataset(
+            torch.tensor(X_val, dtype=torch.float32),
+            torch.tensor(y_val, dtype=torch.float32),
+        )
 
-        return trainloader, testloader
+        trainloader = torch.utils.data.DataLoader(
+            train_dataset, batch_size=self.batch_size, shuffle=True
+        )
+        valloader = torch.utils.data.DataLoader(
+            val_dataset, batch_size=self.batch_size, shuffle=False
+        )
+
+        return trainloader, valloader
+        
+    def get_metadata(self):
+        return {
+            "input_dim"  : len(self.feature_cols),
+            "num_classes": self.config.num_classes,
+            "num_samples": self.df.shape[0], 
+            "task_type"  : self.config.task.name,
+        "data_format": "tabular",
+        }
 
 
     def get_num_partitions(self) -> int:
