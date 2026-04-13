@@ -1,5 +1,4 @@
 from .classification import ClassificationTask
-from .anomaly_detection import AnomalyDetectionTask
 
 TASK_REGISTRY = {
     "classification": ClassificationTask,
@@ -7,4 +6,4 @@ TASK_REGISTRY = {
 }
 
 def create_task(task_config):
-    return TASK_REGISTRY[task_config["name"]]()
+    return TASK_REGISTRY[task_config.name]

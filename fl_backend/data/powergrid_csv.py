@@ -2,20 +2,20 @@ import pandas as pd
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, TensorDataset, random_split
-from .base import BaseDatasetHandler
+from .BaseDataHandler import BaseDatasetHandler
 
 
 class PowerGridCSVHandler(BaseDatasetHandler):
-    def __init__(self, config: dict):
+    def __init__(self, config):     # config: PowerGridCSVConfig
         super().__init__(config)
 
-        self.file_path = config["file_path"]
-        self.batch_size = config.get("batch_size", 32)
-        self.num_clients = config.get("num_clients", 1)
-        self.test_split = config.get("test_split", 0.2)
-        self.normalize = config.get("normalize", True)
-        self.seed = config.get("seed", 42)
-        self.label_column = config.get("label_column", "marker")
+        self.file_path = config.file_path
+        self.batch_size = config.batch_size
+        self.num_clients = config.num_clients
+        self.test_split = config.test_split
+        self.normalize = config.normalize
+        self.seed = config.seed
+        self.label_column = config.target
      
 
         self.df = pd.read_csv(self.file_path)

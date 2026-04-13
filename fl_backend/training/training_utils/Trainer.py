@@ -1,6 +1,10 @@
 import torch
-from training.AnormalyTrainerBase import AnomalyTrainerBase
-class Trainer(AnomalyTrainerBase):
+import torch.nn as nn
+import numpy as np
+from training.training_utils.TrainEvalBase import TrainEvalBase
+
+
+class Trainer(TrainEvalBase):
     """
     Trains a single model with fixed hyperparameters.
     Inherits dataloader, train/val epoch logic from AnomalyTrainerBase.
@@ -8,14 +12,14 @@ class Trainer(AnomalyTrainerBase):
 
     def __init__(
         self,
-        model,
-        loss_fn,
-        lr,
-        batch_size,
-        epochs,
-        patience,
-        num_classes,
-        weight_decay,
+        model:        nn.Module,
+        loss_fn:      nn.Module,
+        lr:           float,
+        batch_size:   int,
+        epochs:       int,
+        patience:     int,
+        num_classes:  int,
+        weight_decay: float,
     ):
         super().__init__(epochs, patience, num_classes)  # initialise base class
         self.model       = model.to(self.device)
@@ -29,7 +33,13 @@ class Trainer(AnomalyTrainerBase):
     #  Public API                                                          #
     # ------------------------------------------------------------------ #
 
-    def train(self, X_train, y_train, X_val, y_val):
+    def train(
+        self,
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        X_val:   np.ndarray,
+        y_val:   np.ndarray,
+    ) -> nn.Module:
         """Train the model and restore the best checkpoint."""
         train_loader = self._build_dataloader(X_train, y_train, self.batch_size, shuffle=True)
         val_loader   = self._build_dataloader(X_val,   y_val,   self.batch_size, shuffle=False)
@@ -38,7 +48,7 @@ class Trainer(AnomalyTrainerBase):
         self.history = []
 
         for epoch in range(1, self.epochs + 1):
-            train_loss                          = self._train_epoch(self.model, train_loader, self.optimizer, self.loss_fn)
+            train_loss                            = self._train_epoch(self.model, train_loader, self.optimizer, self.loss_fn)
             val_loss, val_f1, best_thresh, pr_auc = self._val_epoch(self.model, val_loader, self.loss_fn)
 
             metrics = {

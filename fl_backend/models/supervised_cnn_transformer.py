@@ -2,11 +2,11 @@
 # Machine learning libraries
 import torch
 import torch.nn as nn #neural network module
-from supervised_utils.featureExtractor import FeatureExtractor
-from supervised_utils.Classifier import Classifier
-from base import BaseModel
+from .supervised_utils.featureExtractor import FeatureExtractor
+from .supervised_utils.Classifier import Classifier
+from .base import BaseModel
 
-class SupervisedTansformerCNN(BaseModel):
+class SupervisedTransformerCNN(BaseModel):
     def __init__(self, in_channels, d_model, nhead, num_layers, num_classes=1, dropout=0.3):
         super().__init__()
         
