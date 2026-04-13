@@ -47,17 +47,9 @@ class FedAvgWithSave(FedAvg):
         if aggregated_parameters is not None and server_round == CONFIG.federation.num_rounds:
             print(f"Final round {server_round} complete, saving aggregated model...")
 
-            device   = get_device()
-            ndarrays = parameters_to_ndarrays(aggregated_parameters)
-
-            # Infer input_dim from the first Conv1d weight in the aggregated parameters.
-            # Conv1d weights have shape (out_ch, in_ch, kernel_size) — the only 3-D arrays in
-            # this architecture (transformer weights are all 2-D).  This ensures the server
-            # reconstructs a model whose first layer matches whatever feature count the clients
-            # actually trained with, preventing load_state_dict shape mismatches.
-            input_dim = _infer_input_dim(ndarrays, fallback=CONFIG.model.in_channels)
-            data_metadata = {"input_dim": input_dim, "num_classes": CONFIG.model.num_classes}
-            model         = create_model(CONFIG.model, data_metadata).to(device)
+            device        = get_device()
+            metadata      = {"input_dim": CONFIG.model.in_channels, "num_classes": CONFIG.model.num_classes}
+            model         = create_model(CONFIG.model, metadata).to(device)
 
             # Convert Flower parameters back to numpy arrays, then load into model
             params_dict = zip(model.state_dict().keys(), ndarrays)
