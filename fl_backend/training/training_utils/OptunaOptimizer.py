@@ -8,6 +8,7 @@ from training.training_utils.TrainEvalBase import TrainEvalBase
 from training.training_utils.utils import compute_pos_weight
 from models.utils import get_device
 from config import CONFIG
+from models.registry import MODEL_REGISTRY
 
 class OptunaOptimizer(TrainEvalBase):
     """
@@ -67,12 +68,8 @@ class OptunaOptimizer(TrainEvalBase):
         if callable(model_name):
             return model_name
 
-        model_registry = {
-            "SupervisedTransformerCNN": SupervisedTransformerCNN,
-        }
-
-        if model_name in model_registry:
-            return model_registry[model_name]
+        if model_name in MODEL_REGISTRY:
+            return MODEL_REGISTRY[model_name]
 
         raise ValueError(f"Unsupported model name: {model_name}")
 
