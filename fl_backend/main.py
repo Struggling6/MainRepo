@@ -8,6 +8,8 @@ from models.registry import create_model
 from tasks.registry import create_task
 from training.train import train_model
 from training.evaluate import evaluate_model
+from plotting.plotting_config import plot_diagrams
+
 
 def main():
     config = CONFIG
@@ -51,6 +53,7 @@ def main():
     )
     print(f"Evaluation results: {eval_results}")
 
+    plot_diagrams(eval_results["targets"], eval_results["preds"], train_results["train_losses"], train_results["train_accuracies"])
 
 if __name__ == "__main__":
     main()
