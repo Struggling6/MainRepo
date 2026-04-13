@@ -11,7 +11,7 @@ CONFIG = {
 
     "data": {
         "name": "powergrid_csv",
-        "file_path": "datasets/data1.csv",
+        "file_path": "fl_backend/datasets/data1.csv",
         "label_column": "marker",
         "batch_size": 32,
         "num_clients": 1,
