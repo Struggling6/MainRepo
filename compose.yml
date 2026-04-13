@@ -48,6 +48,6 @@ services:
     depends_on:
       - supernode-1
     stop_signal: SIGINT
-    cpus: "1.0"
-    mem_limit: 256m
+    cpus: "2.0"
+    mem_limit: 8g
 

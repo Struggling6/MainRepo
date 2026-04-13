@@ -1,37 +1,67 @@
 import torch
+import torch.nn as nn
+import numpy as np
+from config import TrainingConfig, CNNTransformerConfig
+from training.training_utils.utils import compute_pos_weight
 
-def train_model(model, trainloader, task, training_config: dict ,  device):
-    model.to(device)
-    model.train()
+def train_model(
+        model: nn.Module, 
+        trainloader: torch.utils.data.DataLoader, 
+        training_config: TrainingConfig, 
+        model_config: CNNTransformerConfig, 
+        device: torch.device
+    ):
+    """
+    Entry point for Flower's client training loop.
+    Trains the model using config-specified loss function and hyperparameters.
+    """
 
-    epochs = training_config.get("local_epochs", 10)
-    lr = training_config.get("learning_rate", 0.001)
+    # Compute pos_weight from training labels
+    y_train    = _extract_labels(trainloader)
+    pos_weight = compute_pos_weight(y_train, cap=model_config.pos_weight_cap)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    # Loss function comes from model config — not hardcoded
+    loss_fn = model_config.loss_fn(
+        pos_weight=torch.tensor([pos_weight], device=device)
+    )
 
-    total_loss = 0.0
-    total_correct = 0
-    total_examples = 0
-    
+    # Extract arrays from dataloader for Trainer
+    X_train, y_train = _dataloader_to_arrays(trainloader)
 
-    for _ in range (epochs):
-        for batch in trainloader:
-            optimizer.zero_grad()
+    from training.training_utils.Trainer import Trainer
+    trainer = Trainer(
+        model=model,
+        loss_fn=loss_fn,
+        lr=training_config.learning_rate,
+        weight_decay=training_config.weight_decay,
+        batch_size=trainloader.batch_size,
+        epochs=training_config.local_epochs,
+        patience=training_config.patience,
+        num_classes=model_config.num_classes,
+    )
 
-            loss, outputs, targets = task.compute_loss(model, batch, device)
-            loss.backward()
-            optimizer.step()
-
-            metrics = task.compute_metrics(outputs, targets)
-
-            batch_size = targets.size(0)
-            total_loss += loss.item() * batch_size
-            total_correct += metrics["correct"]
-            total_examples += batch_size
-
+    # Use same data for val — Flower handles proper evaluation separately
+    trainer.train(X_train, y_train, X_train, y_train)
 
     return {
-        "loss": total_loss / total_examples,
-        "accuracy": total_correct / total_examples,
-        "num_examples": total_examples,
+        "train_loss":   trainer.history[-1]["train_loss"],
+        "val_f1":       trainer.history[-1]["val_f1"],
+        "num_examples": len(trainloader.dataset),
     }
+
+
+def _dataloader_to_arrays(loader):
+    """Extract all features and labels from a DataLoader into numpy arrays."""
+    all_x, all_y = [], []
+    for x, y in loader:
+        all_x.append(x.numpy())
+        all_y.append(y.numpy())
+    return np.concatenate(all_x), np.concatenate(all_y)
+
+
+def _extract_labels(loader):
+    """Extract only labels from a DataLoader for pos_weight computation."""
+    all_y = []
+    for _, y in loader:
+        all_y.append(y.numpy())
+    return np.concatenate(all_y)

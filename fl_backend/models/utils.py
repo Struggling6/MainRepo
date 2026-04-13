@@ -1,7 +1,6 @@
 import numpy as np
 import torch
 
-
 def get_device():
     """
     Returns the best available device in priority order:
@@ -21,8 +20,6 @@ def get_device():
         print("No GPU found, using CPU")
     
     return device
-
-print(torch.cuda.is_available())
 
 def get_model_parameters(model):
     return [val.cpu().numpy() for _, val in model.state_dict().items()]

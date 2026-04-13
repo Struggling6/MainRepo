@@ -4,14 +4,19 @@ from torch.utils.data import TensorDataset, DataLoader
 from sklearn.metrics import f1_score, average_precision_score
 from models.utils import get_device
 
-class AnomalyTrainerBase:
+class TrainEvalBase:
     """
     Shared base class for Trainer and OptunaOptimizer.
     Holds common state and utility methods so neither subclass
     has to reimplement them.
     """
 
-    def __init__(self, epochs, patience, num_classes=1):
+    def __init__(
+            self,
+            epochs:      int = 1, 
+            patience:    int = 1, 
+            num_classes: int = 1
+            ):
         self.device      = get_device()
         self.epochs      = epochs
         self.patience    = patience # how many epochs to wait for improvement before stopping
@@ -22,17 +27,13 @@ class AnomalyTrainerBase:
     # ------------------------------------------------------------------ #
 
     def _build_dataloader(self, features, labels, batch_size, shuffle):
-        feature_tensor = torch.tensor(features, dtype=torch.float32)
+        feature_tensor = torch.tensor(features.astype(np.float32))  # cast first to avoid object dtype error
         label_tensor   = torch.tensor(
             labels,
             dtype=torch.long if self.num_classes > 1 else torch.float32
         )
         dataset = TensorDataset(feature_tensor, label_tensor)
         return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
-
-    def _compute_pos_weight(self, y_train, cap=None):
-        raw_pw = float((y_train == 0).sum() / (y_train == 1).sum())
-        return min(raw_pw, cap) if cap else raw_pw
 
     def _train_epoch(self, model, loader, optimizer, loss_fn):
         model.train()
@@ -67,7 +68,7 @@ class AnomalyTrainerBase:
         all_probs  = torch.cat(all_probs).numpy()
         all_labels = torch.cat(all_labels).numpy()
 
-        # Find threshold that maximises F1
+        # Search for the decision threshold that maximises F1
         best_f1, best_thresh = 0.0, 0.5
         for thresh in np.arange(0.01, 0.5, 0.01):
             preds = (all_probs >= thresh).astype(float)

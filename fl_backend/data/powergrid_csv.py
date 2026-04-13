@@ -3,33 +3,33 @@ import numpy as np
 import torch
 
 from torch.utils.data import DataLoader, TensorDataset, random_split 
-from .base import BaseDatasetHandler #Import out base class
+from .BaseDataHandler import BaseDatasetHandler #Import out base class
 
 
 class PowerGridCSVHandler(BaseDatasetHandler):
-    def __init__(self, config: dict):
+    def __init__(self, config):     # config: PowerGridCSVConfig
         super().__init__(config)
 
         #Path to the CSV file.
-        self.file_path = config["file_path"]
+        self.file_path = config.file_path
 
         #Use from config if provided, otherwise default to 32
-        self.batch_size = config.get("batch_size", 32) 
+        self.batch_size = config.batch_size 
 
         #How many clients to split data into. Default is 1
-        self.num_clients = config.get("num_clients", 1)
+        self.num_clients = config.num_clients
 
         #Percentage of data to use for testing (rest is for training).
-        self.test_split = config.get("test_split", 0.2)
+        self.test_split = config.test_split
 
         #Whether to normalize features.
-        self.normalize = config.get("normalize", True)
+        self.normalize = config.normalize
 
         #Ensure reproducibility by using a fixed random seed for shuffling and splitting data.
-        self.seed = config.get("seed", 42)
+        self.seed = config.seed
         
         #Name of the column in the CSV that reveals if its an attack or natural
-        self.label_column = config.get("label_column", "marker")
+        self.label_column = config.target
      
         #Load the CSV file into a pandas DataFrame (table).
         self.df = pd.read_csv(self.file_path)
