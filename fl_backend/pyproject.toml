@@ -12,6 +12,7 @@ dependencies = [
     "torch",
     "pandas",
     "numpy",
+    "scikit-learn",
 ]
 
 [tool.flwr.app]
