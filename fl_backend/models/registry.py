@@ -10,13 +10,13 @@ MODEL_REGISTRY = {
     "supervised_cnn_transformer": SupervisedTransformerCNN,
 }
 
-def create_model(model_config, input_dim):
+def create_model(model_config, metadata):
     model_cls = MODEL_REGISTRY.get(model_config.name)
     if model_cls is None:
         raise ValueError(f"Model '{model_config.name}' is not registered.")
 
     return model_cls(
-        in_channels=input_dim,  # comes from dataset, not model config
+        in_channels=metadata["input_dim"],  # comes from dataset, not model config
         d_model=model_config.d_model,
         nhead=model_config.nhead,
         num_layers=model_config.num_layers,

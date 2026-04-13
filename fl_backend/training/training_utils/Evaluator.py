@@ -25,11 +25,10 @@ class Evaluator(TrainEvalBase):
     def __init__(
         self,
         model_config,
-        num_classes: int,
     ):
         # epochs and patience are irrelevant for evaluation
         # but required by AnomalyTrainerBase.__init__
-        super().__init__(num_classes=num_classes)
+        super().__init__(num_classes=model_config.num_classes)
         self.model_config = model_config
 
     # ------------------------------------------------------------------ #
@@ -119,7 +118,7 @@ class Evaluator(TrainEvalBase):
         built from self.model_config.
         """
 
-        model = create_model(self.model_config, self.input_dim)
+        model = create_model(self.model_config)
 
         checkpoint = torch.load(path, map_location=self.device)
         model.load_state_dict(checkpoint["model_state_dict"])

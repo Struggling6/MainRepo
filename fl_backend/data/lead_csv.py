@@ -1,12 +1,10 @@
 # Data manipulation and visualization libraries
 import numpy as np
 import pandas as pd
-from sqlalchemy import TIMESTAMP
-from sqlalchemy import TIMESTAMP
 import torch
 
-from pathlib import Path
-from fl_backend.data.BaseDataHandler import BaseDatasetHandler
+from sqlalchemy import TIMESTAMP
+from data.BaseDataHandler import BaseDatasetHandler
 from data.utils import temporal_grouped_split
 
 
@@ -39,7 +37,6 @@ class LeadCSVHandler(BaseDatasetHandler):
         # _prepare_data must run before _prepare_partitions because
         # _prepare_partitions needs self.df to have building IDs
         self.features, self.labels = self._prepare_data()
-        self.df = pd.read_csv(self.file_path)
         self._prepare_partitions()
 
     # ------------------------------------------------------------------ #
@@ -218,47 +215,8 @@ class LeadCSVHandler(BaseDatasetHandler):
             "num_classes": self.config.num_classes,
             "num_samples": self.df.shape[0], 
             "task_type"  : self.config.task.name,
-            "data_format": "tabular",
+        "data_format": "tabular",
         }
-
-    def get_dataloaders(self, partition_id: int):
-        if partition_id < 0 or partition_id >= self.num_clients:
-            raise ValueError(f"Invalid partition_id: {partition_id}")
-        
-        # only keep rows belonging to the buildings assigned to this client
-        client_df = self.df[self.df["building_id"].isin(self.client_indices[partition_id])]
-
-        # Perform temporal split on this client's slice
-        X_train, y_train, X_val, y_val = temporal_grouped_split(
-            
-            df           = client_df,  # ← only this client's rows
-            feature_cols = self.feature_cols,
-            node_col     = "building_id",
-            time_col     = "timestamp",
-            train_ratio  = 1.0 - self.test_split,  # e.g. 0.8 means 80% train, 20% test
-            gap_hours    = 73,                     # matches longest lag feature (lag73)
-            window_size  = 168,                    # 1 week of hourly data
-            stride       = 24,                     # one window per day
-            target       = self.target,
-        )
-
-        train_dataset = torch.utils.data.TensorDataset(
-            torch.tensor(X_train, dtype=torch.float32),
-            torch.tensor(y_train, dtype=torch.float32),
-        )
-        val_dataset = torch.utils.data.TensorDataset(
-            torch.tensor(X_val, dtype=torch.float32),
-            torch.tensor(y_val, dtype=torch.float32),
-        )
-
-        trainloader = torch.utils.data.DataLoader(
-            train_dataset, batch_size=self.batch_size, shuffle=True
-        )
-        valloader = torch.utils.data.DataLoader(
-            val_dataset, batch_size=self.batch_size, shuffle=False
-        )
-
-        return trainloader, valloader
 
 
     def get_num_partitions(self) -> int:
