@@ -215,9 +215,9 @@ class LeadCSVHandler(BaseDatasetHandler):
     def get_metadata(self):
         return {
             "input_dim"  : len(self.feature_cols),
-            "num_classes": 1,
+            "num_classes": self.config.num_classes,
             "num_samples": self.df.shape[0], 
-            "task_type"  : "binary_classification",
+            "task_type"  : self.config.task.name,
             "data_format": "tabular",
         }
 
