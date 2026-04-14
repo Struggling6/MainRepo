@@ -46,6 +46,7 @@ def main():
     eval_results = evaluator.evaluate_round(model, valloader)
     print(f"Evaluation results: {eval_results}")
 
+    plot_diagrams(eval_results["targets"], eval_results["preds"], train_results["train_losses"], train_results["train_accuracies"])
 
 if __name__ == "__main__":
     main()

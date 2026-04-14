@@ -22,4 +22,5 @@ class ClassificationTask(BaseTask):
         return {
             "correct": correct,
             "total": total,
+            "preds" : preds,
         }
