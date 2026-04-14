@@ -1,12 +1,11 @@
-#Flower tools for building the server.
-from flwr.server import ServerApp, ServerConfig, ServerAppComponents
+from flwr.server import ServerApp, ServerAppComponents, ServerConfig
+
 from config import CONFIG
 from FedAvgWithSave import FedAvgWithSave
-from models.registry import create_model
-from models.utils import get_device
+
 
 def server_fn(context):
-    fed_config  = CONFIG.federation
+    fed_config = CONFIG.federation
     num_clients = CONFIG.data.num_clients
 
     strategy = FedAvgWithSave(

@@ -1,7 +1,7 @@
 import pandas as pd
 from abc import ABC, abstractmethod
 from pathlib import Path
-from data.utils import temporal_grouped_split, create_test_windows
+from .time_series_utils import temporal_grouped_split, create_test_windows
 
 #this is supposed to be an interface for all the data handlers
 # so each Data handler has these methods implemented, 
