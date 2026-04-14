@@ -1,34 +1,118 @@
-CONFIG = {
-    "task": {
-        "name": "classification",
-    },
+from dataclasses import dataclass, field
+from pathlib import Path
+import torch.nn as nn
 
-    "model": {
-        "name": "mlp",
-        "hidden_dim": 64,
-        "dropout": 0.2,
-    },
 
-    "data": {
-        "name": "powergrid_csv",
-        "file_path": "datasets/data1.csv",
-        "label_column": "marker",
-        "batch_size": 32,
-        "num_clients": 1,
-        "test_split": 0.2,
-        "normalize": True,
-        "seed": 42,
-        "partition_mode": "shared",
-    },
+# ── Task configs ─────────────────────────────────────────────────────── #
 
-    "training": {
-        "learning_rate": 0.001,
-        "local_epochs": 5,
-    },
+@dataclass
+class BinaryClassificationConfig:
+    name: str = "binary_classification"
 
-    "federation": {
-        "num_rounds": 5,
-        "fraction_fit": 1.0,
-        "fraction_evaluate": 1.0,
-    },
-}
+@dataclass
+class AnomalyDetectionConfig:
+    name: str = "anomaly_detection"
+
+
+# ── Model configs ─────────────────────────────────────────────────────── #
+
+@dataclass
+class CNNTransformerConfig:
+    name:           str   = "supervised_cnn_transformer"
+    d_model:        int   = 128
+    nhead:          int   = 4 # number of attention heads (nhead is PyTorch's parameter name)
+    num_layers:     int   = 2
+    dropout:        float = 0.3
+    pos_weight_cap: float = 10.0
+    num_classes:    int   = 1  # binary classification
+    loss_fn:        type  = nn.BCEWithLogitsLoss  # default loss function for binary classification
+
+@dataclass
+class LSTMConfig:
+    name:        str   = "lstm"
+    hidden_size: int   = 128
+    num_layers:  int   = 2
+    dropout:     float = 0.3
+    loss_fn:     type  = nn.BCEWithLogitsLoss
+
+
+# ── Data configs ──────────────────────────────────────────────────────── #
+
+@dataclass
+class LeadCSVConfig:
+    name:          str  = "lead_csv"
+    file_path:     Path = Path("datasets/LEAD/train_features.csv")
+    target:        str  = "anomaly"
+    batch_size:    int  = 64
+    test_split:   float = 0.2
+    num_clients:   int  = 1
+    seed:          int  = 42
+    partition_mode: str = "shared"
+
+@dataclass
+class PowerGridCSVConfig:
+    name:         str   = "powergrid_csv"
+    file_path:    Path  = Path("datasets/EPIC/Scenario_1/EpicLog_noisy.csv")
+    clean_path:   Path  = Path("datasets/EPIC/Scenario_1/EpicLog_clean.csv")
+    target:       str   = "marker"
+    batch_size:   int   = 32
+    num_clients:  int   = 1
+    test_split:   float = 0.2
+    normalize:    bool  = True
+    noise_level:  float = 0.7
+    seed:         int   = 42
+    partition_mode: str = "shared"
+
+
+# ── Training config ───────────────────────────────────────────────────── #
+
+@dataclass
+class TrainingConfig:
+    learning_rate: float = 1e-4
+    weight_decay:  float = 1e-4
+    local_epochs:  int   = 30
+    patience:      int   = 10
+
+
+# ── Federation config ─────────────────────────────────────────────────── #
+
+@dataclass
+class FederationConfig:
+    num_rounds:        int   = 5
+    fraction_fit:      float = 1.0
+    fraction_evaluate: float = 1.0
+
+# ── Evaluation config ─────────────────────────────────────────────────── #
+
+@dataclass
+class EvaluationConfig:
+    model_path:   Path  = Path("checkpoints/model.pt")
+    test_path:    Path  = Path("datasets/LEAD/test_features.csv")
+    target:       str   = "anomaly"
+    batch_size:   int   = 64
+    threshold:    float = 0.5   # decision threshold — override with best_thresh from training
+    input_dim:    int   = 0     # set after data loading
+
+# ── Top-level experiment config ───────────────────────────────────────── #
+
+@dataclass
+class ExperimentConfig:
+    task:       BinaryClassificationConfig = field(default_factory=BinaryClassificationConfig)
+    model:      CNNTransformerConfig       = field(default_factory=CNNTransformerConfig)
+    data:       LeadCSVConfig              = field(default_factory=LeadCSVConfig)
+    training:   TrainingConfig             = field(default_factory=TrainingConfig)
+    federation: FederationConfig           = field(default_factory=FederationConfig)
+    evaluation: EvaluationConfig           = field(default_factory=EvaluationConfig)
+
+# ── Active experiment ─────────────────────────────────────────────────── #
+# This is the single line you change when switching experiments
+
+CONFIG = ExperimentConfig()
+
+# Example: switch to PowerGrid dataset with LSTM
+# CONFIG = ExperimentConfig(
+#     task=AnomalyDetectionConfig(),
+#     model=LSTMConfig(hidden_size=256),
+#     data=PowerGridCSVConfig(num_clients=3),
+#     training=TrainingConfig(learning_rate=5e-4),
+# )
