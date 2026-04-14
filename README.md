@@ -26,7 +26,6 @@ This was done to be sure to have the correct version of the libraries and is app
 rebuild + start Docker Compose commands
 Run:
 docker compose down
-docker compose up --build -d
 What this does:
 - down = stops/removes old containers
 - up --build -d = rebuilds using our pyproject.toml and starts everything again
@@ -160,3 +159,126 @@ class MyDatasetHandler(BaseDatasetHandler):
         return self.num_clients
 
 ```
+## Federated Learning with Flower
+
+This project uses Flower to implement a federated learning system with a custom client and server.
+
+### Overview
+
+The system follows the standard federated learning workflow:
+
+1. The server sends a global model to clients  
+2. Clients train the model on their local data partitions  
+3. Clients return updated model parameters  
+4. The server aggregates updates using FedAvg  
+5. The process repeats for multiple rounds  
+
+---
+
+### Client
+
+The client is implemented by extending `NumPyClient`.
+
+Each client:
+- Loads its assigned data partition  
+- Builds the model and task  
+- Trains locally on its data  
+- Evaluates the global model  
+
+#### Methods
+
+- `get_parameters`: Returns current model parameters  
+- `fit`: Trains the model locally and returns updated parameters and metrics  
+- `evaluate`: Evaluates the model on local test data  
+
+The `client_fn` function creates a client using a partition ID provided by Flower.
+
+---
+
+### Server
+
+The server defines the training strategy and number of rounds.
+
+#### Strategy
+
+FedAvg is used to aggregate client updates:
+
+- Model parameters from clients are averaged  
+- Each client’s contribution is weighted by its number of training examples  
+
+#### Configuration
+
+- `fraction_fit`: Fraction of clients used for training each round  
+- `fraction_evaluate`: Fraction of clients used for evaluation  
+- `min_*`: Minimum number of clients required  
+
+---
+
+### Data
+
+- The dataset is split into partitions  
+- Each client trains only on its own partition  
+- No raw data is shared between clients or server  
+
+---
+
+### What is Context?
+
+`context` is a Flower-provided object that contains runtime information about the current client or server.
+
+- In the client, it is used to determine which data partition to load  
+- In the server, it can be used for configuration if needed
+
+## Optuna Hyperparameter Optimization
+
+This script runs [Optuna](https://optuna.org/) hyperparameter search over a model, then updates the global `CONFIG` object with the best trial's parameters so downstream training uses them automatically.
+
+### How it works
+
+1. **Parses CLI flags** for epochs, trials, and patience (see below).
+2. **Loads the dataset** via `LeadCSVHandler(CONFIG.data)` and splits it into train/validation tensors using `run_split()`. The split is temporal and grouped by `node_id`, so no node leaks between train and val. (node refers to building, sensor, device, etc.)
+3. **Instantiates `OptunaOptimizer`** with the training/validation tensors and the chosen trial budget.
+4. **Runs the study.** Each Optuna trial samples a hyperparameter combination (model width, number of heads, layers, dropout, learning rate, weight decay, batch size, pos-weight cap) and trains a fresh model for up to `--epochs` number of epochs with early stopping controlled by `--patience`.
+5. **Writes the best trial's parameters back into `CONFIG`** — specifically `CONFIG.model`, `CONFIG.training`, and `CONFIG.data.batch_size` — and prints the updated config to stdout.
+
+### Prerequisites
+
+- You must run the script **from the `fl_backend/` directory**. The imports (`data.lead_csv`, `models.supervised_cnn_transformer`, `config`) resolve relative to that folder.
+- The virtual environment must be activated and all dependencies installed (PyTorch, Optuna, pandas, numpy, etc.).
+- `CONFIG.data.file_path` must as of now point to LEAD CSV file.
+
+### Running
+
+Because `training` is a Python package (a module with an `__init__.py`), run the script with `-m` so relative imports inside `training/` resolve correctly:
+
+```bash
+cd fl_backend
+python -m training.optimize
+```
+
+### Command-line arguments
+
+All three flags are optional. If omitted, the defaults shown below are used.
+
+| Flag              | Short | Type | Default | Description                                                                 |
+|-------------------|-------|------|---------|-----------------------------------------------------------------------------|
+| `--epochs`        | `-e`  | int  | `10`    | Maximum number of training epochs per Optuna trial.                          |
+| `--trials`        | `-t`  | int  | `50`    | Number of Optuna trials to run in the study.                                 |
+| `--patience`      | `-p`  | int  | `10`    | Early-stopping patience (epochs without val improvement before a trial stops). |
+
+Run `python -m training.optimize --help` to see this same information at the command line.
+
+## Hyperparameters searched
+
+The `OptunaOptimizer` samples and returns values for the following keys in `study.best_trial.params`:
+
+- `d_model` — transformer model dimension
+- `nhead` — number of attention heads
+- `num_layers` — number of transformer encoder layers
+- `dropout` — dropout rate
+- `pos_weight_cap` — cap on the positive-class weight in the loss
+- `lr` — learning rate
+- `weight_decay` — AdamW weight decay
+- `batch_size` — training batch size
+
+See `training/training_utils/OptunaOptimizer.py` for the exact search spaces.
