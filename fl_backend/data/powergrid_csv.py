@@ -30,7 +30,7 @@ class PowerGridCSVHandler(BaseDatasetHandler):
         
         #Name of the column in the CSV that reveals if its an attack or natural
         self.label_column = config.target
-        self.partition_mode = config.get("partition_mode", "shared")
+        self.partition_mode = getattr(config, "partition_mode", "shared")
         #Load the CSV file into a pandas DataFrame (table).
         self.df = pd.read_csv(self.file_path)
 
@@ -79,7 +79,17 @@ class PowerGridCSVHandler(BaseDatasetHandler):
             std = self.features.std(axis=0) #Calculate std of each feature column
             std[std == 0] = 1.0 # If std is 0, replace with 1 to avoid division errors
             self.features = (self.features - mean) / std #Standardization/Z-score normalization. Mean = 0, Std = 1.
+    def _preprocess(self, df):
+        df = df.copy()
 
+        # Example cleanup
+        df.columns = [c.strip() for c in df.columns]
+
+        # Drop rows with missing target
+        if self.config.target in df.columns:
+            df = df.dropna(subset=[self.config.target])
+
+        return df
     def _prepare_partitions(self):
         if self.partition_mode == "local":
             self.client_indices = [np.arange(len(self.features))]
@@ -115,12 +125,14 @@ class PowerGridCSVHandler(BaseDatasetHandler):
         }
 
     def get_dataloaders(self, partition_id: int):
-        #Check that the requested partition_id is valid
-        if partition_id < 0 or partition_id >= len(self.client_indices):
-            raise ValueError(f"Invalid partition_id: {partition_id}")
-
-        #Get indices for this client
-        idx = self.client_indices[partition_id]
+        #In local mode each SuperNode has its own dataset file, so the
+        #requested partition_id is ignored and the full local dataset is used.
+        if self.partition_mode == "local":
+            idx = np.arange(len(self.features))
+        else:
+            if partition_id < 0 or partition_id >= len(self.client_indices):
+                raise ValueError(f"Invalid partition_id: {partition_id}")
+            idx = self.client_indices[partition_id]
 
         #Select features and labels for this client using the indices
         x_client = self.features[idx]
