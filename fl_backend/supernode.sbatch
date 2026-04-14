@@ -5,7 +5,6 @@
 #SBATCH --chdir=/ceph/home/student.aau.dk/rr68qj/fl_backend
 #SBATCH --mem=8G
 #SBATCH --cpus-per-task=4
-#SBATCH --gres=gpu:1
 #SBATCH --time=01:00:00
 
 set -euo pipefail
@@ -31,7 +30,7 @@ echo "Partition ID: ${PARTITION_ID}"
 echo "ClientAppIo port: ${CLIENTAPPIO_PORT}"
 echo "Job ID: ${SLURM_JOB_ID}"
 
-srun singularity exec --nv \
+srun singularity exec \
   -B /ceph/home/student.aau.dk/rr68qj/fl_venv:/scratch/fl_venv \
   -B /ceph/home/student.aau.dk/rr68qj/fl_backend:/workspace/fl_backend \
   /ceph/container/pytorch/pytorch_25.08.sif \
@@ -39,7 +38,7 @@ srun singularity exec --nv \
     source /scratch/fl_venv/bin/activate
     export PYTHONWARNINGS='ignore:Protobuf gencode version:UserWarning'
     cd /workspace/fl_backend
-    flower-supernode \
+    /scratch/fl_venv/bin/flower-supernode \
       --insecure \
       --superlink ${SUPERLINK_HOST}:9092 \
       --clientappio-api-address 127.0.0.1:${CLIENTAPPIO_PORT} \
