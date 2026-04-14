@@ -45,8 +45,9 @@ class LeadCSVConfig:
     target:        str  = "anomaly"
     batch_size:    int  = 64
     test_split:   float = 0.2
-    num_clients:   int  = 1
+    num_clients:   int  = 2
     seed:          int  = 42
+    partition_mode: str = "shared"
 
 @dataclass
 class PowerGridCSVConfig:
@@ -55,11 +56,12 @@ class PowerGridCSVConfig:
     clean_path:   Path  = Path("datasets/EPIC/Scenario_1/EpicLog_clean.csv")
     target:       str   = "marker"
     batch_size:   int   = 32
-    num_clients:  int   = 1
+    num_clients:  int   = 2
     test_split:   float = 0.2
     normalize:    bool  = True
     noise_level:  float = 0.7
     seed:         int   = 42
+    partition_mode: str = "shared"
 
 
 # ── Training config ───────────────────────────────────────────────────── #
@@ -97,7 +99,7 @@ class EvaluationConfig:
 class ExperimentConfig:
     task:       BinaryClassificationConfig = field(default_factory=BinaryClassificationConfig)
     model:      CNNTransformerConfig       = field(default_factory=CNNTransformerConfig)
-    data:       LeadCSVConfig              = field(default_factory=LeadCSVConfig)
+    data:       PowerGridCSVConfig              = field(default_factory=PowerGridCSVConfig)
     training:   TrainingConfig             = field(default_factory=TrainingConfig)
     federation: FederationConfig           = field(default_factory=FederationConfig)
     evaluation: EvaluationConfig           = field(default_factory=EvaluationConfig)

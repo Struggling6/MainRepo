@@ -24,13 +24,11 @@ serverapp = "server_app:app"
 
 
 [tool.hatch.build.targets.wheel]
+packages = ["data", "models", "tasks", "training"]
 include = [
   "client_app.py",
   "server_app.py",
+  "FedAvgWithSave.py",
   "config.py",
   "main.py",
-  "data",
-  "models",
-  "tasks",
-  "training",
 ]
