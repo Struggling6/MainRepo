@@ -1,14 +1,12 @@
 #This file is just to test that everything works end to end before implementing flower.
 
-import torch
 from config import CONFIG
 from data.registry import create_dataset_handler
 from models.registry import create_model
-from tasks.registry import create_task
 from training.train import train_model
-from training.evaluate import evaluate_model
 from models.utils import get_device
 from training.training_utils.Evaluator import Evaluator
+from plotting.plotting_config import plot_diagrams
 
 def main():
     config = CONFIG
