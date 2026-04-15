@@ -1,4 +1,3 @@
-
 # Machine learning libraries
 import torch
 import torch.nn as nn #neural network module
