@@ -6,7 +6,6 @@ from flwr.client import ClientApp, NumPyClient
 
 from config import CONFIG
 from data.registry import create_dataset_handler
-from models.registry import create_model
 from models.utils import get_device, get_model_parameters, set_model_parameters
 from training.train import train_model
 from training.training_utils.Evaluator import Evaluator
@@ -34,7 +33,7 @@ class FlowerClient(NumPyClient):
         # Build dataset/model from config
         self.dataset_handler = create_dataset_handler(self.config.data)
         self.metadata = self.dataset_handler.get_metadata()
-        self.model = create_model(self.config.model, self.metadata)
+        self.model = CONFIG.model.build(input_dim=self.metadata["input_dim"])
 
         self.trainloader, self.testloader = self.dataset_handler.get_dataloaders(
             partition_id=self.partition_id

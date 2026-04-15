@@ -77,11 +77,13 @@ class BaseDatasetHandler(ABC):
     @abstractmethod
     def get_metadata(self) -> dict:
         """
-        Return a dictionary of dataset metadata used by create_model
-        to build the correct architecture. Must include at least:
-          - input_dim  : number of features per timestep
+        Return a dictionary of dataset metadata used by the model
+        config's build() method to construct the correct architecture.
+        Must include at least:
+          - input_dim  : number of features per timestep — passed to
+                         build(input_dim=...) as the model's in_channels
           - num_classes: number of output classes
-          - num_samples: total number of raw rows
+          - num_samples: total number of raw rows after preprocessing
           - task_type  : e.g. "binary_classification"
           - data_format: e.g. "tabular"
         """
