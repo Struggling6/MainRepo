@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from pathlib import Path
+from pyparsing import Literal, Optional
 import torch.nn as nn
 
 
@@ -35,6 +36,26 @@ class LSTMConfig:
     dropout:     float = 0.3
     loss_fn:     type  = nn.BCEWithLogitsLoss
 
+@dataclass
+class PatchTSTConfig:
+    name:                   str = "patch_tst"
+    num_input_channels:     int         = 1
+    context_length:         int         = 32       
+    patch_length:           int         = 16
+    patch_stride:           int         = 1
+    d_model:                int         = 128
+    num_attention_heads:    int         = 16
+    num_hidden_layers:      int         = 3
+    ffn_dim:                int         = 256
+    dropout:                float       = 0.2
+    head_dropout:           float       = 0.2
+    channel_attention:      bool        = True
+    loss:                   str         = "mse"
+    attention_dropout:      float       = 0.0
+    positional_dropout:     float       = 0.0
+    pre_norm:               bool        = True
+    norm_type:              Literal["batchnorm", "layernorm"] | None = "batchnorm"
+    num_classes:            int         = 1
 
 # ── Data configs ──────────────────────────────────────────────────────── #
 
@@ -99,7 +120,7 @@ class EvaluationConfig:
 class ExperimentConfig:
     task:       BinaryClassificationConfig = field(default_factory=BinaryClassificationConfig)
     model:      CNNTransformerConfig       = field(default_factory=CNNTransformerConfig)
-    data:       PowerGridCSVConfig              = field(default_factory=PowerGridCSVConfig)
+    data:       PowerGridCSVConfig         = field(default_factory=PowerGridCSVConfig)
     training:   TrainingConfig             = field(default_factory=TrainingConfig)
     federation: FederationConfig           = field(default_factory=FederationConfig)
     evaluation: EvaluationConfig           = field(default_factory=EvaluationConfig)

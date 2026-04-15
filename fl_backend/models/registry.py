@@ -4,10 +4,12 @@
 #from .transformer.py import TransformerModel
 from .mlp import MLPModel
 from .supervised_cnn_transformer import SupervisedTransformerCNN
+from .PatchTST import PatchTST
 
 MODEL_REGISTRY = {
     "mlp":                        MLPModel,
     "supervised_cnn_transformer": SupervisedTransformerCNN,
+    "patch_tst":                  PatchTST,
 }
 
 def create_model(model_config, metadata):
