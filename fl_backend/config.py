@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Optional
 from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
-
+from models import SupervisedTransformerCNN, LSTMModel, MLPModel
 # ── Task configs ─────────────────────────────────────────────────────── #
 
 @dataclass
@@ -25,45 +25,34 @@ class MultiClassClassificationConfig:
 class CNNTransformerConfig:
     name:           str   = "supervised_cnn_transformer"
     d_model:        int   = 128
-    nhead:          int   = 4 # number of attention heads (nhead is PyTorch's parameter name)
+    num_heads:      int   = 4
     num_layers:     int   = 2
     dropout:        float = 0.3
     pos_weight_cap: float = 10.0
-    num_classes:    int   = 1  # binary classification
-    loss_fn:        type  = nn.BCEWithLogitsLoss  # default loss function for binary classification
+    num_classes:    int   = 1
+    loss_fn:        type  = nn.BCEWithLogitsLoss
+
+    def build(self, input_dim: int) -> nn.Module:
+        return SupervisedTransformerCNN(
+            in_channels=input_dim,
+            d_model=self.d_model,
+            num_heads=self.num_heads,
+            num_layers=self.num_layers,
+            num_classes=self.num_classes,
+            dropout=self.dropout,
+        )
+
 
 @dataclass
 class LSTMConfig:
-    name:        str   = "lstm"
-    hidden_size: int   = 128
-    num_layers:  int   = 2
-    dropout:     float = 0.3
-    loss_fn:     type  = nn.BCEWithLogitsLoss
+    name:            str       = "lstm"
+    hidden_size:     int       = 128
+    num_layers:      int       = 2
+    dropout:         float     = 0.3
+    num_classes:     int       = 1
+    pos_weight_cap:  float     = 10.0
+    loss_fn:         type      = nn.BCEWithLogitsLoss
 
-@dataclass
-class PatchTSTConfig(HF_PatchTSTConfig):
-    name:                   str = "patchtst"
-    num_input_channels:     int         = 1
-    context_length:         int         = 32       
-    patch_length:           int         = 16
-    patch_stride:           int         = 1
-    d_model:                int         = 128
-    num_attention_heads:    int         = 16
-    num_hidden_layers:      int         = 3
-    ffn_dim:                int         = 256
-    dropout:                float       = 0.2
-    head_dropout:           float       = 0.2
-    channel_attention:      bool        = True
-    loss:                   str         = "mse"
-    attention_dropout:      float       = 0.0
-    positional_dropout:     float       = 0.0
-    pre_norm:               bool        = True
-    norm_type:              Literal["batchnorm", "layernorm"] | None = "batchnorm"
-    num_classes:            int         = 1
-
-    # Our own parameters (not in HuggingFace config) needed for our training loop
-    nhead:                  int         = num_attention_heads
-    num_layers:             int         = num_hidden_layers
 
 # ── Data configs ──────────────────────────────────────────────────────── #
 

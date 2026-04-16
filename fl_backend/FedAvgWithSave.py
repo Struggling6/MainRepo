@@ -6,7 +6,6 @@ import torch.nn as nn
 from pathlib import Path
 from typing import Union, Optional
 from config import CONFIG
-from models.registry import create_model
 from models.utils import get_device
 from data.registry import create_dataset_handler
 
@@ -35,7 +34,7 @@ class FedAvgWithSave(FedAvg):
 
             device = get_device()
             metadata = create_dataset_handler(CONFIG.data).get_metadata()
-            model = create_model(CONFIG.model, metadata).to(device)
+            model = CONFIG.model.build(input_dim=self.metadata["input_dim"])
 
             # Convert Flower parameters back to numpy arrays, then load into model
             ndarrays    = parameters_to_ndarrays(aggregated_parameters)
