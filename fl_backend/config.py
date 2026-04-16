@@ -9,10 +9,6 @@ import torch.nn as nn
 class BinaryClassificationConfig:
     name: str = "binary_classification"
 
-@dataclass
-class AnomalyDetectionConfig:
-    name: str = "anomaly_detection"
-
 
 # ── Model configs ─────────────────────────────────────────────────────── #
 
@@ -36,6 +32,17 @@ class LSTMConfig:
     loss_fn:     type  = nn.BCEWithLogitsLoss
 
 
+@dataclass
+class TransformerConfig:
+    name:           str   = "transformer"
+    d_model:        int   = 128
+    nhead:          int   = 4
+    num_layers:     int   = 2
+    dropout:        float = 0.3
+    pos_weight_cap: float = 10.0 
+    num_classes:    int   = 1
+    loss_fn:        type  = nn.BCEWithLogitsLoss
+
 # ── Data configs ──────────────────────────────────────────────────────── #
 
 @dataclass
@@ -44,8 +51,8 @@ class LeadCSVConfig:
     file_path:     Path = Path("datasets/LEAD/train_features.csv")
     target:        str  = "anomaly"
     batch_size:    int  = 64
-    test_split:   float = 0.2
-    num_clients:   int  = 2
+    test_split:   float = 0.4
+    num_clients:   int  = 1
     seed:          int  = 42
     partition_mode: str = "shared"
 
@@ -70,7 +77,7 @@ class PowerGridCSVConfig:
 class TrainingConfig:
     learning_rate: float = 1e-4
     weight_decay:  float = 1e-4
-    local_epochs:  int   = 30
+    local_epochs:  int   = 5
     patience:      int   = 10
 
 
@@ -98,8 +105,8 @@ class EvaluationConfig:
 @dataclass
 class ExperimentConfig:
     task:       BinaryClassificationConfig = field(default_factory=BinaryClassificationConfig)
-    model:      CNNTransformerConfig       = field(default_factory=CNNTransformerConfig)
-    data:       PowerGridCSVConfig              = field(default_factory=PowerGridCSVConfig)
+    model:      TransformerConfig       = field(default_factory=TransformerConfig)
+    data:       LeadCSVConfig             = field(default_factory=LeadCSVConfig)
     training:   TrainingConfig             = field(default_factory=TrainingConfig)
     federation: FederationConfig           = field(default_factory=FederationConfig)
     evaluation: EvaluationConfig           = field(default_factory=EvaluationConfig)

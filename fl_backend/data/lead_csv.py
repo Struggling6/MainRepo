@@ -16,7 +16,7 @@ class LeadCSVHandler(BaseDatasetHandler):
     features from leaking across the train/val boundary.
     """
     # Override base class default — matches longest lag feature
-    _gap_hours = 73
+    _gap_hours = 0
 
     def __init__(self, config):    # config: LeadCSVConfig
 
@@ -211,10 +211,12 @@ class LeadCSVHandler(BaseDatasetHandler):
     def get_metadata(self):
         return {
             "input_dim"  : len(self.feature_cols),
-            "num_classes": self.config.num_classes,
+           #"num_classes": self.config.num_classes, old line .. LeadCSVConfig does not have num_classes, so your old code crashes.
+            "num_classes": 1,
             "num_samples": self.df.shape[0], 
-            "task_type"  : self.config.task.name,
-        "data_format": "tabular",
+           #"task_type"  : self.config.task.name, old line .. LeadCSVConfig does not have task, so your old code crashes.
+            "task_type"  : "binary_classification",
+            "data_format": "tabular",
         }
 
 

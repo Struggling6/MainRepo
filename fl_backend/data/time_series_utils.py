@@ -78,7 +78,7 @@ def temporal_grouped_split(
     node_col: str,
     time_col="timestamp",
     train_ratio=0.8,
-    gap_hours=0,
+    gap_hours=73,
     target="anomaly",
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
@@ -111,12 +111,16 @@ def temporal_grouped_split(
     #Process each node seperately so different time series are not mixed together
     for node, group in df.groupby(node_col):
         group    = group.sort_values(time_col)
+        
+        print(f"\n--- NODE {node} ---")
+        print(f"total rows: {len(group)}")
 
-        # Train: everything up to and including the cutoff
-        train_df = group[group[time_col] <= cutoff] #Older data for training
+        train_df = group[group[time_col] <= cutoff]
+        val_df   = group[group[time_col] > cutoff + pd.Timedelta(hours=gap_hours)]
 
-        # Val: everything after cutoff + gap to avoid lag leakage
-        val_df   = group[group[time_col] > cutoff + pd.Timedelta(hours=gap_hours)] #Newer data for testing, after optinal gap
+        print(f"train rows: {len(train_df)}")
+        print(f"val rows: {len(val_df)}")
+        print(f"window_size: {window_size}")
 
         if len(train_df) > window_size:
             Xtr, ytr = create_windowed_data(train_df, feature_cols, window_size, stride, target)
@@ -171,7 +175,7 @@ def estimate_split_mem_usage(df, feature_cols):
     """
     total_rows     = len(df)
     approx_windows = total_rows / 24   # stride=24
-    window_size    = 168
+    window_size    = 24
     n_features     = len(feature_cols)
 
     memory_gb = (approx_windows * window_size * n_features * 4) / 1e9  # float32 = 4 bytes

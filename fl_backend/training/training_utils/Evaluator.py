@@ -133,8 +133,16 @@ class Evaluator(TrainEvalBase):
 
     def _build_loss(self, testloader):
         """Build loss function using pos_weight computed from test labels."""
-        y      = self._extract_labels(testloader)
-        pw     = compute_pos_weight(y, cap=self.model_config.pos_weight_cap)
+        y = self._extract_labels(testloader)
+         
+        # If there are NO positive samples (no anomalies),
+        # we cannot compute pos_weight (division by zero / invalid)
+        # → fallback to standard BCE loss without class weighting
+        if (y == 1).sum() == 0:
+            print("No positive labels in eval, using standard BCE loss", flush=True)
+            return self.model_config.loss_fn()
+
+        pw = compute_pos_weight(y, cap=self.model_config.pos_weight_cap)
         return self.model_config.loss_fn(
             pos_weight=torch.tensor([pw], device=self.device)
         )

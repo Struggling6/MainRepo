@@ -38,16 +38,50 @@ docker compose ps
 
 ## New Docker COmmands:
 
-You only need to rebuild the image if you changed:
+First-time setup (only once)
 
-Python code
-pyproject.toml
-the Dockerfile
-
-Then run:
+Build the Docker image and start the services:
 
 docker build -t fl-backend-app:latest ./fl_backend
 docker compose up -d
+
+This installs Python, dependencies, and system setup.
+
+## Daily development (when changing Python code)
+
+If you modify models, training logic, dataset handling, or configs, you do NOT need to rebuild Docker.
+
+Instead run:
+
+docker compose restart superexec-serverapp superexec-clientapp-1
+Then start Flower:
+
+cd fl_backend
+flwr run . local-deployment --stream
+
+Multiple clients
+
+## If you have multiple clients:
+
+docker compose restart superexec-serverapp superexec-clientapp-1 superexec-clientapp-2
+
+Or restart everything:
+
+docker compose restart
+
+## When you MUST rebuild
+
+You only need to rebuild Docker if you change:
+
+requirements.txt
+Dockerfile
+Python version
+system dependencies
+
+Then run:
+docker build -t fl-backend-app:latest ./fl_backend
+docker compose up -d
+
 
 If you only change:
 
@@ -61,6 +95,9 @@ python generate_compose.py --num-clients 15
 docker compose up -d
 
 No rebuild needed.
+
+
+
 
 ## Flower CLI commands:
 flwr config list

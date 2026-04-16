@@ -35,7 +35,7 @@ class BaseDatasetHandler(ABC):
 
     _node_col    = "building_id"
     _time_col    = "timestamp"
-    _window_size = 168   # 1 week of hourly data
+    _window_size = 24   # 1 week of hourly data. Den var på 168 før men det var for mange til lead. så if len(train_df) > window_size var aldrig true.
     _stride      = 24    # one window per day
     _gap_hours   = 0     # override if lag features require a gap
 
