@@ -6,9 +6,10 @@ from data.registry import create_dataset_handler
 from models.registry import create_model
 from tasks.registry import create_task
 from training.train import train_model
-from training.evaluate import evaluate_model
+from training.evaluate import evaluate
 from models.utils import get_device
 from training.training_utils.Evaluator import Evaluator
+from plotting.plotting_config import plot_diagrams
 
 def main():
     config = CONFIG
@@ -16,7 +17,7 @@ def main():
 
     # ── Dataset ──────────────────────────────────────────────────────── #
     dataset_handler = create_dataset_handler(config.data)
-    metadata   = dataset_handler.get_metadata()
+    metadata        = dataset_handler.get_metadata()
     CONFIG.evaluation.input_dim = metadata["input_dim"]
     print(f"Dataset metadata: {metadata}")
 
@@ -41,12 +42,11 @@ def main():
     # ── Evaluation ───────────────────────────────────────────────────── #
     evaluator = Evaluator(
         model_config=config.model,
-        input_dim=metadata["input_dim"],
     )
     eval_results = evaluator.evaluate_round(model, valloader)
     print(f"Evaluation results: {eval_results}")
 
-    plot_diagrams(eval_results["targets"], eval_results["preds"], train_results["train_losses"], train_results["train_accuracies"])
+    #plot_diagrams(eval_results["targets"], eval_results["preds"], train_results["train_losses"], train_results["train_accuracies"])
 
 if __name__ == "__main__":
     main()

@@ -55,9 +55,9 @@ class FedAvgWithSave(FedAvg):
     def _save_model(
         model:      nn.Module,
         path:       Path,
-        config:     object = None,
-        threshold:  float  = 0.5,
-        metrics:    dict   = None,
+        config:     object,
+        threshold:  float,
+        metrics:    dict,
     ):
         """
         Save model weights, architecture config, best threshold,

@@ -42,7 +42,14 @@ class TrainEvalBase:
         for features, labels in loader:
             features, labels = features.to(self.device), labels.to(self.device)
             optimizer.zero_grad()
-            loss = loss_fn(model(features), labels)
+
+            if loss_fn is None:
+                # HuggingFace model — pass labels directly, model computes loss internally
+                output = model(features, labels)
+                loss   = output.loss
+            else:
+                loss = loss_fn(model(features), labels)
+
             loss.backward()
             optimizer.step()
 

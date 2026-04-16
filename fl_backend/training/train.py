@@ -15,15 +15,17 @@ def train_model(
     Entry point for Flower's client training loop.
     Trains the model using config-specified loss function and hyperparameters.
     """
+    if hasattr(model_config, "loss_fn"):
+        # Standard models — build loss from config with pos_weight
+        y_train    = _extract_labels(trainloader)
+        pos_weight = compute_pos_weight(y_train, cap=model_config.pos_weight_cap)
 
-    # Compute pos_weight from training labels
-    y_train    = _extract_labels(trainloader)
-    pos_weight = compute_pos_weight(y_train, cap=model_config.pos_weight_cap)
-
-    # Loss function comes from model config — not hardcoded
-    loss_fn = model_config.loss_fn(
-        pos_weight=torch.tensor([pos_weight], device=device)
-    )
+        loss_fn    = model_config.loss_fn(
+            pos_weight=torch.tensor([pos_weight], device=device)
+        ) if model_config.loss_fn == nn.BCEWithLogitsLoss else model_config.loss_fn()
+    else:
+        # HuggingFace models — loss is handled internally, pass None
+        loss_fn = None
 
     # Extract arrays from dataloader for Trainer
     X_train, y_train = _dataloader_to_arrays(trainloader)

@@ -13,7 +13,7 @@ class Trainer(TrainEvalBase):
     def __init__(
         self,
         model:        nn.Module,
-        loss_fn:      nn.Module,
+        loss_fn:      nn.Module | None, # Optionally pass None for HuggingFace models that compute loss internally
         lr:           float,
         batch_size:   int,
         epochs:       int,

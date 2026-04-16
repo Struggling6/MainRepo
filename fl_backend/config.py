@@ -1,8 +1,8 @@
+import torch.nn as nn
 from dataclasses import dataclass, field
 from pathlib import Path
-from pyparsing import Literal, Optional
-import torch.nn as nn
-
+from typing import Literal, Optional
+from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
 
 # ── Task configs ─────────────────────────────────────────────────────── #
 
@@ -13,6 +13,10 @@ class BinaryClassificationConfig:
 @dataclass
 class AnomalyDetectionConfig:
     name: str = "anomaly_detection"
+
+@dataclass
+class MultiClassClassificationConfig:
+    name: str = "multi_class_classification"
 
 
 # ── Model configs ─────────────────────────────────────────────────────── #
@@ -37,8 +41,8 @@ class LSTMConfig:
     loss_fn:     type  = nn.BCEWithLogitsLoss
 
 @dataclass
-class PatchTSTConfig:
-    name:                   str = "patch_tst"
+class PatchTSTConfig(HF_PatchTSTConfig):
+    name:                   str = "patchtst"
     num_input_channels:     int         = 1
     context_length:         int         = 32       
     patch_length:           int         = 16
@@ -56,6 +60,10 @@ class PatchTSTConfig:
     pre_norm:               bool        = True
     norm_type:              Literal["batchnorm", "layernorm"] | None = "batchnorm"
     num_classes:            int         = 1
+
+    # Our own parameters (not in HuggingFace config) needed for our training loop
+    nhead:                  int         = num_attention_heads
+    num_layers:             int         = num_hidden_layers
 
 # ── Data configs ──────────────────────────────────────────────────────── #
 
@@ -120,7 +128,7 @@ class EvaluationConfig:
 class ExperimentConfig:
     task:       BinaryClassificationConfig = field(default_factory=BinaryClassificationConfig)
     model:      CNNTransformerConfig       = field(default_factory=CNNTransformerConfig)
-    data:       PowerGridCSVConfig         = field(default_factory=PowerGridCSVConfig)
+    data:       LeadCSVConfig              = field(default_factory=LeadCSVConfig)
     training:   TrainingConfig             = field(default_factory=TrainingConfig)
     federation: FederationConfig           = field(default_factory=FederationConfig)
     evaluation: EvaluationConfig           = field(default_factory=EvaluationConfig)
@@ -128,12 +136,22 @@ class ExperimentConfig:
 # ── Active experiment ─────────────────────────────────────────────────── #
 # This is the single line you change when switching experiments
 
-CONFIG = ExperimentConfig()
-
 # Example: switch to PowerGrid dataset with LSTM
 # CONFIG = ExperimentConfig(
 #     task=AnomalyDetectionConfig(),
 #     model=LSTMConfig(hidden_size=256),
 #     data=PowerGridCSVConfig(num_clients=3),
 #     training=TrainingConfig(learning_rate=5e-4),
+#     federation=FederationConfig(num_rounds=10),
+#     evaluation=EvaluationConfig(threshold=0.3),
 # )
+
+CONFIG = ExperimentConfig(
+    task=BinaryClassificationConfig(),
+    model=PatchTSTConfig(),
+    data=LeadCSVConfig(num_clients=4),
+    training=TrainingConfig(learning_rate=1e-4, local_epochs=20),
+    federation=FederationConfig(num_rounds=5),
+    evaluation=EvaluationConfig(threshold=0.5),
+)
+

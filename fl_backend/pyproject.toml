@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "fl-backend"
+name = "fl_backend"
 version = "0.1.0"
 description = "Federated anomaly detection backend"
 license = "Apache-2.0"

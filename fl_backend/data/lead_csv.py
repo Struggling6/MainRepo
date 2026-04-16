@@ -1,11 +1,8 @@
-# Data manipulation and visualization libraries
+import torch
 import numpy as np
 import pandas as pd
-from pathlib import Path
 from .time_series_utils import temporal_grouped_split
-import torch
-
-from sqlalchemy import TIMESTAMP
+from config import CONFIG
 from .BaseDataHandler import BaseDatasetHandler
 
 
@@ -31,6 +28,7 @@ class LeadCSVHandler(BaseDatasetHandler):
         self.seed         = config.seed
         self._node_col    = "building_id"
         self._time_col    = "timestamp"
+
 
         # Load raw CSV into self.df so _prepare_data can use it
         self.df = pd.read_csv(self.file_path)
@@ -213,9 +211,9 @@ class LeadCSVHandler(BaseDatasetHandler):
     def get_metadata(self):
         return {
             "input_dim"  : len(self.feature_cols),
-            "num_classes": self.config.num_classes,
+            "num_classes": CONFIG.model.num_classes,
             "num_samples": self.df.shape[0], 
-            "task_type"  : self.config.task.name,
+            "task_type"  : CONFIG.task.name,
         "data_format": "tabular",
         }
 
