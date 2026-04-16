@@ -2,8 +2,6 @@ import optuna
 import os
 os.environ["TORCH_BLAS_PREFER_HIPBLASLT"] = "0" # Silence ROCm warning
 import torch
-import torch.nn as nn
-from models.supervised_cnn_transformer import SupervisedTransformerCNN
 from training.training_utils.TrainEvalBase import TrainEvalBase
 from training.training_utils.utils import compute_pos_weight
 from models.utils import get_device

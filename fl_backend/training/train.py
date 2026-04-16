@@ -4,6 +4,7 @@ import numpy as np
 from config import TrainingConfig, CNNTransformerConfig
 from training.training_utils.utils import compute_pos_weight
 
+
 def train_model(
         model: nn.Module, 
         trainloader: torch.utils.data.DataLoader, 
@@ -16,21 +17,45 @@ def train_model(
     Trains the model using config-specified loss function and hyperparameters.
     """
     if hasattr(model_config, "loss_fn"):
-        # Standard models — build loss from config with pos_weight
-        y_train    = _extract_labels(trainloader)
-        pos_weight = compute_pos_weight(y_train, cap=model_config.pos_weight_cap)
+        print("[TRAIN] entering train_model", flush=True)
 
-        loss_fn    = model_config.loss_fn(
+        # --------------------------------------------------
+        # Extract labels (for pos_weight)
+        # --------------------------------------------------
+        print("[TRAIN] extracting labels for pos_weight...", flush=True)
+        y_train = _extract_labels(trainloader)
+        print(f"[TRAIN] labels extracted: shape={y_train.shape}", flush=True)
+
+        pos_weight = compute_pos_weight(y_train, cap=model_config.pos_weight_cap)
+        print(f"[TRAIN] pos_weight computed: {pos_weight}", flush=True)
+
+
+
+
+        # --------------------------------------------------
+        # Loss function
+        # --------------------------------------------------
+        print("[TRAIN] creating loss function...", flush=True)
+        loss_fn = model_config.loss_fn(
             pos_weight=torch.tensor([pos_weight], device=device)
         ) if model_config.loss_fn == nn.BCEWithLogitsLoss else model_config.loss_fn()
     else:
         # HuggingFace models — loss is handled internally, pass None
         loss_fn = None
-
-    # Extract arrays from dataloader for Trainer
+        
+    # --------------------------------------------------
+    # Convert DataLoader -> numpy arrays (THIS IS HEAVY)
+    # --------------------------------------------------
+    print("[TRAIN] converting dataloader to arrays...", flush=True)
     X_train, y_train = _dataloader_to_arrays(trainloader)
+    print(f"[TRAIN] arrays created: X={X_train.shape}, y={y_train.shape}", flush=True)
 
+    # --------------------------------------------------
+    # Trainer setup
+    # --------------------------------------------------
+    print("[TRAIN] initializing Trainer...", flush=True)
     from training.training_utils.Trainer import Trainer
+
     trainer = Trainer(
         model=model,
         loss_fn=loss_fn,
@@ -42,28 +67,68 @@ def train_model(
         num_classes=model_config.num_classes,
     )
 
-    # Use same data for val — Flower handles proper evaluation separately
+    # --------------------------------------------------
+    # Training
+    # --------------------------------------------------
+    print("[TRAIN] starting training loop...", flush=True)
     trainer.train(X_train, y_train, X_train, y_train)
+    print("[TRAIN] training finished", flush=True)
 
-    return {
+    # --------------------------------------------------
+    # Results
+    # --------------------------------------------------
+    result = {
         "train_loss":   trainer.history[-1]["train_loss"],
         "val_f1":       trainer.history[-1]["val_f1"],
         "num_examples": len(trainloader.dataset),
     }
 
+    print(f"[TRAIN] returning results: {result}", flush=True)
+
+    return result
+
 
 def _dataloader_to_arrays(loader):
     """Extract all features and labels from a DataLoader into numpy arrays."""
+    print("[TRAIN] _dataloader_to_arrays start", flush=True)
+
     all_x, all_y = [], []
-    for x, y in loader:
+
+    for i, (x, y) in enumerate(loader):
+        if i == 0:
+            print("[TRAIN] first batch loaded", flush=True)
+
+        if i % 50 == 0:
+            print(f"[TRAIN] loading batch {i}", flush=True)
+
         all_x.append(x.numpy())
         all_y.append(y.numpy())
-    return np.concatenate(all_x), np.concatenate(all_y)
+
+    print("[TRAIN] concatenating arrays...", flush=True)
+    X = np.concatenate(all_x)
+    y = np.concatenate(all_y)
+
+    print("[TRAIN] _dataloader_to_arrays done", flush=True)
+    return X, y
 
 
 def _extract_labels(loader):
     """Extract only labels from a DataLoader for pos_weight computation."""
+    print("[TRAIN] _extract_labels start", flush=True)
+
     all_y = []
-    for _, y in loader:
+
+    for i, (_, y) in enumerate(loader):
+        if i == 0:
+            print("[TRAIN] first label batch loaded", flush=True)
+
+        if i % 50 == 0:
+            print(f"[TRAIN] extracting labels batch {i}", flush=True)
+
         all_y.append(y.numpy())
-    return np.concatenate(all_y)
+
+    print("[TRAIN] concatenating labels...", flush=True)
+    y = np.concatenate(all_y)
+
+    print("[TRAIN] _extract_labels done", flush=True)
+    return y

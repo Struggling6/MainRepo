@@ -70,13 +70,15 @@ class PatchTSTConfig(HF_PatchTSTConfig):
 @dataclass
 class LeadCSVConfig:
     name:          str  = "lead_csv"
-    file_path:     Path = Path("datasets/LEAD/train_features.csv")
+    file_path:     Path = Path("datasets/LEAD/data1.csv")
     target:        str  = "anomaly"
     batch_size:    int  = 64
+    num_classes:   int  = 2
+    task_name:     str  = "binary_classification"
     test_split:   float = 0.2
     num_clients:   int  = 2
     seed:          int  = 42
-    partition_mode: str = "shared"
+    partition_mode: str = "local" #shared or local
 
 @dataclass
 class PowerGridCSVConfig:
