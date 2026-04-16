@@ -53,6 +53,57 @@ class LSTMConfig:
     pos_weight_cap:  float     = 10.0
     loss_fn:         type      = nn.BCEWithLogitsLoss
 
+    def build(self, input_dim: int) -> nn.Module:
+        return LSTMModel(
+            in_channels=input_dim,
+            hidden_size=self.hidden_size,
+            num_layers=self.num_layers,
+            num_classes=self.num_classes,
+            dropout=self.dropout,
+        )
+
+@dataclass
+class MLPConfig:
+    name:           str   = "mlp"
+    hidden_size:    int   = 128
+    num_layers:     int   = 2
+    dropout:        float = 0.3
+    num_classes:    int   = 1
+    pos_weight_cap: float = 10.0
+    loss_fn:        type  = nn.BCEWithLogitsLoss
+
+    def build(self, input_dim: int) -> nn.Module:
+        return MLPModel(
+            in_channels=input_dim,
+            hidden_size=self.hidden_size,
+            num_layers=self.num_layers,
+            num_classes=self.num_classes,
+            dropout=self.dropout,
+        )
+
+@dataclass
+class PatchTSTConfig(HF_PatchTSTConfig):
+    name:                   str = "patchtst"
+    num_input_channels:     int         = 1
+    context_length:         int         = 32       
+    patch_length:           int         = 16
+    patch_stride:           int         = 1
+    d_model:                int         = 128
+    num_attention_heads:    int         = 16
+    num_hidden_layers:      int         = 3
+    ffn_dim:                int         = 256
+    dropout:                float       = 0.2
+    head_dropout:           float       = 0.2
+    channel_attention:      bool        = True
+    loss:                   str         = "mse"
+    attention_dropout:      float       = 0.0
+    positional_dropout:     float       = 0.0
+    pre_norm:               bool        = True
+    norm_type:              Literal["batchnorm", "layernorm"] | None = "batchnorm"
+
+    # Our own parameters (not in HuggingFace config) needed for our training loopS
+    nhead:                  int         = num_attention_heads
+    num_layers:             int         = num_hidden_layers
 
 # ── Data configs ──────────────────────────────────────────────────────── #
 
