@@ -17,6 +17,24 @@ dependencies = [
 
 [tool.flwr.app]
 publisher = "local"
+fab-include = [
+  "client_app.py",
+  "server_app.py",
+  "FedAvgWithSave.py",
+  "config.py",
+  "main.py",
+  "data/**/*.py",
+  "models/**/*.py",
+  "tasks/**/*.py",
+  "training/**/*.py",
+]
+fab-exclude = [
+  ".venv/**",
+  "**/__pycache__/**",
+  "**/*.pyc",
+  "build/**",
+  "dist/**",
+]
 
 [tool.flwr.app.components]
 clientapp = "client_app:app"

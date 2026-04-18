@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 import torch.nn as nn
-from models import SupervisedTransformerCNN, LSTMModel, MLPModel
+from models import SupervisedCNNTransformer, LSTMModel, MLPModel, SupervisedCNN
 
 
 # ── Task configs ─────────────────────────────────────────────────────── #
@@ -10,10 +10,6 @@ from models import SupervisedTransformerCNN, LSTMModel, MLPModel
 class BinaryClassificationConfig:
     name: str = "binary_classification"
 
-@dataclass
-class AnomalyDetectionConfig:
-    name: str = "anomaly_detection"
-
 
 # ── Model configs ─────────────────────────────────────────────────────── #
 
@@ -21,7 +17,7 @@ class AnomalyDetectionConfig:
 class CNNTransformerConfig:
     name:           str   = "supervised_cnn_transformer"
     d_model:        int   = 128
-    num_heads:      int   = 4
+    n_heads:         int   = 4
     num_layers:     int   = 2
     dropout:        float = 0.3
     pos_weight_cap: float = 10.0
@@ -29,10 +25,10 @@ class CNNTransformerConfig:
     loss_fn:        type  = nn.BCEWithLogitsLoss
 
     def build(self, input_dim: int) -> nn.Module:
-        return SupervisedTransformerCNN(
+        return SupervisedCNNTransformer(
             in_channels=input_dim,
             d_model=self.d_model,
-            num_heads=self.num_heads,
+            n_heads=self.n_heads,
             num_layers=self.num_layers,
             num_classes=self.num_classes,
             dropout=self.dropout,
@@ -76,18 +72,35 @@ class MLPConfig:
             num_classes=self.num_classes,
             dropout=self.dropout,
         )
+    
+@dataclass
+class SupervisedCNNConfig:
+    name:           str   = "SupervisedCNN"
+    d_model:        int   = 128
+    dropout:        float = 0.3
+    pos_weight_cap: float = 10.0
+    num_classes:    int   = 1
+    loss_fn:        type  = nn.BCEWithLogitsLoss
+
+    def build(self, input_dim: int) -> nn.Module:
+        return SupervisedCNN(
+            in_channels=input_dim,
+            d_model=self.d_model,
+            num_classes=self.num_classes,
+            dropout=self.dropout,
+        )
 # ── Data configs ──────────────────────────────────────────────────────── #
 
 @dataclass
 class LeadCSVConfig:
     name:          str  = "lead_csv"
-    file_path:     Path = Path("datasets/LEAD/data1.csv")
+    file_path:     Path = Path("datasets/LEAD/train_features.csv")
     target:        str  = "anomaly"
     batch_size:    int  = 64
     num_classes:   int  = 2
     task_name:     str  = "binary_classification"
-    test_split:   float = 0.2
-    num_clients:   int  = 2
+    test_split:   float = 0.4
+    num_clients:   int  = 1
     seed:          int  = 42
     partition_mode: str = "local" #shared or local
 
@@ -112,7 +125,7 @@ class PowerGridCSVConfig:
 class TrainingConfig:
     learning_rate: float = 1e-4
     weight_decay:  float = 1e-4
-    local_epochs:  int   = 30
+    local_epochs:  int   = 5
     patience:      int   = 10
 
 
@@ -140,7 +153,7 @@ class EvaluationConfig:
 @dataclass
 class ExperimentConfig:
     task:       BinaryClassificationConfig = field(default_factory=BinaryClassificationConfig)
-    model:      CNNTransformerConfig       = field(default_factory=CNNTransformerConfig)
+    model:      SupervisedCNNConfig       = field(default_factory=SupervisedCNNConfig)
     data:       LeadCSVConfig              = field(default_factory=LeadCSVConfig)
     training:   TrainingConfig             = field(default_factory=TrainingConfig)
     federation: FederationConfig           = field(default_factory=FederationConfig)

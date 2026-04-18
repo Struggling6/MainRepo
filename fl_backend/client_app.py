@@ -2,6 +2,7 @@ from copy import deepcopy
 from pathlib import Path
 
 import torch
+from torch import nn
 from flwr.client import ClientApp, NumPyClient
 
 from config import CONFIG
@@ -9,6 +10,33 @@ from data.registry import create_dataset_handler
 from models.utils import get_device, get_model_parameters, set_model_parameters
 from training.train import train_model
 from training.training_utils.Evaluator import Evaluator
+
+
+def _resolve_real_model(model):
+    """Return the actual nn.Module containing weights."""
+    if not isinstance(model, nn.Module):
+        raise TypeError(f"build(...) returned {type(model).__name__}, expected nn.Module")
+
+    # Try common wrapper attributes first
+    candidates = [
+        model,
+        getattr(model, "model", None),
+        getattr(model, "net", None),
+        getattr(model, "network", None),
+        getattr(model, "module", None),
+    ]
+
+    for cand in candidates:
+        if isinstance(cand, nn.Module):
+            num_tensors = len(cand.state_dict())
+            num_params = sum(p.numel() for p in cand.parameters())
+            if num_tensors > 0 or num_params > 0:
+                return cand
+
+    raise RuntimeError(
+        f"Model {type(model).__name__} has no registered tensors/parameters. "
+        "Your build(...) likely returns a wrapper or stores layers incorrectly."
+    )
 
 
 class FlowerClient(NumPyClient):
@@ -36,8 +64,13 @@ class FlowerClient(NumPyClient):
         print(f"[Client Init] metadata={self.metadata}", flush=True)
 
         print("[Client Init] creating model", flush=True)
+        built = self.config.model.build(input_dim=self.metadata["input_dim"])
+        self.model = _resolve_real_model(built)
 
-        self.model = CONFIG.model.build(input_dim=self.metadata["input_dim"])
+        print("[DEBUG] built type =", type(built), flush=True)
+        print("[DEBUG] real model type =", type(self.model), flush=True)
+        print("[DEBUG] state_dict keys =", list(self.model.state_dict().keys()), flush=True)
+        print("[DEBUG] num params =", sum(p.numel() for p in self.model.parameters()), flush=True)
 
         print("[Client Init] creating dataloaders", flush=True)
         self.trainloader, self.testloader = self.dataset_handler.get_dataloaders(
@@ -56,7 +89,10 @@ class FlowerClient(NumPyClient):
         self.evaluator = Evaluator(model_config=self.config.model)
 
     def get_parameters(self, config):
-        return get_model_parameters(self.model)
+        print("=== CLIENT get_parameters ENTERED ===", flush=True)
+        params = get_model_parameters(self.model)
+        print(f"[DEBUG] returning {len(params)} parameter arrays", flush=True)
+        return params
 
     def fit(self, parameters, config):
         print(f"[FIT] start facility_id={self.facility_id}", flush=True)
