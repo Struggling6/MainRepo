@@ -19,6 +19,10 @@ class FedAvgWithSave(FedAvg):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+    
+        self.fit_history = []
+        self.eval_history = []
+
 
     def aggregate_fit(
         self,
@@ -26,9 +30,21 @@ class FedAvgWithSave(FedAvg):
         results: list[tuple[ClientProxy, FitRes]],
         failures: list[Union[tuple[ClientProxy, FitRes], BaseException]],
     ) -> tuple[Optional[Parameters], dict]:
+        
         aggregated_parameters, metrics = super().aggregate_fit(
             server_round, results, failures
         )
+
+        #Saves metric history of clients for plotting
+        for client, fit_res in results:
+            row = {
+                "round": server_round,
+                "client_id": client.cid,
+                "num_examples": fit_res.num_examples,
+            }
+
+            row.update(fit_res.metrics)
+            self.fit_history.append(row)
 
         if (
             aggregated_parameters is not None
@@ -59,6 +75,10 @@ class FedAvgWithSave(FedAvg):
                 model=model,
                 path=CONFIG.evaluation.model_path,
                 config=CONFIG.model,
+                metrics={
+                    "fit_history": self.fit_history,
+                    "final_round_metrics": metrics,
+                },
             )
 
         return aggregated_parameters, metrics
