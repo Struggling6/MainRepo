@@ -81,7 +81,9 @@ class MLPConfig:
 @dataclass
 class LeadCSVConfig:
     name:          str  = "lead_csv"
-    file_path:     Path = Path("dataset/LEAD/data1.csv")
+    file_path:     Path = Path("dataset/LEAD/data{client_index}.csv") #used for shared mode, ignored for local mode, should be the large dataset csv
+    data_dir            = Path("dataset/LEAD")
+    file_pattern        = "data{client_index}.csv"
     target:        str  = "anomaly"
     batch_size:    int  = 64
     num_classes:   int  = 2
@@ -112,7 +114,7 @@ class PowerGridCSVConfig:
 class TrainingConfig:
     learning_rate: float = 1e-4
     weight_decay:  float = 1e-4
-    local_epochs:  int   = 30
+    local_epochs:  int   = 2
     patience:      int   = 10
 
 
@@ -120,9 +122,10 @@ class TrainingConfig:
 
 @dataclass
 class FederationConfig:
-    num_rounds:        int   = 5
+    num_rounds:        int   = 2
     fraction_fit:      float = 1.0
     fraction_evaluate: float = 1.0
+    proximal_mu:       float = 0.5
 
 # ── Evaluation config ─────────────────────────────────────────────────── #
 

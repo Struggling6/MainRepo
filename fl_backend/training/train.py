@@ -6,11 +6,12 @@ from training.training_utils.utils import compute_pos_weight
 
 
 def train_model(
-        model: nn.Module, 
-        trainloader: torch.utils.data.DataLoader, 
-        training_config: TrainingConfig, 
-        model_config: CNNTransformerConfig, 
-        device: torch.device
+        model: nn.Module,
+        trainloader: torch.utils.data.DataLoader,
+        training_config: TrainingConfig,
+        model_config: CNNTransformerConfig,
+        device: torch.device,
+        proximal_mu: float = 0.0,
     ):
     """
     Entry point for Flower's client training loop.
@@ -59,6 +60,7 @@ def train_model(
         epochs=training_config.local_epochs,
         patience=training_config.patience,
         num_classes=model_config.num_classes,
+        proximal_mu=proximal_mu,
     )
 
     # --------------------------------------------------

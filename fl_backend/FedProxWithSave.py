@@ -1,4 +1,4 @@
-from flwr.server.strategy import FedAvg
+from flwr.server.strategy import FedProx
 from flwr.common import parameters_to_ndarrays, FitRes, Parameters
 from flwr.server.client_proxy import ClientProxy
 import torch
@@ -10,7 +10,7 @@ from models.utils import get_device
 from data.registry import create_dataset_handler
 
 
-class FedAvgWithSave(FedAvg):
+class FedProxWithSave(FedProx):
     """
     FedAvg strategy that saves the aggregated model to disk
     after the final federation round completes.
@@ -32,9 +32,8 @@ class FedAvgWithSave(FedAvg):
         if aggregated_parameters is not None and server_round == CONFIG.federation.num_rounds:
             print(f"Final round {server_round} complete, saving aggregated model...")
 
-            device = get_device()
             metadata = create_dataset_handler(CONFIG.data).get_metadata()
-            model = CONFIG.model.build(input_dim=self.metadata["input_dim"])
+            model = CONFIG.model.build(input_dim=metadata["input_dim"])
 
             # Convert Flower parameters back to numpy arrays, then load into model
             ndarrays    = parameters_to_ndarrays(aggregated_parameters)
@@ -49,7 +48,7 @@ class FedAvgWithSave(FedAvg):
             )
 
         return aggregated_parameters, metrics
-    
+
     @staticmethod
     def _save_model(
         model:      nn.Module,
@@ -62,7 +61,7 @@ class FedAvgWithSave(FedAvg):
         Save model weights, architecture config, best threshold,
         and training metrics to a single checkpoint file.
         """
-    
+
         if isinstance(path, Path):
             path.parent.mkdir(parents=True, exist_ok=True)  # create checkpoints/ dir if it doesn't exist
 
