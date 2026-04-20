@@ -26,7 +26,7 @@ class FlowerClient(NumPyClient):
 
         if data_path is not None:
             self.config.data.file_path = Path(data_path)
-            self.config.data.partition_mode = "local"
+            self.config.federation.partition_mode = "local"
 
         print("[Client Init] creating dataset handler", flush=True)
         self.dataset_handler = create_dataset_handler(self.config)
@@ -47,7 +47,7 @@ class FlowerClient(NumPyClient):
             f"[Client Init] facility_id={self.facility_id}, "
             f"partition_id={self.partition_id}, "
             f"data_path={self.config.data.file_path}, "
-            f"partition_mode={self.config.data.partition_mode}, "
+            f"partition_mode={self.config.federation.partition_mode}, "
             f"device={self.device}",
             flush=True,
         )
