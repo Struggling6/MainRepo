@@ -4,6 +4,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from sklearn.metrics import f1_score, average_precision_score
 from models.utils import get_device
 
+
 class TrainEvalBase:
     """
     Shared base class for Trainer and OptunaOptimizer.
@@ -12,48 +13,55 @@ class TrainEvalBase:
     """
 
     def __init__(
-            self,
-            epochs:      int = 1, 
-            patience:    int = 1, 
-            num_classes: int = 1
-            ):
-        self.device      = get_device()
-        self.epochs      = epochs
-        self.patience    = patience # how many epochs to wait for improvement before stopping
+        self,
+        epochs: int = 1,
+        patience: int = 1,
+        num_classes: int = 1,
+    ):
+        self.device = get_device()
+        self.epochs = epochs
+        self.patience = patience
         self.num_classes = num_classes
 
     # ------------------------------------------------------------------ #
-    #  Shared utilities                                                    #
+    # Shared utilities                                                    #
     # ------------------------------------------------------------------ #
 
     def _build_dataloader(self, features, labels, batch_size, shuffle):
-        feature_tensor = torch.tensor(features.astype(np.float32))  # cast first to avoid object dtype error
-        label_tensor   = torch.tensor(
+        feature_tensor = torch.tensor(features.astype(np.float32))
+        label_tensor = torch.tensor(
             labels,
-            dtype=torch.long if self.num_classes > 1 else torch.float32
+            dtype=torch.long if self.num_classes > 1 else torch.float32,
         )
         dataset = TensorDataset(feature_tensor, label_tensor)
         return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
-    def _train_epoch(self, model, loader, optimizer, loss_fn):
+    def _train_epoch(self, model, loader, optimizer, loss_fn, proximal_mu=0.0, global_params=None):
         model.train()
         total_loss, total_samples = 0.0, 0
 
         for features, labels in loader:
-            features, labels = features.to(self.device), labels.to(self.device)
-            optimizer.zero_grad()
+            features = features.to(self.device)
+            labels = labels.to(self.device)
 
-            if loss_fn is None:
-                # HuggingFace model — pass labels directly, model computes loss internally
-                output = model(features, labels)
-                loss   = output.loss
-            else:
-                loss = loss_fn(model(features), labels)
+            optimizer.zero_grad()
+            logits = model(features)
+
+            if self.num_classes == 1:
+                labels = labels.float().view_as(logits)
+
+            loss = loss_fn(logits, labels)
+
+            if proximal_mu > 0.0 and global_params is not None:
+                proximal_term = 0.0
+                for param, global_param in zip(model.parameters(), global_params):
+                    proximal_term += torch.sum((param - global_param) ** 2)
+                loss = loss + (proximal_mu / 2.0) * proximal_term
 
             loss.backward()
             optimizer.step()
 
-            total_loss    += loss.item() * features.size(0)
+            total_loss += loss.item() * features.size(0)
             total_samples += features.size(0)
 
         return total_loss / total_samples
@@ -65,14 +73,23 @@ class TrainEvalBase:
 
         with torch.no_grad():
             for features, labels in loader:
-                features, labels = features.to(self.device), labels.to(self.device)
-                logits = model(features)
-                total_loss    += loss_fn(logits, labels).item() * features.size(0)
-                total_samples += features.size(0)
-                all_probs.append(torch.sigmoid(logits).cpu())
-                all_labels.append(labels.cpu())
+                features = features.to(self.device)
+                labels = labels.to(self.device)
 
-        all_probs  = torch.cat(all_probs).numpy()
+                logits = model(features)
+
+                if self.num_classes == 1:
+                    loss_labels = labels.float().view_as(logits)
+                else:
+                    loss_labels = labels
+
+                total_loss += loss_fn(logits, loss_labels).item() * features.size(0)
+                total_samples += features.size(0)
+
+                all_probs.append(torch.sigmoid(logits).cpu().view(-1))
+                all_labels.append(labels.cpu().view(-1))
+
+        all_probs = torch.cat(all_probs).numpy()
         all_labels = torch.cat(all_labels).numpy()
 
         # Search for the decision threshold that maximises F1

@@ -1,6 +1,10 @@
 import torch
 import numpy as np
 import pandas as pd
+import torch
+
+from pathlib import Path
+
 from .time_series_utils import temporal_grouped_split
 from config import CONFIG
 from .BaseDataHandler import BaseDatasetHandler
@@ -37,107 +41,68 @@ class LeadCSVHandler(BaseDatasetHandler):
 
     def __init__(self, config):
         super().__init__(config)
-        self.file_path      = config.file_path
-        self.target         = config.target
-        self.batch_size     = config.batch_size
-        self.test_split     = config.test_split
-        self.num_clients    = config.num_clients
-        self.seed           = config.seed
-        self._node_col      = "building_id"
-        self._time_col      = "timestamp"
-        self.partition_mode = getattr(config, "partition_mode", "shared")
 
-        print(f"[LEAD] Loading file: {self.file_path}")
-        self.df = pd.read_csv(self.file_path)
-        print(f"[LEAD] Raw shape: {self.df.shape}")
+        self.file_path = config.data.file_path
+        self.target = config.data.target
+        self.batch_size = config.data.batch_size
+        self.test_split = config.data.test_split
+        self.num_clients = config.federation.num_clients
+        self.seed = config.data.seed
+        self.partition_mode = getattr(config.federation, "partition_mode")
 
-        if self.target not in self.df.columns:
-            raise ValueError(
-                f"CSV file must contain target column '{self.target}', "
-                f"but columns were: {list(self.df.columns)}"
-            )
+        # Optional local-mode settings
+        self.data_dir = getattr(config.data, "data_dir", None)
+        self.file_pattern = getattr(config.data, "file_pattern", None)
 
-        self.features, self.labels = self._prepare_data()
+        self._node_col = "building_id"
+        self._time_col = "timestamp"
+
+        self.df = None
+        self.features = None
+        self.labels = None
+        self.feature_cols = self._build_feature_columns()
 
         if self.partition_mode == "shared":
+            print(f"[LEAD] Loading shared file: {self.file_path}")
+            self.df = pd.read_csv(self.file_path)
+            print(f"[LEAD] Raw shape: {self.df.shape}")
+
+            if self.target not in self.df.columns:
+                raise ValueError(
+                    f"CSV file must contain target column '{self.target}', "
+                    f"but columns were: {list(self.df.columns)}"
+                )
+
+            self.features, self.labels = self._prepare_data(self.df)
             self._prepare_partitions()
+
         elif self.partition_mode == "local":
-            self.client_indices = [np.arange(len(self.features))]
-            self.num_clients = 1
+            # In local mode each client gets its own file later in get_dataloaders(...)
+            self.client_indices = list(range(self.num_clients))
+
         else:
             raise ValueError(
                 f"Unsupported partition_mode: {self.partition_mode}. "
                 f"Expected 'shared' or 'local'."
             )
 
-    def _preprocess(self, df: pd.DataFrame) -> pd.DataFrame:
-        print("[LEAD] Starting _prepare_data")
-        df = df.copy()
+    def _resolve_local_file_path(self, partition_id: int) -> Path:
+        if partition_id < 0:
+            raise ValueError(f"Invalid partition_id: {partition_id}")
 
-        # Parse timestamp and sort within building
-        df[self._time_col] = pd.to_datetime(df[self._time_col])
-        df = df.sort_values(by=[self._node_col, self._time_col])
+        if self.data_dir and self.file_pattern:
+            client_index = partition_id + 1
+            path = Path(self.data_dir) / self.file_pattern.format(client_index=client_index)
+        else:
+            # Fallback to single-file behavior if no local pattern is configured
+            path = Path(self.file_path)
 
-        # Memory optimization
-        float_cols = df.select_dtypes(include="float64").columns
-        df[float_cols] = df[float_cols].astype("float32")
+        if not path.exists():
+            raise FileNotFoundError(f"Local client file not found for partition {partition_id}: {path}")
 
-        int_cols = df.select_dtypes(include="int64").columns
-        df[int_cols] = df[int_cols].astype("int32")
+        return path
 
-        # Force fixed category universe so all clients get identical dummy columns
-        df["primary_use"] = pd.Categorical(
-            df["primary_use"],
-            categories=self.PRIMARY_USE_CATEGORIES,
-        )
-
-        groups = df.groupby(self._node_col)
-
-        # Lag features
-        df["meter_lag1"] = groups["meter_reading"].shift(1)
-        df["meter_lag24"] = groups["meter_reading"].shift(24)
-
-        # Rolling features
-        df["meter_roll_mean_24"] = groups["meter_reading"].transform(
-            lambda x: x.rolling(window=24, min_periods=1).mean()
-        )
-        df["meter_roll_std_24"] = groups["meter_reading"].transform(
-            lambda x: x.rolling(window=24, min_periods=1).std()
-        )
-
-        # Difference features
-        df["meter_diff_1"] = df["meter_reading"] - df["meter_lag1"]
-        df["meter_diff_24"] = df["meter_reading"] - df["meter_lag24"]
-
-        # Z-score feature
-        df["meter_zscore_24"] = (
-            (df["meter_reading"] - df["meter_roll_mean_24"])
-            / (df["meter_roll_std_24"] + 1e-6)
-        )
-
-        # One-hot encode with fixed schema
-        df = pd.get_dummies(df, columns=["primary_use"], drop_first=False)
-
-        expected_primary_use_cols = [
-            f"primary_use_{cat}" for cat in self.PRIMARY_USE_CATEGORIES
-        ]
-        for col in expected_primary_use_cols:
-            if col not in df.columns:
-                df[col] = 0.0
-
-        # Cast dummy bools to float
-        bool_cols = df.select_dtypes(include="bool").columns
-        df[bool_cols] = df[bool_cols].astype("float32")
-
-        # Drop rows made invalid by lag/rolling ops
-        df = df.dropna()
-
-        print(f"[LEAD] Processed shape: {df.shape}")
-        return df
-
-    def _prepare_data(self):
-        df = self._preprocess(self.df)
-
+    def _build_feature_columns(self):
         base_features = [
             "meter_reading",
             "site_id",
@@ -179,16 +144,73 @@ class LeadCSVHandler(BaseDatasetHandler):
             f"primary_use_{cat}" for cat in self.PRIMARY_USE_CATEGORIES
         ]
 
-        self.feature_cols = base_features + primary_use_cols
-        self.df = df
+        return base_features + primary_use_cols
+
+    def _preprocess(self, df: pd.DataFrame) -> pd.DataFrame:
+        print("[LEAD] Starting _prepare_data")
+        df = df.copy()
+
+        df[self._time_col] = pd.to_datetime(df[self._time_col])
+        df = df.sort_values(by=[self._node_col, self._time_col])
+
+        float_cols = df.select_dtypes(include="float64").columns
+        df[float_cols] = df[float_cols].astype("float32")
+
+        int_cols = df.select_dtypes(include="int64").columns
+        df[int_cols] = df[int_cols].astype("int32")
+
+        df["primary_use"] = pd.Categorical(
+            df["primary_use"],
+            categories=self.PRIMARY_USE_CATEGORIES,
+        )
+
+        groups = df.groupby(self._node_col)
+
+        df["meter_lag1"] = groups["meter_reading"].shift(1)
+        df["meter_lag24"] = groups["meter_reading"].shift(24)
+
+        df["meter_roll_mean_24"] = groups["meter_reading"].transform(
+            lambda x: x.rolling(window=24, min_periods=1).mean()
+        )
+        df["meter_roll_std_24"] = groups["meter_reading"].transform(
+            lambda x: x.rolling(window=24, min_periods=1).std()
+        )
+
+        df["meter_diff_1"] = df["meter_reading"] - df["meter_lag1"]
+        df["meter_diff_24"] = df["meter_reading"] - df["meter_lag24"]
+
+        df["meter_zscore_24"] = (
+            (df["meter_reading"] - df["meter_roll_mean_24"])
+            / (df["meter_roll_std_24"] + 1e-6)
+        )
+
+        df = pd.get_dummies(df, columns=["primary_use"], drop_first=False)
+
+        expected_primary_use_cols = [
+            f"primary_use_{cat}" for cat in self.PRIMARY_USE_CATEGORIES
+        ]
+        for col in expected_primary_use_cols:
+            if col not in df.columns:
+                df[col] = 0.0
+
+        bool_cols = df.select_dtypes(include="bool").columns
+        df[bool_cols] = df[bool_cols].astype("float32")
+
+        df = df.dropna()
+
+        print(f"[LEAD] Processed shape: {df.shape}")
+        return df
+
+    def _prepare_data(self, raw_df: pd.DataFrame):
+        df = self._preprocess(raw_df)
 
         print(f"[LEAD] Feature count: {len(self.feature_cols)}")
 
         missing_features = [col for col in self.feature_cols if col not in df.columns]
         if missing_features:
-            raise ValueError(
-                f"Missing expected feature columns: {missing_features}"
-            )
+            raise ValueError(f"Missing expected feature columns: {missing_features}")
+
+        self.df = df
 
         X = df[self.feature_cols].values.astype(np.float32)
         y = df[self.target].values.astype(np.int64)
@@ -212,7 +234,21 @@ class LeadCSVHandler(BaseDatasetHandler):
         )
 
         if self.partition_mode == "local":
+            file_path = self._resolve_local_file_path(partition_id)
+            print(f"[LEAD] Loading local client file: {file_path}")
+
+            raw_df = pd.read_csv(file_path)
+            print(f"[LEAD] Raw local shape: {raw_df.shape}")
+
+            if self.target not in raw_df.columns:
+                raise ValueError(
+                    f"CSV file must contain target column '{self.target}', "
+                    f"but columns were: {list(raw_df.columns)}"
+                )
+
+            _, _ = self._prepare_data(raw_df)
             client_df = self.df
+
         else:
             if partition_id < 0 or partition_id >= len(self.client_indices):
                 raise ValueError(f"Invalid partition_id: {partition_id}")
@@ -260,12 +296,28 @@ class LeadCSVHandler(BaseDatasetHandler):
         return trainloader, valloader
 
     def get_metadata(self):
+        if self.df is None:
+            if self.partition_mode == "local":
+                sample_path = self._resolve_local_file_path(0)
+                print(f"[LEAD] Loading representative local file for metadata: {sample_path}")
+                raw_df = pd.read_csv(sample_path)
+
+                if self.target not in raw_df.columns:
+                    raise ValueError(
+                        f"CSV file must contain target column '{self.target}', "
+                        f"but columns were: {list(raw_df.columns)}"
+                    )
+
+                self._prepare_data(raw_df)
+            else:
+                raise RuntimeError("Metadata requested before dataset was prepared")
+
         return {
-            "input_dim"  : len(self.feature_cols),
-            "num_classes": CONFIG.model.num_classes,
-            "num_samples": self.df.shape[0], 
-            "task_type"  : CONFIG.task.name,
-        "data_format": "tabular",
+            "input_dim": len(self.feature_cols),
+            "num_classes": self.config.num_classes,
+            "num_samples": self.df.shape[0],
+            "task_type": self.config.task_name,
+            "data_format": "tabular",
         }
 
     def get_num_partitions(self) -> int:
