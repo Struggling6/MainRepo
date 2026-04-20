@@ -2,15 +2,17 @@ import torch
 import torch.nn as nn
 import numpy as np
 from config import TrainingConfig, CNNTransformerConfig
+from training.training_utils.Trainer import Trainer
 from training.training_utils.utils import compute_pos_weight
 
 
 def train_model(
-        model: nn.Module,
-        trainloader: torch.utils.data.DataLoader,
+        model:           nn.Module,
+        trainloader:     torch.utils.data.DataLoader,
+        valloader:       torch.utils.data.DataLoader,
         training_config: TrainingConfig,
-        model_config: CNNTransformerConfig,
-        device: torch.device,
+        model_config:    CNNTransformerConfig,
+        device:          torch.device,
         proximal_mu: float = 0.0,
     ):
     """
@@ -55,7 +57,6 @@ def train_model(
     # Trainer setup
     # --------------------------------------------------
     print("[TRAIN] initializing Trainer...", flush=True)
-    from training.training_utils.Trainer import Trainer
 
     trainer = Trainer(
         model=model,
@@ -73,7 +74,7 @@ def train_model(
     # Training
     # --------------------------------------------------
     print("[TRAIN] starting training loop...", flush=True)
-    trainer.train(X_train, y_train, X_train, y_train)
+    trainer.train(trainloader, valloader)
     print("[TRAIN] training finished", flush=True)
 
     # --------------------------------------------------

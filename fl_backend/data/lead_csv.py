@@ -313,11 +313,11 @@ class LeadCSVHandler(BaseDatasetHandler):
                 raise RuntimeError("Metadata requested before dataset was prepared")
 
         return {
-            "input_dim": len(self.feature_cols),
-            "num_classes": self.config.num_classes,
-            "num_samples": self.df.shape[0],
-            "task_type": self.config.task_name,
-            "data_format": "tabular",
+            "input_dim"  : len(self.feature_cols),
+            "num_classes": CONFIG.model.num_classes,
+            "num_samples": self.df.shape[0], 
+            "task_type"  : CONFIG.task.name,
+        "data_format": "tabular",
         }
 
     def get_num_partitions(self) -> int:
