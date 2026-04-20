@@ -81,7 +81,7 @@ class MLPConfig:
 @dataclass
 class LeadCSVConfig:
     name:          str  = "lead_csv"
-    file_path:     Path = Path("datasets/LEAD/train_features.csv")
+    file_path:     Path = Path("dataset/LEAD/data1.csv")
     target:        str  = "anomaly"
     batch_size:    int  = 64
     num_classes:   int  = 2
