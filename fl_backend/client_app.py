@@ -29,7 +29,7 @@ class FlowerClient(NumPyClient):
             self.config.data.partition_mode = "local"
 
         print("[Client Init] creating dataset handler", flush=True)
-        self.dataset_handler = create_dataset_handler(self.config.data)
+        self.dataset_handler = create_dataset_handler(self.config)
 
         print("[Client Init] getting metadata", flush=True)
         self.metadata = self.dataset_handler.get_metadata()
@@ -96,11 +96,17 @@ def client_fn(context):
     facility_id = context.node_config.get("facility-id", f"client-{partition_id}")
     data_path = context.node_config.get("data-path")
 
-    return FlowerClient(
-        partition_id=partition_id,
-        facility_id=facility_id,
-        data_path=data_path,
-    ).to_client()
+    try:
+        return FlowerClient(
+            partition_id=partition_id,
+            facility_id=facility_id,
+            data_path=data_path,
+        ).to_client()
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            f"Client {partition_id} ({facility_id}): dataset not found — {exc}. "
+            "Ensure the datasets directory is mounted and the file exists."
+        ) from exc
 
 
 app = ClientApp(client_fn=client_fn)
