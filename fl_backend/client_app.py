@@ -36,7 +36,6 @@ class FlowerClient(NumPyClient):
         print(f"[Client Init] metadata={self.metadata}", flush=True)
 
         print("[Client Init] creating model", flush=True)
-
         self.model = CONFIG.model.build(input_dim=self.metadata["input_dim"])
 
         print("[Client Init] creating dataloaders", flush=True)
@@ -62,12 +61,15 @@ class FlowerClient(NumPyClient):
         print(f"[FIT] start facility_id={self.facility_id}", flush=True)
         set_model_parameters(self.model, parameters)
 
+        proximal_mu = config.get("proximal-mu", self.config.federation.proximal_mu)
+
         results = train_model(
             model=self.model,
             trainloader=self.trainloader,
             training_config=self.config.training,
             model_config=self.config.model,
             device=self.device,
+            proximal_mu=proximal_mu,
         )
 
         print(f"[FIT] done facility_id={self.facility_id} results={results}", flush=True)
@@ -76,6 +78,7 @@ class FlowerClient(NumPyClient):
     def evaluate(self, parameters, config):
         print(f"[EVAL] start facility_id={self.facility_id}", flush=True)
         set_model_parameters(self.model, parameters)
+        self.model = self.model.to(self.device)
 
         results = self.evaluator.evaluate_round(self.model, self.testloader)
 

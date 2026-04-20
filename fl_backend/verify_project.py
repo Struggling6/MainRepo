@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Optional
 from collections import defaultdict
 
+
 @dataclass
 class CheckResult:
     name: str
@@ -103,7 +104,7 @@ def check_repo_shape(root: Path) -> None:
         "config.py",
         "client_app.py",
         "server_app.py",
-        "FedAvgWithSave.py",
+        "FedProxWithSave.py",
         "data/registry.py",
         "data/lead_csv.py",
         "data/powergrid_csv.py",
@@ -197,18 +198,16 @@ def instantiate_model_from_config(cfg: Any, metadata: dict[str, Any]):
 def first_batch(loader: Any):
     return next(iter(loader))
 
+
 def build_balanced_smoke_loader(trainloader: Any, max_examples: int):
     import torch
 
     xs_by_class = defaultdict(list)
     ys_by_class = defaultdict(list)
 
-    total_seen = 0
-
     for batch in trainloader:
         x_batch, y_batch = batch
 
-        # Ensure tensors
         x_batch = x_batch.cpu()
         y_batch = y_batch.cpu()
 
@@ -216,9 +215,7 @@ def build_balanced_smoke_loader(trainloader: Any, max_examples: int):
             label = int(y_batch[i].item())
             xs_by_class[label].append(x_batch[i])
             ys_by_class[label].append(y_batch[i])
-            total_seen += 1
 
-            # Stop once we have enough data and at least 2 classes
             num_classes_found = len([k for k, v in xs_by_class.items() if len(v) > 0])
             total_collected = sum(len(v) for v in xs_by_class.values())
 
@@ -237,7 +234,6 @@ def build_balanced_smoke_loader(trainloader: Any, max_examples: int):
             f"Could not build balanced smoke subset. Classes found: {available_classes}, counts: {counts}"
         )
 
-    # Keep at least 1 sample from each class, then fill remaining slots round-robin
     selected_x = []
     selected_y = []
 
@@ -270,6 +266,66 @@ def build_balanced_smoke_loader(trainloader: Any, max_examples: int):
 
     class_counts = {int(cls): int((y == cls).sum().item()) for cls in torch.unique(y)}
     return tiny_loader, class_counts
+
+
+def check_flwr_wiring() -> None:
+    flwr_mod = try_import("flwr")
+    client_app_mod = try_import("client_app")
+    server_app_mod = try_import("server_app")
+
+    if flwr_mod is None:
+        warn(
+            "flwr:wiring",
+            "Skipping Flower wiring checks because 'flwr' could not be imported",
+        )
+        return
+
+    if client_app_mod is None or server_app_mod is None:
+        warn(
+            "flwr:wiring",
+            "Skipping Flower app checks because client_app or server_app failed to import",
+        )
+        return
+
+    client_app_obj = getattr(client_app_mod, "app", None)
+    server_app_obj = getattr(server_app_mod, "app", None)
+
+    if client_app_obj is None:
+        fail("flwr:client_app.app", "client_app imported but no 'app' object was found")
+    else:
+        ok("flwr:client_app.app", f"Found app object of type {type(client_app_obj).__name__}")
+
+    if server_app_obj is None:
+        fail("flwr:server_app.app", "server_app imported but no 'app' object was found")
+    else:
+        ok("flwr:server_app.app", f"Found app object of type {type(server_app_obj).__name__}")
+
+    try:
+        from flwr.client import ClientApp
+        if client_app_obj is not None:
+            if isinstance(client_app_obj, ClientApp):
+                ok("flwr:client_app.type", "client_app.app is a Flower ClientApp")
+            else:
+                warn(
+                    "flwr:client_app.type",
+                    f"client_app.app exists but is not a ClientApp (got {type(client_app_obj).__name__})",
+                )
+    except Exception as exc:
+        warn("flwr:client_app.type", f"Could not validate ClientApp type: {fmt_exc(exc)}")
+
+    try:
+        from flwr.server import ServerApp
+        if server_app_obj is not None:
+            if isinstance(server_app_obj, ServerApp):
+                ok("flwr:server_app.type", "server_app.app is a Flower ServerApp")
+            else:
+                warn(
+                    "flwr:server_app.type",
+                    f"server_app.app exists but is not a ServerApp (got {type(server_app_obj).__name__})",
+                )
+    except Exception as exc:
+        warn("flwr:server_app.type", f"Could not validate ServerApp type: {fmt_exc(exc)}")
+
 
 def check_dataset_and_model_flow(root: Path, config_mod: Any, data_registry_mod: Any, train_mod: Any, args: argparse.Namespace) -> None:
     try:
@@ -350,7 +406,6 @@ def check_dataset_and_model_flow(root: Path, config_mod: Any, data_registry_mod:
         skipped("train:smoke", "Skipped by user request")
         return
 
-    
     try:
         import torch
         train_model = getattr(train_mod, "train_model", None)
@@ -395,9 +450,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Verify fl_backend project wiring")
     parser.add_argument("--project-root", default=".", help="Path to repo root")
     parser.add_argument("--partition-id", type=int, default=0, help="Partition id to test")
-    parser.add_argument("--skip-train", action="store_true", help="Skip calling training.train_model")
+    parser.add_argument("--skip-train", dest="skip_train", action="store_true", help="Skip calling training.train_model")
     parser.add_argument("--strict", action="store_true", help="Warnings also cause non-zero exit")
     parser.add_argument("--max-train-batch", type=int, default=16, help="Max examples used for the smoke training step")
+    parser.add_argument("--verify-flwr", action="store_true", help="Verify Flower imports and app wiring")
     args = parser.parse_args()
 
     root = Path(args.project_root).resolve()
@@ -413,7 +469,6 @@ def main() -> int:
     check_repo_shape(root)
     check_models_exports(root)
 
-    # base dependency imports
     try:
         import torch
         ok("import:torch", f"PyTorch {torch.__version__}")
@@ -432,7 +487,6 @@ def main() -> int:
     except Exception as exc:
         fail("import:numpy", fmt_exc(exc), traceback.format_exc())
 
-    # importing config first is intentionally useful because it reveals package issues early
     config_mod = try_import("config")
     if config_mod is None:
         warn(
@@ -440,7 +494,6 @@ def main() -> int:
             "Core verification stopped early because config.py could not be imported",
             "Fixing the config/models import path should unlock the deeper dataset/model/training checks.",
         )
-        # Still try direct imports that do not require config? Most core modules depend on config, so not much value.
         return summarize(args.strict)
 
     check_config_build_path(config_mod)
@@ -450,7 +503,10 @@ def main() -> int:
     try_import("training.evaluate")
     try_import("client_app")
     try_import("server_app")
-    try_import("FedAvgWithSave")
+    try_import("FedProxWithSave")
+
+    if args.verify_flwr:
+        check_flwr_wiring()
 
     if data_registry_mod is None or train_mod is None:
         warn(
