@@ -11,6 +11,9 @@ WORKDIR /app
 COPY --chown=app:app pyproject.toml .
 COPY --chown=app:app . .
 
+RUN python -m pip install --no-cache-dir \
+    torch --index-url https://download.pytorch.org/whl/rocm6.3
+
 RUN python -m pip install -U --no-cache-dir .
 
 ENTRYPOINT ["flower-superexec"]
