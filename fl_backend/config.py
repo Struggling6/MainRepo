@@ -21,7 +21,7 @@ class AnomalyDetectionConfig:
 class CNNTransformerConfig:
     name:           str   = "supervised_cnn_transformer"
     d_model:        int   = 128
-    num_heads:      int   = 4
+    nhead:          int   = 4
     num_layers:     int   = 2
     dropout:        float = 0.3
     pos_weight_cap: float = 10.0
@@ -32,7 +32,7 @@ class CNNTransformerConfig:
         return SupervisedTransformerCNN(
             in_channels=input_dim,
             d_model=self.d_model,
-            num_heads=self.num_heads,
+            nhead=self.nhead,
             num_layers=self.num_layers,
             num_classes=self.num_classes,
             dropout=self.dropout,
@@ -81,7 +81,7 @@ class MLPConfig:
 @dataclass
 class LeadCSVConfig:
     name:          str  = "lead_csv"
-    file_path:     Path = Path("datasets/LEAD/data1.csv")
+    file_path:     Path = Path("datasets/LEAD/train_features.csv")
     target:        str  = "anomaly"
     batch_size:    int  = 64
     num_classes:   int  = 2
