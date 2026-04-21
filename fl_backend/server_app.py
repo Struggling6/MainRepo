@@ -45,7 +45,7 @@ def weighted_average_evaluate(metrics):
 
 def server_fn(context):
     fed_config = CONFIG.federation
-    num_clients = CONFIG.data.num_clients
+    num_clients = fed_config.num_clients
     proximal_mu = fed_config.proximal_mu
 
     strategy = FedProxWithSave(

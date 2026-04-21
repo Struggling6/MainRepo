@@ -94,17 +94,15 @@ class SupervisedCNNConfig:
 @dataclass
 class LeadCSVConfig:
     name:          str  = "lead_csv"
-    file_path:     Path = Path("datasets/LEAD/data{client_index}.csv") #used for shared mode, ignored for local mode, should be the large dataset csv
+    file_path:     Path = Path("datasets/LEAD/train_features.csv") #used for shared mode, ignored for local mode, should be the large dataset csv
     data_dir            = Path("datasets/LEAD")
     file_pattern        = "data{client_index}.csv"
     target:        str  = "anomaly"
     batch_size:    int  = 64
     num_classes:   int  = 2
     task_name:     str  = "binary_classification"
-    test_split:   float = 0.4
-    num_clients:   int  = 1
+    test_split:   float = 0.2
     seed:          int  = 42
-    partition_mode: str = "local" #shared or local
 
 @dataclass
 class PowerGridCSVConfig:
@@ -113,13 +111,10 @@ class PowerGridCSVConfig:
     clean_path:   Path  = Path("datasets/EPIC/Scenario_1/EpicLog_clean.csv")
     target:       str   = "marker"
     batch_size:   int   = 32
-    num_clients:  int   = 2
     test_split:   float = 0.2
     normalize:    bool  = True
     noise_level:  float = 0.7
     seed:         int   = 42
-    partition_mode: str = "shared"
-
 
 # ── Training config ───────────────────────────────────────────────────── #
 
@@ -135,7 +130,9 @@ class TrainingConfig:
 
 @dataclass
 class FederationConfig:
+    partition_mode:    str   = "shared" # local or shared
     num_rounds:        int   = 2
+    num_clients:       int   = 1
     fraction_fit:      float = 1.0
     fraction_evaluate: float = 1.0
     proximal_mu:       float = 0.5

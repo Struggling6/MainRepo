@@ -12,13 +12,13 @@ def main():
     device = get_device()
 
     # ── Dataset ──────────────────────────────────────────────────────── #
-    dataset_handler = create_dataset_handler(config.data)
+    dataset_handler = create_dataset_handler(config)
     metadata   = dataset_handler.get_metadata()
-    CONFIG.evaluation.input_dim = metadata["input_dim"]
+    config.evaluation.input_dim = metadata["input_dim"]
     print(f"Dataset metadata: {metadata}")
 
     # ── Model ─────────────────────────────────────────────────────────── #
-    model = CONFIG.model.build(input_dim=metadata["input_dim"])
+    model = config.model.build(input_dim=metadata["input_dim"])
     print(f"Model created: {config.model.name}")
 
     # ── DataLoaders ───────────────────────────────────────────────────── #
