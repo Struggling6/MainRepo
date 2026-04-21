@@ -2,7 +2,6 @@
 
 from config import CONFIG
 from data.registry import create_dataset_handler
-from models.registry import create_model
 from training.train import train_model
 from models.utils import get_device
 from training.training_utils.Evaluator import Evaluator
@@ -19,7 +18,7 @@ def main():
     print(f"Dataset metadata: {metadata}")
 
     # ── Model ─────────────────────────────────────────────────────────── #
-    model = create_model(config.model, metadata)
+    model = CONFIG.model.build(input_dim=metadata["input_dim"])
     print(f"Model created: {config.model.name}")
 
     # ── DataLoaders ───────────────────────────────────────────────────── #

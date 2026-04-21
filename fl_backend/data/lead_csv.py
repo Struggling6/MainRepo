@@ -1,9 +1,10 @@
-# Data manipulation and visualization libraries
 import numpy as np
 import pandas as pd
-from .time_series_utils import temporal_grouped_split
 import torch
 
+from pathlib import Path
+
+from .time_series_utils import temporal_grouped_split
 from .BaseDataHandler import BaseDatasetHandler
 
 
@@ -11,98 +12,95 @@ class LeadCSVHandler(BaseDatasetHandler):
     """
     Dataset handler for the LEAD building energy dataset.
 
-    The gap between train and validation is set to 73 hours to match
-    the longest lag feature (air_temperature_*_lag73), preventing those
-    features from leaking across the train/val boundary.
+    Supports two modes:
+    - shared: load one large CSV and partition internally by building_id
+    - local: load one already client-specific CSV file
+
+    Also enforces a fixed one-hot schema for `primary_use` so all clients
+    produce the same input dimensionality.
     """
-    # Override base class default — matches longest lag feature
-    _gap_hours = 0
 
-    def __init__(self, config):    # config: LeadCSVConfig
+    _gap_hours = 73
 
+    PRIMARY_USE_CATEGORIES = [
+        "Education",
+        "Entertainment/public assembly",
+        "Food sales and service",
+        "Healthcare",
+        "Lodging/residential",
+        "Manufacturing/industrial",
+        "Office",
+        "Other",
+        "Parking",
+        "Public services",
+        "Religious worship",
+        "Services",
+    ]
+
+    def __init__(self, config):
         super().__init__(config)
-        self.file_path    = config.file_path
-        self.target       = config.target
-        self.batch_size   = config.batch_size
-        self.test_split   = config.test_split
-        self.num_clients  = config.num_clients
-        self.seed         = config.seed
-        self._node_col    = "building_id"
-        self._time_col    = "timestamp"
 
-        # Load raw CSV into self.df so _prepare_data can use it
-        self.df = pd.read_csv(self.file_path)
+        self.file_path = config.file_path
+        self.target = config.target
+        self.batch_size = config.batch_size
+        self.test_split = config.test_split
+        self.num_clients = config.num_clients
+        self.seed = config.seed
+        self.partition_mode = getattr(config, "partition_mode", "shared")
 
-        # _prepare_data must run before _prepare_partitions because
-        # _prepare_partitions needs self.df to have building IDs
-        self.features, self.labels = self._prepare_data()
-        self._prepare_partitions()
+        # Optional local-mode settings
+        self.data_dir = getattr(config, "data_dir", None)
+        self.file_pattern = getattr(config, "file_pattern", None)
 
-    # ------------------------------------------------------------------ #
-    #  Template Method implementations                                     #
-    # ------------------------------------------------------------------ #
+        self._node_col = "building_id"
+        self._time_col = "timestamp"
 
-    def _preprocess(self, df):
-        """
-        Apply LEAD-specific feature engineering to any raw DataFrame.
-        Called by both _prepare_data (training) and load_test_set (testing)
-        so the exact same cleaning steps are applied to both.
-        """
+        self.df = None
+        self.features = None
+        self.labels = None
+        self.feature_cols = self._build_feature_columns()
 
-        df[self._time_col] = pd.to_datetime(df[self._time_col])
-        df = df.sort_values(by=[self._node_col, self._time_col])
+        if self.partition_mode == "shared":
+            print(f"[LEAD] Loading shared file: {self.file_path}")
+            self.df = pd.read_csv(self.file_path)
+            print(f"[LEAD] Raw shape: {self.df.shape}")
 
-        # Memory optimisation — halves RAM usage for large datasets
-        float_cols = df.select_dtypes(include="float64").columns
-        df[float_cols] = df[float_cols].astype("float32")
-        int_cols = df.select_dtypes(include="int64").columns
-        df[int_cols] = df[int_cols].astype("int32")
-        str_cols = df.select_dtypes(include="object").columns
-        df[str_cols] = df[str_cols].astype("category")
+            if self.target not in self.df.columns:
+                raise ValueError(
+                    f"CSV file must contain target column '{self.target}', "
+                    f"but columns were: {list(self.df.columns)}"
+                )
 
-        # Lag features — computed per building so no cross-building leakage
-        groups = df.groupby(self._node_col)
-        df["meter_lag1"]  = groups["meter_reading"].shift(1)   # 1 hour ago
-        df["meter_lag24"] = groups["meter_reading"].shift(24)  # 24 hours ago
+            self.features, self.labels = self._prepare_data(self.df)
+            self._prepare_partitions()
 
-        # Rolling statistics over the last 24 hours
-        # min_periods=1 ensures values are produced near the start of the series
-        df["meter_roll_mean_24"] = groups["meter_reading"].transform(
-            lambda x: x.rolling(window=24, min_periods=1).mean()
-        )
-        df["meter_roll_std_24"] = groups["meter_reading"].transform(
-            lambda x: x.rolling(window=24, min_periods=1).std()
-        )
+        elif self.partition_mode == "local":
+            # In local mode each client gets its own file later in get_dataloaders(...)
+            self.client_indices = list(range(self.num_clients))
 
-        # Difference features — how much has consumption changed?
-        df["meter_diff_1"]  = df["meter_reading"] - df["meter_lag1"]
-        df["meter_diff_24"] = df["meter_reading"] - df["meter_lag24"]
+        else:
+            raise ValueError(
+                f"Unsupported partition_mode: {self.partition_mode}. "
+                f"Expected 'shared' or 'local'."
+            )
 
-        # Z-score — how many std devs is current reading from 24hr mean?
-        # +1e-6 prevents division by zero when std is 0 (flat signal)
-        df["meter_zscore_24"] = (
-            (df["meter_reading"] - df["meter_roll_mean_24"])
-            / (df["meter_roll_std_24"] + 1e-6)
-        )
+    def _resolve_local_file_path(self, partition_id: int) -> Path:
+        if partition_id < 0:
+            raise ValueError(f"Invalid partition_id: {partition_id}")
 
-        # One-hot encode primary_use — drop_first avoids dummy variable trap
-        df = pd.get_dummies(df, columns=["primary_use"], drop_first=True)
+        if self.data_dir and self.file_pattern:
+            client_index = partition_id + 1
+            path = Path(self.data_dir) / self.file_pattern.format(client_index=client_index)
+        else:
+            # Fallback to single-file behavior if no local pattern is configured
+            path = Path(self.file_path)
 
-        # pandas 2.x returns bool columns from get_dummies — cast to float32
-        # so the feature matrix stays a single numeric dtype
-        bool_cols = df.select_dtypes(include="bool").columns
-        df[bool_cols] = df[bool_cols].astype("float32")
+        if not path.exists():
+            raise FileNotFoundError(f"Local client file not found for partition {partition_id}: {path}")
 
-        return df.dropna()
+        return path
 
-    def _prepare_data(self):
-        """
-        Preprocess the training DataFrame and populate self.df and
-        self.feature_cols. Returns X, y as numpy arrays for use by
-        get_metadata and _prepare_partitions.
-        """
-        df = self._preprocess(self.df)
-
+    def _build_feature_columns(self):
         base_features = [
             "meter_reading",
             "site_id",
@@ -140,44 +138,125 @@ class LeadCSVHandler(BaseDatasetHandler):
             "meter_zscore_24",
         ]
 
-        # Collect any one-hot columns created from primary_use
-        primary_use_cols  = [col for col in df.columns if col.startswith("primary_use_")]
-        self.feature_cols = base_features + primary_use_cols
+        primary_use_cols = [
+            f"primary_use_{cat}" for cat in self.PRIMARY_USE_CATEGORIES
+        ]
 
-        # Store the fully processed DataFrame so run_split and
-        # get_dataloaders can use it with correct timestamps and features
+        return base_features + primary_use_cols
+
+    def _preprocess(self, df: pd.DataFrame) -> pd.DataFrame:
+        print("[LEAD] Starting _prepare_data")
+        df = df.copy()
+
+        df[self._time_col] = pd.to_datetime(df[self._time_col])
+        df = df.sort_values(by=[self._node_col, self._time_col])
+
+        float_cols = df.select_dtypes(include="float64").columns
+        df[float_cols] = df[float_cols].astype("float32")
+
+        int_cols = df.select_dtypes(include="int64").columns
+        df[int_cols] = df[int_cols].astype("int32")
+
+        df["primary_use"] = pd.Categorical(
+            df["primary_use"],
+            categories=self.PRIMARY_USE_CATEGORIES,
+        )
+
+        groups = df.groupby(self._node_col)
+
+        df["meter_lag1"] = groups["meter_reading"].shift(1)
+        df["meter_lag24"] = groups["meter_reading"].shift(24)
+
+        df["meter_roll_mean_24"] = groups["meter_reading"].transform(
+            lambda x: x.rolling(window=24, min_periods=1).mean()
+        )
+        df["meter_roll_std_24"] = groups["meter_reading"].transform(
+            lambda x: x.rolling(window=24, min_periods=1).std()
+        )
+
+        df["meter_diff_1"] = df["meter_reading"] - df["meter_lag1"]
+        df["meter_diff_24"] = df["meter_reading"] - df["meter_lag24"]
+
+        df["meter_zscore_24"] = (
+            (df["meter_reading"] - df["meter_roll_mean_24"])
+            / (df["meter_roll_std_24"] + 1e-6)
+        )
+
+        df = pd.get_dummies(df, columns=["primary_use"], drop_first=False)
+
+        expected_primary_use_cols = [
+            f"primary_use_{cat}" for cat in self.PRIMARY_USE_CATEGORIES
+        ]
+        for col in expected_primary_use_cols:
+            if col not in df.columns:
+                df[col] = 0.0
+
+        bool_cols = df.select_dtypes(include="bool").columns
+        df[bool_cols] = df[bool_cols].astype("float32")
+
+        df = df.dropna()
+
+        print(f"[LEAD] Processed shape: {df.shape}")
+        return df
+
+    def _prepare_data(self, raw_df: pd.DataFrame):
+        df = self._preprocess(raw_df)
+
+        print(f"[LEAD] Feature count: {len(self.feature_cols)}")
+
+        missing_features = [col for col in self.feature_cols if col not in df.columns]
+        if missing_features:
+            raise ValueError(f"Missing expected feature columns: {missing_features}")
+
         self.df = df
 
         X = df[self.feature_cols].values.astype(np.float32)
-        y = df[self.config.target].values.astype(np.float32)
+        y = df[self.target].values.astype(np.int64)
+
         return X, y
-    
-    # ------------------------------------------------------------------ #
-    #  Partitioning                                                        #
-    # ------------------------------------------------------------------ #
 
     def _prepare_partitions(self):
-        """Split sample indices into num_clients equal partitions, shuffled."""
-        rng     = np.random.default_rng(self.seed)
-        buildings = self.df["building_id"].unique()
+        """
+        Shared mode: partition buildings across clients.
+        Each building_id belongs to exactly one client partition.
+        """
+        rng = np.random.default_rng(self.seed)
+        buildings = self.df[self._node_col].unique()
         rng.shuffle(buildings)
         self.client_indices = np.array_split(buildings, self.num_clients)
-        
-    # ------------------------------------------------------------------ #
-    #  BaseDatasetHandler interface                                        #
-    # ------------------------------------------------------------------ #
-    
+
     def get_dataloaders(self, partition_id: int):
-        if partition_id < 0 or partition_id >= self.num_clients:
-            raise ValueError(f"Invalid partition_id: {partition_id}")
+        print(
+            f"[LEAD] get_dataloaders partition_mode={self.partition_mode} "
+            f"partition_id={partition_id}"
+        )
 
-        # Filter to only the buildings assigned to this client
-        client_df = self.df[
-            self.df[self._node_col].isin(self.client_indices[partition_id])
-        ]
+        if self.partition_mode == "local":
+            file_path = self._resolve_local_file_path(partition_id)
+            print(f"[LEAD] Loading local client file: {file_path}")
 
-        # Temporal split on this client's buildings only — each client
-        # trains on its own time-ordered slice of the data
+            raw_df = pd.read_csv(file_path)
+            print(f"[LEAD] Raw local shape: {raw_df.shape}")
+
+            if self.target not in raw_df.columns:
+                raise ValueError(
+                    f"CSV file must contain target column '{self.target}', "
+                    f"but columns were: {list(raw_df.columns)}"
+                )
+
+            _, _ = self._prepare_data(raw_df)
+            client_df = self.df
+
+        else:
+            if partition_id < 0 or partition_id >= len(self.client_indices):
+                raise ValueError(f"Invalid partition_id: {partition_id}")
+
+            client_df = self.df[
+                self.df[self._node_col].isin(self.client_indices[partition_id])
+            ]
+
+        print(f"[LEAD] Client df shape: {client_df.shape}")
+
         X_train, y_train, X_val, y_val = temporal_grouped_split(
             client_df,
             feature_cols=self.feature_cols,
@@ -187,38 +266,57 @@ class LeadCSVHandler(BaseDatasetHandler):
             gap_hours=self._gap_hours,
             window_size=self._window_size,
             stride=self._stride,
-            target=self.config.target,
+            target=self.target,
         )
+
+        print(f"[LEAD] Split done: X_train={X_train.shape}, X_val={X_val.shape}")
 
         train_dataset = torch.utils.data.TensorDataset(
             torch.tensor(X_train, dtype=torch.float32),
-            torch.tensor(y_train, dtype=torch.float32),
+            torch.tensor(y_train, dtype=torch.long),
         )
         val_dataset = torch.utils.data.TensorDataset(
             torch.tensor(X_val, dtype=torch.float32),
-            torch.tensor(y_val, dtype=torch.float32),
+            torch.tensor(y_val, dtype=torch.long),
         )
 
         trainloader = torch.utils.data.DataLoader(
-            train_dataset, batch_size=self.batch_size, shuffle=True
+            train_dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
         )
         valloader = torch.utils.data.DataLoader(
-            val_dataset, batch_size=self.batch_size, shuffle=False
+            val_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
         )
 
         return trainloader, valloader
-        
+
     def get_metadata(self):
+        if self.df is None:
+            if self.partition_mode == "local":
+                sample_path = self._resolve_local_file_path(0)
+                print(f"[LEAD] Loading representative local file for metadata: {sample_path}")
+                raw_df = pd.read_csv(sample_path)
+
+                if self.target not in raw_df.columns:
+                    raise ValueError(
+                        f"CSV file must contain target column '{self.target}', "
+                        f"but columns were: {list(raw_df.columns)}"
+                    )
+
+                self._prepare_data(raw_df)
+            else:
+                raise RuntimeError("Metadata requested before dataset was prepared")
+
         return {
-            "input_dim"  : len(self.feature_cols),
-           #"num_classes": self.config.num_classes, old line .. LeadCSVConfig does not have num_classes, so your old code crashes.
-            "num_classes": 1,
-            "num_samples": self.df.shape[0], 
-           #"task_type"  : self.config.task.name, old line .. LeadCSVConfig does not have task, so your old code crashes.
-            "task_type"  : "binary_classification",
+            "input_dim": len(self.feature_cols),
+            "num_classes": self.config.num_classes,
+            "num_samples": self.df.shape[0],
+            "task_type": self.config.task_name,
             "data_format": "tabular",
         }
 
-
     def get_num_partitions(self) -> int:
-        return self.num_clients
+        return len(self.client_indices)

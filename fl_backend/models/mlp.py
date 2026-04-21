@@ -3,26 +3,26 @@ from .base import BaseModel
 
 
 class MLPModel(BaseModel):
-    def __init__(self, model_config: dict, data_metadata: dict):
+    def __init__(
+        self,
+        in_channels:  int,
+        hidden_size:  int   = 128,
+        num_layers:   int   = 2,
+        num_classes:  int   = 1,
+        dropout:      float = 0.3,
+    ):
         super().__init__()
 
-        input_dim = data_metadata["input_dim"]
-        num_classes = data_metadata["num_classes"]
+        layers = []
+        in_dim = in_channels
+        for _ in range(num_layers):
+            layers.append(nn.Linear(in_dim, hidden_size))
+            layers.append(nn.ReLU())
+            layers.append(nn.Dropout(dropout))
+            in_dim = hidden_size
+        layers.append(nn.Linear(in_dim, num_classes))
 
-        hidden_dim = model_config.get("hidden_dim", 64)
-        dropout = model_config.get("dropout", 0.2)
-
-        self.network = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-
-            nn.Linear(hidden_dim, num_classes)
-        )
+        self.network = nn.Sequential(*layers)
 
     def forward(self, x):
         return self.network(x)

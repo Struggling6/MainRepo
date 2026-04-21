@@ -9,8 +9,7 @@ from sklearn.metrics import (
 )
 from training.training_utils.TrainEvalBase import TrainEvalBase
 from training.training_utils.utils import compute_pos_weight
-from models.registry import create_model
-
+from config import CONFIG
 
 class Evaluator(TrainEvalBase):
     """
@@ -118,7 +117,7 @@ class Evaluator(TrainEvalBase):
         built from self.model_config.
         """
 
-        model = create_model(self.model_config)
+        model = CONFIG.model.build(input_dim=self.metadata["input_dim"])
 
         checkpoint = torch.load(path, map_location=self.device)
         model.load_state_dict(checkpoint["model_state_dict"])
