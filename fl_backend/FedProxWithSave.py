@@ -1,7 +1,5 @@
 import torch
 import torch.nn as nn
-import logging
-
 from flwr.server.strategy import FedProx
 from flwr.common import parameters_to_ndarrays, FitRes, Parameters
 from flwr.server.client_proxy import ClientProxy
@@ -9,8 +7,6 @@ from pathlib import Path
 from typing import Union, Optional
 from config import CONFIG
 from data.registry import create_dataset_handler
-
-logger = logging.getLogger(__name__)
 
 class FedProxWithSave(FedProx):
     """
@@ -25,8 +21,6 @@ class FedProxWithSave(FedProx):
         failures: list[Union[tuple[ClientProxy, FitRes], BaseException]],
     ) -> tuple[Optional[Parameters], dict]:
 
-        logger.info(f"Round {server_round}: aggregating {len(results)} clients, {len(failures)} failures")
-
         # Run standard FedAvg aggregation first
         aggregated_parameters, metrics = super().aggregate_fit(
             server_round, results, failures
@@ -34,7 +28,6 @@ class FedProxWithSave(FedProx):
 
         # Save only after the final round
         if aggregated_parameters is not None and server_round == CONFIG.federation.num_rounds:
-            logger.info(f"Final round {server_round} complete, saving aggregated model...")
 
             metadata = create_dataset_handler(CONFIG.data).get_metadata()
             model = CONFIG.model.build(input_dim=metadata["input_dim"])
@@ -49,12 +42,7 @@ class FedProxWithSave(FedProx):
                 model=model,
                 path=CONFIG.evaluation.model_path,
                 config=CONFIG.model,
-                metrics={
-                    "fit_history": self.fit_history,
-                    "final_round_metrics": metrics,
-                },
             )
-            logger.info(f"Model saved to {CONFIG.evaluation.model_path}")
 
         return aggregated_parameters, metrics
 

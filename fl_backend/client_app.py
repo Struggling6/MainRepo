@@ -102,7 +102,7 @@ class FlowerClient(NumPyClient):
         )
 
         print(f"[FIT] done facility_id={self.facility_id} results={results}", flush=True)
-        return get_model_parameters(self.model), results["num_examples"], results, results["train_loss"] #, results["train_accuracy"]
+        return get_model_parameters(self.model), results["num_examples"], results
 
     def evaluate(self, parameters, config):
         round_num = config.get("round", "?")

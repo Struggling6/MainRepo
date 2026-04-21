@@ -15,7 +15,6 @@ def pr_auc_plot(pr_history):
     rounds = [item[0] for item in pr_history]
     pr_auc_values = [item[1] for item in pr_history]
     
-    # Create plot
     plt.figure(figsize=(10, 6))
     plt.plot(rounds, pr_auc_values, marker='o', linewidth=2, markersize=8, label='PR-AUC')
     
@@ -26,11 +25,5 @@ def pr_auc_plot(pr_history):
     plt.legend()
     plt.tight_layout()
     
-    # Save and show
     plt.savefig("fl_backend/plotting/saved_plots/pr_auc_plot.png", dpi=300)
     plt.close()
-
-
-# Example usage:
-# pr_history = [(1, 0.0063107944772530155), (2, 0.0063107944772530155)]
-# pr_auc_plot(pr_history)

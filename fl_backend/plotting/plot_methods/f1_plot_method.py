@@ -12,8 +12,7 @@ def f1_plot(f1_history):
     # Extract rounds and F1 values
     rounds = [item[0] for item in f1_history]
     f1_values = [item[1] for item in f1_history]
-    
-    # Create plot
+
     plt.figure(figsize=(10, 6))
     plt.plot(rounds, f1_values, marker='o', linewidth=2, markersize=8, label='F1 Score', color='blue')
     
@@ -25,6 +24,5 @@ def f1_plot(f1_history):
     plt.ylim([0, 1])  # F1 scores range from 0 to 1
     plt.tight_layout()
     
-    # Save and show
     plt.savefig("fl_backend/plotting/saved_plots/f1_plot.png", dpi=300)
     plt.close()
