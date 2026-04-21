@@ -3,7 +3,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
-from models import SupervisedTransformerCNN, LSTMModel, MLPModel
+from models import SupervisedCNNTransformer, LSTMModel, MLPModel
+from models.transformer import Transformer
 # ── Task configs ─────────────────────────────────────────────────────── #
 
 @dataclass
@@ -33,7 +34,7 @@ class CNNTransformerConfig:
     loss_fn:        type  = nn.BCEWithLogitsLoss
 
     def build(self, input_dim: int) -> nn.Module:
-        return SupervisedTransformerCNN(
+        return SupervisedCNNTransformer(
             in_channels=input_dim,
             d_model=self.d_model,
             nhead=self.nhead,
@@ -42,6 +43,27 @@ class CNNTransformerConfig:
             dropout=self.dropout,
         )
 
+@dataclass
+class TransformerConfig:
+    name:           str   = "transformer"
+    d_model:        int   = 128
+    nhead:          int   = 4
+    num_layers:     int   = 2
+    dropout:        float = 0.3
+    pos_weight_cap: float = 10.0
+    num_classes:    int   = 1
+    loss_fn:        type  = nn.BCEWithLogitsLoss
+
+    def build(self, input_dim: int, context_length: int = None) -> nn.Module:
+        return Transformer(
+            in_channels=input_dim,
+            d_model=self.d_model,
+            nhead=self.nhead,
+            num_layers=self.num_layers,
+            num_classes=self.num_classes,
+            dropout=self.dropout,
+            seq_len=context_length if context_length is not None else 168,
+        )
 
 @dataclass
 class LSTMConfig:
@@ -207,7 +229,7 @@ class EvaluationConfig:
 @dataclass
 class ExperimentConfig:
     task:       BinaryClassificationConfig = field(default_factory=BinaryClassificationConfig)
-    model:      CNNTransformerConfig       = field(default_factory=CNNTransformerConfig)
+    model:      Transformer                = field(default_factory=TransformerConfig)
     data:       LeadCSVConfig              = field(default_factory=LeadCSVConfig)
     training:   TrainingConfig             = field(default_factory=TrainingConfig)
     federation: FederationConfig           = field(default_factory=FederationConfig)
@@ -217,11 +239,7 @@ class ExperimentConfig:
 # Change CONFIG to switch experiments. All fields have defaults so you only
 # need to specify what differs from the defaults.
 
-CONFIG = ExperimentConfig(
-    model=PatchTSTConfig(num_attention_heads=4, num_hidden_layers=3),
-    data=LeadCSVConfig(batch_size=32),
-    training=TrainingConfig(local_epochs=1, learning_rate=1e-5),
-)
+CONFIG = ExperimentConfig()
 
 """
 Examples:

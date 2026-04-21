@@ -1,6 +1,7 @@
 from pathlib import Path
 from torch import nn
 from flwr.client import ClientApp, NumPyClient
+from training.training_utils.Evaluator import Evaluator
 from flwr.common.logger import log
 from logging import INFO
 from config import CONFIG
