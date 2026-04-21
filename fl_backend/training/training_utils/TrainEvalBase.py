@@ -36,32 +36,21 @@ class TrainEvalBase:
         dataset = TensorDataset(feature_tensor, label_tensor)
         return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
-    def _train_epoch(self, model, loader, optimizer, loss_fn, proximal_mu=0.0, global_params=None):
+    def _train_epoch(self, model, loader, optimizer, loss_fn):
         model.train()
         total_loss, total_samples = 0.0, 0
 
         for features, labels in loader:
             features = features.to(self.device)
-            labels = labels.to(self.device)
+            labels   = labels.to(self.device).float()   # ← cast to float32
 
             optimizer.zero_grad()
             logits = model(features)
-
-            if self.num_classes == 1:
-                labels = labels.float().view_as(logits)
-
-            loss = loss_fn(logits, labels)
-
-            if proximal_mu > 0.0 and global_params is not None:
-                proximal_term = 0.0
-                for param, global_param in zip(model.parameters(), global_params):
-                    proximal_term += torch.sum((param - global_param) ** 2)
-                loss = loss + (proximal_mu / 2.0) * proximal_term
-
+            loss   = loss_fn(logits, labels)
             loss.backward()
             optimizer.step()
 
-            total_loss += loss.item() * features.size(0)
+            total_loss    += loss.item() * features.size(0)
             total_samples += features.size(0)
 
         return total_loss / total_samples

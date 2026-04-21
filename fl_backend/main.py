@@ -59,6 +59,7 @@ def main():
     train_results = train_model(
         model=model,
         trainloader=trainloader,
+        valloader=valloader,
         training_config=config.training,
         model_config=config.model,
         device=device,

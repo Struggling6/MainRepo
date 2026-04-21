@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "fl_backend"
+name = "fl-backend"
 version = "0.1.0"
 description = "Federated anomaly detection backend"
 license = "Apache-2.0"
@@ -13,14 +13,12 @@ dependencies = [
     "pandas",
     "numpy",
     "scikit-learn",
+    "transformers",
 ]
-
-[toolp.sources]
-torch = { index = "pytorch-rocm" }
 
 [[tool.pip.indexes]]
 name = "pytorch-rocm"
-url = "https://download.pytorch.org/whl/rocm6.2"
+url = "https://download.pytorch.org/whl/rocm6.3"
 
 [tool.flwr.app]
 publisher = "local"

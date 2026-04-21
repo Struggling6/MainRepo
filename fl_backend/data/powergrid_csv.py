@@ -11,26 +11,26 @@ class PowerGridCSVHandler(BaseDatasetHandler):
         super().__init__(config)
 
         #Path to the CSV file.
-        self.file_path = config.file_path
+        self.file_path = config.data.file_path
 
         #Use from config if provided, otherwise default to 32
-        self.batch_size = config.batch_size 
+        self.batch_size = config.data.batch_size 
 
         #How many clients to split data into. Default is 1
-        self.num_clients = config.num_clients
+        self.num_clients = config.federation.num_clients
 
         #Percentage of data to use for testing (rest is for training).
-        self.test_split = config.test_split
+        self.test_split = config.data.test_split
 
         #Whether to normalize features.
-        self.normalize = config.normalize
+        self.normalize = config.data.normalize
 
         #Ensure reproducibility by using a fixed random seed for shuffling and splitting data.
-        self.seed = config.seed
+        self.seed = config.data.seed
         
         #Name of the column in the CSV that reveals if its an attack or natural
-        self.label_column = config.target
-        self.partition_mode = getattr(config, "partition_mode", "shared")
+        self.label_column = config.data.target
+        self.partition_mode = getattr(config.federation, "partition_mode", "shared")
         #Load the CSV file into a pandas DataFrame (table).
         self.df = pd.read_csv(self.file_path)
 

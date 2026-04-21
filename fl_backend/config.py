@@ -83,28 +83,66 @@ class MLPConfig:
 
 @dataclass
 class PatchTSTConfig(HF_PatchTSTConfig):
-    name:                   str = "patchtst"
-    num_input_channels:     int         = 1
-    context_length:         int         = 32       
-    patch_length:           int         = 16
-    patch_stride:           int         = 1
-    d_model:                int         = 128
-    num_attention_heads:    int         = 16
-    num_hidden_layers:      int         = 3
-    ffn_dim:                int         = 256
-    dropout:                float       = 0.2
-    head_dropout:           float       = 0.2
-    channel_attention:      bool        = True
-    loss:                   str         = "mse"
-    attention_dropout:      float       = 0.0
-    positional_dropout:     float       = 0.0
-    pre_norm:               bool        = True
-    norm_type:              Literal["batchnorm", "layernorm"] | None = "batchnorm"
+    name:                str   = "patchtst"
+    num_input_channels:  int   = 1
+    context_length:      int   = 168
+    patch_length:        int   = 16
+    patch_stride:        int   = 8
+    d_model:             int   = 128
+    num_attention_heads: int   = 4
+    num_hidden_layers:   int   = 3
+    ffn_dim:             int   = 256
+    dropout:             float = 0.2
+    head_dropout:        float = 0.2
+    channel_attention:   bool  = True
+    attention_dropout:   float = 0.0
+    positional_dropout:  float = 0.0
+    pre_norm:            bool  = True
+    norm_type:           Literal["batchnorm", "layernorm"] | None = "batchnorm"
+    pos_weight_cap:      float = 10.0
+    loss_fn:             type  = nn.BCEWithLogitsLoss
 
-    # Our own parameters (not in HuggingFace config) needed for our training loopS
-    nhead:                  int         = num_attention_heads
-    num_layers:             int         = num_hidden_layers
+    def __post_init__(self):
+        # Call HuggingFace PretrainedConfig.__init__ to set internal attributes
+        # like _attn_implementation_internal that are required for model init
+        HF_PatchTSTConfig.__init__(
+            self,
+            num_input_channels=self.num_input_channels,
+            context_length=self.context_length,
+            patch_length=self.patch_length,
+            patch_stride=self.patch_stride,
+            d_model=self.d_model,
+            num_attention_heads=self.num_attention_heads,
+            num_hidden_layers=self.num_hidden_layers,
+            ffn_dim=self.ffn_dim,
+            dropout=self.dropout,
+            head_dropout=self.head_dropout,
+            channel_attention=self.channel_attention,
+            attention_dropout=self.attention_dropout,
+            positional_dropout=self.positional_dropout,
+            pre_norm=self.pre_norm,
+            norm_type=self.norm_type,
+        )
 
+    @property
+    def num_classes(self):
+        return self.num_labels
+
+    @property
+    def nhead(self):
+        return self.num_attention_heads
+
+    @property
+    def num_layers(self):
+        return self.num_hidden_layers
+
+    def build(self, input_dim: int, context_length: int = None) -> nn.Module:
+        from models.PatchTST import PatchTST
+        self.num_input_channels = input_dim
+        if context_length is not None:
+            self.context_length = context_length
+        return PatchTST(self)
+    
 # ── Data configs ──────────────────────────────────────────────────────── #
 
 @dataclass
@@ -176,24 +214,37 @@ class ExperimentConfig:
     evaluation: EvaluationConfig           = field(default_factory=EvaluationConfig)
 
 # ── Active experiment ─────────────────────────────────────────────────── #
-# This is the single line you change when switching experiments
-
-# Example: switch to PowerGrid dataset with LSTM
-# CONFIG = ExperimentConfig(
-#     task=AnomalyDetectionConfig(),
-#     model=LSTMConfig(hidden_size=256),
-#     data=PowerGridCSVConfig(num_clients=3),
-#     training=TrainingConfig(learning_rate=5e-4),
-#     federation=FederationConfig(num_rounds=10),
-#     evaluation=EvaluationConfig(threshold=0.3),
-# )
+# Change CONFIG to switch experiments. All fields have defaults so you only
+# need to specify what differs from the defaults.
 
 CONFIG = ExperimentConfig(
-    task=BinaryClassificationConfig(),
-    model=PatchTSTConfig(),
-    data=LeadCSVConfig(num_clients=4),
-    training=TrainingConfig(learning_rate=1e-4, local_epochs=20),
-    federation=FederationConfig(num_rounds=5),
-    evaluation=EvaluationConfig(threshold=0.5),
+    model=PatchTSTConfig(num_attention_heads=4, num_hidden_layers=3),
+    data=LeadCSVConfig(batch_size=32),
+    training=TrainingConfig(local_epochs=1, learning_rate=1e-5),
 )
+
+"""
+Examples:
+
+FedProx with LSTM on PowerGrid dataset:
+CONFIG = ExperimentConfig(
+    model=LSTMConfig(hidden_size=256, dropout=0.2),
+    data=PowerGridCSVConfig(),
+    training=TrainingConfig(learning_rate=5e-4, local_epochs=1),
+    federation=FederationConfig(num_rounds=10, num_clients=3, proximal_mu=0.1),
+    evaluation=EvaluationConfig(threshold=0.3),
+)
+
+PatchTST on LEAD dataset:
+CONFIG = ExperimentConfig(
+    model=PatchTSTConfig(num_attention_heads=4, num_hidden_layers=3),
+    data=LeadCSVConfig(batch_size=32),
+    training=TrainingConfig(local_epochs=1, learning_rate=1e-5),
+)
+
+MLP baseline on LEAD dataset:
+CONFIG = ExperimentConfig(
+    model=MLPConfig(hidden_size=64, num_layers=3),
+)
+"""
 

@@ -22,45 +22,48 @@ This was done to be sure to have the correct version of the libraries and is app
 
 
 
-## Docker compose:
-rebuild + start Docker Compose commands
-Run:
-docker compose down
-What this does:
-- down = stops/removes old containers
-- up --build -d = rebuilds using our pyproject.toml and starts everything again
+## Docker
 
-docker compose ps
-- Shows running containers
+### First Time / After Code Changes
 
+Rebuild the image and restart if you changed Python code, `pyproject.toml`, or the `Dockerfile`:
 
-
-
-## New Docker COmmands:
-
-You only need to rebuild the image if you changed:
-
-Python code
-pyproject.toml
-the Dockerfile
-
-Then run:
-
+```bash
 docker build -t fl-backend-app:latest ./fl_backend
+docker compose down
 docker compose up -d
+```
 
-If you only change:
+By default the image uses CPU PyTorch. To build with GPU support:
 
-number of clients
-ports
-resource limits
+```bash
+# ROCm (AMD)
+docker build --build-arg TORCH_VARIANT=rocm -t fl-backend-app:latest ./fl_backend
 
-then just regenerate compose and restart:
+# CUDA (Nvidia)
+docker build --build-arg TORCH_VARIANT=cuda -t fl-backend-app:latest ./fl_backend
+```
 
-python generate_compose.py --num-clients 15
+---
+
+### Config Changes Only
+
+If you only changed the number of clients, ports, or resource limits — no rebuild needed. Just regenerate the compose file and restart:
+
+```bash
+python generate_compose.py --num-clients 4
 docker compose up -d
+```
 
-No rebuild needed.
+---
+
+### Useful Commands
+
+```bash
+docker compose ps        # show running containers
+docker compose down      # stop and remove containers
+docker compose logs -f   # follow logs from all containers
+```
 
 ## Flower CLI commands:
 flwr config list
