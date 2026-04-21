@@ -1,5 +1,4 @@
 from pathlib import Path
-
 from .lead_csv import LeadCSVHandler
 from .powergrid_csv import PowerGridCSVHandler 
 from config import LeadCSVConfig, PowerGridCSVConfig

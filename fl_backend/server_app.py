@@ -1,5 +1,4 @@
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
-
 from config import CONFIG
 from FedAvgWithSave import FedAvgWithSave
 
