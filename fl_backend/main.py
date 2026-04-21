@@ -1,11 +1,8 @@
 from config import CONFIG
 from data.registry import create_dataset_handler
 from training.train import train_model
-from training.evaluate import evaluate
 from models.utils import get_device
 from training.training_utils.Evaluator import Evaluator
-from plotting.plotting_config import plot_diagrams
-from plotting.plotting_config import plot_diagrams
 
 import argparse
 parser = argparse.ArgumentParser()

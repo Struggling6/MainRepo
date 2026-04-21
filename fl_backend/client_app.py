@@ -1,11 +1,8 @@
 from pathlib import Path
-
-import torch
 from torch import nn
 from flwr.client import ClientApp, NumPyClient
 from flwr.common.logger import log
 from logging import INFO
-
 from config import CONFIG
 from data.registry import create_dataset_handler
 from models.utils import get_device, get_model_parameters, set_model_parameters

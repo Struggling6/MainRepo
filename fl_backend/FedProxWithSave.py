@@ -8,7 +8,6 @@ from flwr.server.client_proxy import ClientProxy
 from pathlib import Path
 from typing import Union, Optional
 from config import CONFIG
-from models.utils import get_device
 from data.registry import create_dataset_handler
 
 logger = logging.getLogger(__name__)

@@ -1,7 +1,7 @@
 import torch.nn as nn
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
 from models import SupervisedTransformerCNN, LSTMModel, MLPModel
 # ── Task configs ─────────────────────────────────────────────────────── #
