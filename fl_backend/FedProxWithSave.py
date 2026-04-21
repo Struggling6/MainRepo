@@ -1,14 +1,17 @@
+import torch
+import torch.nn as nn
+import logging
+
 from flwr.server.strategy import FedProx
 from flwr.common import parameters_to_ndarrays, FitRes, Parameters
 from flwr.server.client_proxy import ClientProxy
-import torch
-import torch.nn as nn
 from pathlib import Path
 from typing import Union, Optional
 from config import CONFIG
 from models.utils import get_device
 from data.registry import create_dataset_handler
 
+logger = logging.getLogger(__name__)
 
 class FedProxWithSave(FedProx):
     """
@@ -16,26 +19,25 @@ class FedProxWithSave(FedProx):
     after the final federation round completes.
     """
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     def aggregate_fit(
         self,
         server_round: int,
         results: list[tuple[ClientProxy, FitRes]],
         failures: list[Union[tuple[ClientProxy, FitRes], BaseException]],
     ) -> tuple[Optional[Parameters], dict]:
+
+        logger.info(f"Round {server_round}: aggregating {len(results)} clients, {len(failures)} failures")
+
+        # Run standard FedAvg aggregation first
         aggregated_parameters, metrics = super().aggregate_fit(
             server_round, results, failures
         )
 
-        if (
-            aggregated_parameters is not None
-            and server_round == CONFIG.federation.num_rounds
-        ):
-            print(f"Final round {server_round} complete, saving aggregated model...")
+        # Save only after the final round
+        if aggregated_parameters is not None and server_round == CONFIG.federation.num_rounds:
+            logger.info(f"Final round {server_round} complete, saving aggregated model...")
 
-            metadata = create_dataset_handler(CONFIG).get_metadata()
+            metadata = create_dataset_handler(CONFIG.data).get_metadata()
             model = CONFIG.model.build(input_dim=metadata["input_dim"])
 
             # Convert Flower parameters back to numpy arrays, then load into model
@@ -49,16 +51,17 @@ class FedProxWithSave(FedProx):
                 path=CONFIG.evaluation.model_path,
                 config=CONFIG.model,
             )
+            logger.info(f"Model saved to {CONFIG.evaluation.model_path}")
 
         return aggregated_parameters, metrics
 
     @staticmethod
     def _save_model(
-        model: nn.Module,
-        path: Path,
-        config: object = None,
-        threshold: float = 0.5,
-        metrics: dict = None,
+        model:      nn.Module,
+        path:       Path,
+        config:     object,
+        threshold:  float,
+        metrics:    dict,
     ):
         """
         Save model weights, architecture config, best threshold,
@@ -66,15 +69,16 @@ class FedProxWithSave(FedProx):
         """
 
         if isinstance(path, Path):
-            path.parent.mkdir(parents=True, exist_ok=True)
+            path.parent.mkdir(parents=True, exist_ok=True)  # create checkpoints/ dir if it doesn't exist
 
             checkpoint = {
-                "model_state_dict": model.state_dict(),
-                "model_config": config,
-                "threshold": threshold,
-                "metrics": metrics or {},
+                "model_state_dict": model.state_dict(), # PyTorch convention for saving/loading weights
+                "model_config":     config,
+                "threshold":        threshold,
+                "metrics":          metrics or {},
             }
             torch.save(checkpoint, path)
             print(f"Model saved to {path}")
+
         else:
             raise ValueError("Path must be a pathlib.Path object")

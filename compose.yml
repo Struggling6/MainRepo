@@ -54,7 +54,7 @@ services:
       - /dev/kfd:/dev/kfd
       - /dev/dri:/dev/dri
     group_add:
+      - render
       - video
-      - "988"
     volumes:
       - ./fl_backend/datasets:/app/datasets

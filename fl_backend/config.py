@@ -1,14 +1,22 @@
+import torch.nn as nn
 from dataclasses import dataclass, field
 from pathlib import Path
-import torch.nn as nn
-from models import SupervisedCNNTransformer, LSTMModel, MLPModel, SupervisedCNN
-
-
+from typing import Literal, Optional
+from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
+from models import SupervisedTransformerCNN, LSTMModel, MLPModel
 # ── Task configs ─────────────────────────────────────────────────────── #
 
 @dataclass
 class BinaryClassificationConfig:
     name: str = "binary_classification"
+
+@dataclass
+class AnomalyDetectionConfig:
+    name: str = "anomaly_detection"
+
+@dataclass
+class MultiClassClassificationConfig:
+    name: str = "multi_class_classification"
 
 
 # ── Model configs ─────────────────────────────────────────────────────── #
@@ -17,7 +25,7 @@ class BinaryClassificationConfig:
 class CNNTransformerConfig:
     name:           str   = "supervised_cnn_transformer"
     d_model:        int   = 128
-    nhead:          int   = 4 # number of attention heads (nhead is PyTorch's parameter name)
+    nhead:          int   = 4
     num_layers:     int   = 2
     dropout:        float = 0.3
     pos_weight_cap: float = 10.0
@@ -25,7 +33,7 @@ class CNNTransformerConfig:
     loss_fn:        type  = nn.BCEWithLogitsLoss
 
     def build(self, input_dim: int) -> nn.Module:
-        return SupervisedCNNTransformer(
+        return SupervisedTransformerCNN(
             in_channels=input_dim,
             d_model=self.d_model,
             nhead=self.nhead,
@@ -37,11 +45,22 @@ class CNNTransformerConfig:
 
 @dataclass
 class LSTMConfig:
-    name:        str   = "lstm"
-    hidden_size: int   = 128
-    num_layers:  int   = 2
-    dropout:     float = 0.3
-    loss_fn:     type  = nn.BCEWithLogitsLoss
+    name:            str       = "lstm"
+    hidden_size:     int       = 128
+    num_layers:      int       = 2
+    dropout:         float     = 0.3
+    num_classes:     int       = 1
+    pos_weight_cap:  float     = 10.0
+    loss_fn:         type      = nn.BCEWithLogitsLoss
+
+    def build(self, input_dim: int) -> nn.Module:
+        return LSTMModel(
+            in_channels=input_dim,
+            hidden_size=self.hidden_size,
+            num_layers=self.num_layers,
+            num_classes=self.num_classes,
+            dropout=self.dropout,
+        )
 
 @dataclass
 class MLPConfig:
@@ -61,31 +80,69 @@ class MLPConfig:
             num_classes=self.num_classes,
             dropout=self.dropout,
         )
-    
-@dataclass
-class TransformerConfig:
-    name:           str   = "transformer"
-    d_model:        int   = 128
-    nhead:          int   = 4
-    num_layers:     int   = 2
-    dropout:        float = 0.3
-    pos_weight_cap: float = 10.0 
-    num_classes:    int   = 1
-    loss_fn:        type  = nn.BCEWithLogitsLoss
 
+@dataclass
+class PatchTSTConfig(HF_PatchTSTConfig):
+    name:                str   = "patchtst"
+    num_input_channels:  int   = 1
+    context_length:      int   = 168
+    patch_length:        int   = 16
+    patch_stride:        int   = 8
+    d_model:             int   = 128
+    num_attention_heads: int   = 4
+    num_hidden_layers:   int   = 3
+    ffn_dim:             int   = 256
+    dropout:             float = 0.2
+    head_dropout:        float = 0.2
+    channel_attention:   bool  = True
+    attention_dropout:   float = 0.0
+    positional_dropout:  float = 0.0
+    pre_norm:            bool  = True
+    norm_type:           Literal["batchnorm", "layernorm"] | None = "batchnorm"
+    pos_weight_cap:      float = 10.0
+    loss_fn:             type  = nn.BCEWithLogitsLoss
+
+    def __post_init__(self):
+        # Call HuggingFace PretrainedConfig.__init__ to set internal attributes
+        # like _attn_implementation_internal that are required for model init
+        HF_PatchTSTConfig.__init__(
+            self,
+            num_input_channels=self.num_input_channels,
+            context_length=self.context_length,
+            patch_length=self.patch_length,
+            patch_stride=self.patch_stride,
+            d_model=self.d_model,
+            num_attention_heads=self.num_attention_heads,
+            num_hidden_layers=self.num_hidden_layers,
+            ffn_dim=self.ffn_dim,
+            dropout=self.dropout,
+            head_dropout=self.head_dropout,
+            channel_attention=self.channel_attention,
+            attention_dropout=self.attention_dropout,
+            positional_dropout=self.positional_dropout,
+            pre_norm=self.pre_norm,
+            norm_type=self.norm_type,
+        )
+
+    @property
+    def num_classes(self):
+        return self.num_labels
+
+    @property
+    def nhead(self):
+        return self.num_attention_heads
+
+    @property
+    def num_layers(self):
+        return self.num_hidden_layers
 
     def build(self, input_dim: int, context_length: int = None) -> nn.Module:
-            from models.supervised_cnn_transformer import SupervisedTransformerCNN
-            return SupervisedTransformerCNN(
-                in_channels=input_dim,
-                d_model=self.d_model,
-                nhead=self.nhead,
-                num_layers=self.num_layers,
-                num_classes=self.num_classes,
-                dropout=self.dropout,
-            )
-
-
+        from models.PatchTST import PatchTST
+        self.num_input_channels = input_dim
+        if context_length is not None:
+            self.context_length = context_length
+        return PatchTST(self)
+    
 # ── Data configs ──────────────────────────────────────────────────────── #
 
 @dataclass
@@ -96,6 +153,8 @@ class LeadCSVConfig:
     file_pattern        = "data{client_index}.csv"
     target:        str  = "anomaly"
     batch_size:    int  = 64
+    num_classes:   int  = 2
+    task_name:     str  = "binary_classification"
     test_split:   float = 0.2
     seed:          int  = 42
 
@@ -117,7 +176,7 @@ class PowerGridCSVConfig:
 class TrainingConfig:
     learning_rate: float = 1e-4
     weight_decay:  float = 1e-4
-    local_epochs:  int   = 30
+    local_epochs:  int   = 2
     patience:      int   = 10
 
 
@@ -125,11 +184,12 @@ class TrainingConfig:
 
 @dataclass
 class FederationConfig:
-    partition_mode:    str   = "local" # local or shared
+    partition_mode:    str   = "shared" # local or shared
     num_rounds:        int   = 2
     num_clients:       int   = 1
     fraction_fit:      float = 1.0
     fraction_evaluate: float = 1.0
+    proximal_mu:       float = 0.5
 
 # ── Evaluation config ─────────────────────────────────────────────────── #
 
@@ -147,21 +207,44 @@ class EvaluationConfig:
 @dataclass
 class ExperimentConfig:
     task:       BinaryClassificationConfig = field(default_factory=BinaryClassificationConfig)
-    model:      CNNTransformerConfig       = field(default_factory=SupervisedCNNConfig)
+    model:      CNNTransformerConfig       = field(default_factory=CNNTransformerConfig)
     data:       LeadCSVConfig              = field(default_factory=LeadCSVConfig)
     training:   TrainingConfig             = field(default_factory=TrainingConfig)
     federation: FederationConfig           = field(default_factory=FederationConfig)
     evaluation: EvaluationConfig           = field(default_factory=EvaluationConfig)
 
 # ── Active experiment ─────────────────────────────────────────────────── #
-# This is the single line you change when switching experiments
+# Change CONFIG to switch experiments. All fields have defaults so you only
+# need to specify what differs from the defaults.
 
-CONFIG = ExperimentConfig()
+CONFIG = ExperimentConfig(
+    model=PatchTSTConfig(num_attention_heads=4, num_hidden_layers=3),
+    data=LeadCSVConfig(batch_size=32),
+    training=TrainingConfig(local_epochs=1, learning_rate=1e-5),
+)
 
-# Example: switch to PowerGrid dataset with LSTM
-# CONFIG = ExperimentConfig(
-#     task=AnomalyDetectionConfig(),
-#     model=LSTMConfig(hidden_size=256),
-#     data=PowerGridCSVConfig(num_clients=3),
-#     training=TrainingConfig(learning_rate=5e-4),
-# )
+"""
+Examples:
+
+FedProx with LSTM on PowerGrid dataset:
+CONFIG = ExperimentConfig(
+    model=LSTMConfig(hidden_size=256, dropout=0.2),
+    data=PowerGridCSVConfig(),
+    training=TrainingConfig(learning_rate=5e-4, local_epochs=1),
+    federation=FederationConfig(num_rounds=10, num_clients=3, proximal_mu=0.1),
+    evaluation=EvaluationConfig(threshold=0.3),
+)
+
+PatchTST on LEAD dataset:
+CONFIG = ExperimentConfig(
+    model=PatchTSTConfig(num_attention_heads=4, num_hidden_layers=3),
+    data=LeadCSVConfig(batch_size=32),
+    training=TrainingConfig(local_epochs=1, learning_rate=1e-5),
+)
+
+MLP baseline on LEAD dataset:
+CONFIG = ExperimentConfig(
+    model=MLPConfig(hidden_size=64, num_layers=3),
+)
+"""
+

@@ -37,6 +37,7 @@ srun singularity exec \
   /bin/bash -lc "
     source /scratch/fl_venv/bin/activate
     export PYTHONWARNINGS='ignore:Protobuf gencode version:UserWarning'
+    export PYTHONUNBUFFERED=1
     cd /workspace/fl_backend
     /scratch/fl_venv/bin/flower-supernode \
       --insecure \

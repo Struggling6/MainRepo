@@ -7,13 +7,13 @@ from training.training_utils.TrainEvalBase import TrainEvalBase
 class Trainer(TrainEvalBase):
     def __init__(
         self,
-        model: nn.Module,
-        loss_fn: nn.Module,
-        lr: float,
-        batch_size: int,
-        epochs: int,
-        patience: int,
-        num_classes: int,
+        model:        nn.Module,
+        loss_fn:      nn.Module | None, # Optionally pass None for HuggingFace models that compute loss internally
+        lr:           float,
+        batch_size:   int,
+        epochs:       int,
+        patience:     int,
+        num_classes:  int,
         weight_decay: float,
         proximal_mu: float = 0.0,
         global_params: list[torch.Tensor] | None = None,
@@ -27,45 +27,13 @@ class Trainer(TrainEvalBase):
         )
         self.proximal_mu = proximal_mu
         self.global_params = global_params
-    """
-    Trains a single model with fixed hyperparameters.
-    Inherits dataloader, train/val epoch logic from AnomalyTrainerBase.
-    """
-
-    def __init__(
-        self,
-        model:        nn.Module,
-        loss_fn:      nn.Module,
-        lr:           float,
-        batch_size:   int,
-        epochs:       int,
-        patience:     int,
-        num_classes:  int,
-        weight_decay: float,
-    ):
-        super().__init__(epochs, patience, num_classes)  # initialise base class
-        self.model       = model.to(self.device)
-        self.loss_fn     = loss_fn
-        self.batch_size  = batch_size
-        self.optimizer   = torch.optim.AdamW(
-            model.parameters(), lr=lr, weight_decay=weight_decay
-        )
-
-    # ------------------------------------------------------------------ #
-    #  Public API                                                          #
-    # ------------------------------------------------------------------ #
 
     def train(
         self,
-        X_train: np.ndarray,
-        y_train: np.ndarray,
-        X_val:   np.ndarray,
-        y_val:   np.ndarray,
+        train_loader: torch.utils.data.DataLoader,
+        val_loader:   torch.utils.data.DataLoader,
     ) -> nn.Module:
-        """Train the model and restore the best checkpoint."""
-        train_loader = self._build_dataloader(X_train, y_train, self.batch_size, shuffle=True)
-        val_loader   = self._build_dataloader(X_val,   y_val,   self.batch_size, shuffle=False)
-
+        """Train the model directly from DataLoaders and restore the best checkpoint."""
         best_f1, best_state, epochs_without_improvement = -1.0, None, 0
         self.history = []
 
@@ -84,7 +52,6 @@ class Trainer(TrainEvalBase):
             self.history.append(metrics)
             self._print_epoch(metrics)
 
-            # Early stopping
             if val_f1 > best_f1:
                 best_f1    = val_f1
                 best_state = {k: v.clone() for k, v in self.model.state_dict().items()}
@@ -95,16 +62,11 @@ class Trainer(TrainEvalBase):
                     print(f"Early stopping at epoch {epoch} (best val F1: {best_f1:.4f})")
                     break
 
-        # Restore best weights
         if best_state is not None:
             self.model.load_state_dict(best_state)
             print(f"Restored best model (val F1: {best_f1:.4f})")
 
         return self.model
-
-    # ------------------------------------------------------------------ #
-    #  Private helpers                                                     #
-    # ------------------------------------------------------------------ #
 
     def _print_epoch(self, m):
         print(

@@ -22,79 +22,48 @@ This was done to be sure to have the correct version of the libraries and is app
 
 
 
-## Docker compose:
-rebuild + start Docker Compose commands
-Run:
+## Docker
+
+### First Time / After Code Changes
+
+Rebuild the image and restart if you changed Python code, `pyproject.toml`, or the `Dockerfile`:
+
+```bash
+docker build -t fl-backend-app:latest ./fl_backend
 docker compose down
-What this does:
-- down = stops/removes old containers
-- up --build -d = rebuilds using our pyproject.toml and starts everything again
-
-docker compose ps
-- Shows running containers
-
-
-
-
-## New Docker COmmands:
-
-First-time setup (only once)
-
-Build the Docker image and start the services:
-
-docker build -t fl-backend-app:latest ./fl_backend
 docker compose up -d
+```
 
-This installs Python, dependencies, and system setup.
+By default the image uses CPU PyTorch. To build with GPU support:
 
-## Daily development (when changing Python code)
+```bash
+# ROCm (AMD)
+docker build --build-arg TORCH_VARIANT=rocm -t fl-backend-app:latest ./fl_backend
 
-If you modify models, training logic, dataset handling, or configs, you do NOT need to rebuild Docker.
+# CUDA (Nvidia)
+docker build --build-arg TORCH_VARIANT=cuda -t fl-backend-app:latest ./fl_backend
+```
 
-Instead run:
+---
 
-docker compose restart superexec-serverapp superexec-clientapp-1
-Then start Flower:
+### Config Changes Only
 
-cd fl_backend
-flwr run . local-deployment --stream
+If you only changed the number of clients, ports, or resource limits — no rebuild needed. Just regenerate the compose file and restart:
 
-Multiple clients
-
-## If you have multiple clients:
-
-docker compose restart superexec-serverapp superexec-clientapp-1 superexec-clientapp-2
-
-Or restart everything:
-
-docker compose restart
-
-## When you MUST rebuild
-
-You only need to rebuild Docker if you change:
-
-requirements.txt
-Dockerfile
-Python version
-system dependencies
-
-Then run:
-docker build -t fl-backend-app:latest ./fl_backend
+```bash
+python generate_compose.py --num-clients 4
 docker compose up -d
+```
 
+---
 
-If you only change:
+### Useful Commands
 
-number of clients
-ports
-resource limits
-
-then just regenerate compose and restart:
-
-python generate_compose.py --num-clients 15
-docker compose up -d
-
-No rebuild needed.
+```bash
+docker compose ps        # show running containers
+docker compose down      # stop and remove containers
+docker compose logs -f   # follow logs from all containers
+```
 
 
 

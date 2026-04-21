@@ -15,7 +15,6 @@ from data.lead_csv import LeadCSVHandler
 from config import CONFIG
 
 
-
 datahandler = LeadCSVHandler(CONFIG.data)
 X_train, y_train, X_val, y_val = datahandler.run_split()
 
