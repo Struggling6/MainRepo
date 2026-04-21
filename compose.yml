@@ -50,11 +50,11 @@ services:
     stop_signal: SIGINT
     cpus: "2.0"
     mem_limit: 8g
-    devices:
-      - /dev/kfd:/dev/kfd
-      - /dev/dri:/dev/dri
-    group_add:
-      - video
-      - "988"
+#    devices:
+#      - /dev/kfd:/dev/kfd
+#      - /dev/dri:/dev/dri
+#    group_add:
+#      - video
+#      - "988"
     volumes:
       - ./fl_backend/datasets:/app/datasets
