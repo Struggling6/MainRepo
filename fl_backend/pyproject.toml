@@ -15,6 +15,10 @@ dependencies = [
     "scikit-learn",
 ]
 
+[[tool.pip.indexes]]
+name = "pytorch-rocm"
+url = "https://download.pytorch.org/whl/rocm6.3"
+
 [tool.flwr.app]
 publisher = "local"
 

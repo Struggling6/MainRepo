@@ -1,11 +1,14 @@
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
+from flwr.common import ndarrays_to_parameters
+
 from config import CONFIG
 from FedAvgWithSave import FedAvgWithSave
 
 
 def server_fn(context):
     fed_config = CONFIG.federation
-    num_clients = CONFIG.data.num_clients
+    num_clients = fed_config.num_clients
+    proximal_mu = fed_config.proximal_mu
 
     strategy = FedAvgWithSave(
         fraction_fit=fed_config.fraction_fit,

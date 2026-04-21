@@ -1,12 +1,7 @@
 import torch
 
+
 def get_device():
-    """
-    Returns the best available device in priority order:
-      1. ROCm (AMD GPU via HIP) — detected through torch.cuda, which ROCm mirrors
-      2. CUDA (Nvidia GPU)      — same API, included for completeness
-      3. CPU                    — fallback if no GPU is available
-    """
     if torch.cuda.is_available():
         device = torch.device("cuda")
         gpu_name = torch.cuda.get_device_name(0)
@@ -17,16 +12,34 @@ def get_device():
     else:
         device = torch.device("cpu")
         print("No GPU found, using CPU")
-    
     return device
 
+
 def get_model_parameters(model):
-    return [val.cpu().numpy() for _, val in model.state_dict().items()]
+    params = [v.detach().cpu().numpy() for _, v in model.state_dict().items()]
+    if len(params) == 0:
+        raise RuntimeError(
+            f"No tensors found in state_dict for model {type(model).__name__}"
+        )
+    return params
 
 
 def set_model_parameters(model, parameters):
-    params_dict = zip(model.state_dict().keys(), parameters)
-    state_dict = {
-        k: torch.tensor(v) for k, v in params_dict
-    }
-    model.load_state_dict(state_dict, strict=True)
+    state_dict = model.state_dict()
+    keys = list(state_dict.keys())
+
+    if len(keys) != len(parameters):
+        raise RuntimeError(
+            f"Parameter count mismatch: model has {len(keys)}, got {len(parameters)}"
+        )
+
+    new_state = {}
+    for key, new_param in zip(keys, parameters):
+        ref = state_dict[key]
+        new_state[key] = torch.tensor(
+            new_param,
+            dtype=ref.dtype,
+            device=ref.device,
+        )
+
+    model.load_state_dict(new_state, strict=True)

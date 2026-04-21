@@ -49,44 +49,53 @@ class LeadCSVHandler(BaseDatasetHandler):
         so the exact same cleaning steps are applied to both.
         """
 
-        df[self._time_col] = pd.to_datetime(df[self._time_col])
-        df = df.sort_values(by=[self._node_col, self._time_col])
+        self.file_path = config.data.file_path
+        self.target = config.data.target
+        self.batch_size = config.data.batch_size
+        self.test_split = config.data.test_split
+        self.num_clients = config.federation.num_clients
+        self.seed = config.data.seed
+        self.partition_mode = getattr(config.federation, "partition_mode")
 
-        # Memory optimisation — halves RAM usage for large datasets
-        float_cols = df.select_dtypes(include="float64").columns
-        df[float_cols] = df[float_cols].astype("float32")
-        int_cols = df.select_dtypes(include="int64").columns
-        df[int_cols] = df[int_cols].astype("int32")
-        str_cols = df.select_dtypes(include="object").columns
-        df[str_cols] = df[str_cols].astype("category")
+        # Optional local-mode settings
+        self.data_dir = getattr(config.data, "data_dir", None)
+        self.file_pattern = getattr(config.data, "file_pattern", None)
 
-        # Lag features — computed per building so no cross-building leakage
-        groups = df.groupby(self._node_col)
-        df["meter_lag1"]  = groups["meter_reading"].shift(1)   # 1 hour ago
-        df["meter_lag24"] = groups["meter_reading"].shift(24)  # 24 hours ago
+        self._node_col = "building_id"
+        self._time_col = "timestamp"
 
-        # Rolling statistics over the last 24 hours
-        # min_periods=1 ensures values are produced near the start of the series
-        df["meter_roll_mean_24"] = groups["meter_reading"].transform(
-            lambda x: x.rolling(window=24, min_periods=1).mean()
-        )
-        df["meter_roll_std_24"] = groups["meter_reading"].transform(
-            lambda x: x.rolling(window=24, min_periods=1).std()
-        )
+        self.df = None
+        self.features = None
+        self.labels = None
+        self.feature_cols = self._build_feature_columns()
 
-        # Difference features — how much has consumption changed?
-        df["meter_diff_1"]  = df["meter_reading"] - df["meter_lag1"]
-        df["meter_diff_24"] = df["meter_reading"] - df["meter_lag24"]
+        if self.partition_mode == "shared":
+            print(f"[LEAD] Loading shared file: {self.file_path}")
+            self.df = pd.read_csv(self.file_path)
+            print(f"[LEAD] Raw shape: {self.df.shape}")
 
-        # Z-score — how many std devs is current reading from 24hr mean?
-        # +1e-6 prevents division by zero when std is 0 (flat signal)
-        df["meter_zscore_24"] = (
-            (df["meter_reading"] - df["meter_roll_mean_24"])
-            / (df["meter_roll_std_24"] + 1e-6)
-        )
+            if self.target not in self.df.columns:
+                raise ValueError(
+                    f"CSV file must contain target column '{self.target}', "
+                    f"but columns were: {list(self.df.columns)}"
+                )
 
-        # One-hot encode primary_use — drop_first avoids dummy variable trap
-        df = pd.get_dummies(df, columns=["primary_use"], drop_first=True)
+            self.features, self.labels = self._prepare_data(self.df)
+            self._prepare_partitions()
+
+        elif self.partition_mode == "local":
+            # In local mode each client gets its own file later in get_dataloaders(...)
+            self.client_indices = list(range(self.num_clients))
+
+        else:
+            raise ValueError(
+                f"Unsupported partition_mode: {self.partition_mode}. "
+                f"Expected 'shared' or 'local'."
+            )
+
+    def _resolve_local_file_path(self, partition_id: int) -> Path:
+        if partition_id < 0:
+            raise ValueError(f"Invalid partition_id: {partition_id}")
 
         # pandas 2.x returns bool columns from get_dummies — cast to float32
         # so the feature matrix stays a single numeric dtype
@@ -210,11 +219,11 @@ class LeadCSVHandler(BaseDatasetHandler):
         
     def get_metadata(self):
         return {
-            "input_dim"  : len(self.feature_cols),
-            "num_classes": self.config.num_classes,
-            "num_samples": self.df.shape[0], 
-            "task_type"  : self.config.task.name,
-        "data_format": "tabular",
+            "input_dim": len(self.feature_cols),
+            "num_classes": self.config.data.num_classes,
+            "num_samples": self.df.shape[0],
+            "task_type": self.config.task.name,
+            "data_format": "tabular",
         }
 
 

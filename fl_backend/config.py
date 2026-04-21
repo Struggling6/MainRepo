@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 import torch.nn as nn
-from models.mlp import MLPModel
+from models import SupervisedCNNTransformer, LSTMModel, MLPModel, SupervisedCNN
 
 
 # ── Task configs ─────────────────────────────────────────────────────── #
@@ -9,10 +9,6 @@ from models.mlp import MLPModel
 @dataclass
 class BinaryClassificationConfig:
     name: str = "binary_classification"
-
-@dataclass
-class AnomalyDetectionConfig:
-    name: str = "anomaly_detection"
 
 
 # ── Model configs ─────────────────────────────────────────────────────── #
@@ -25,8 +21,19 @@ class CNNTransformerConfig:
     num_layers:     int   = 2
     dropout:        float = 0.3
     pos_weight_cap: float = 10.0
-    num_classes:    int   = 1  # binary classification
-    loss_fn:        type  = nn.BCEWithLogitsLoss  # default loss function for binary classification
+    num_classes:    int   = 1
+    loss_fn:        type  = nn.BCEWithLogitsLoss
+
+    def build(self, input_dim: int) -> nn.Module:
+        return SupervisedCNNTransformer(
+            in_channels=input_dim,
+            d_model=self.d_model,
+            nhead=self.nhead,
+            num_layers=self.num_layers,
+            num_classes=self.num_classes,
+            dropout=self.dropout,
+        )
+
 
 @dataclass
 class LSTMConfig:
@@ -84,13 +91,13 @@ class TransformerConfig:
 @dataclass
 class LeadCSVConfig:
     name:          str  = "lead_csv"
-    file_path:     Path = Path("datasets/LEAD/train_features.csv")
+    file_path:     Path = Path("datasets/LEAD/train_features.csv") #used for shared mode, ignored for local mode, should be the large dataset csv
+    data_dir            = Path("datasets/LEAD")
+    file_pattern        = "data{client_index}.csv"
     target:        str  = "anomaly"
     batch_size:    int  = 64
     test_split:   float = 0.2
-    num_clients:   int  = 2
     seed:          int  = 42
-    partition_mode: str = "shared"
 
 @dataclass
 class PowerGridCSVConfig:
@@ -99,13 +106,10 @@ class PowerGridCSVConfig:
     clean_path:   Path  = Path("datasets/EPIC/Scenario_1/EpicLog_clean.csv")
     target:       str   = "marker"
     batch_size:   int   = 32
-    num_clients:  int   = 2
     test_split:   float = 0.2
     normalize:    bool  = True
     noise_level:  float = 0.7
     seed:         int   = 42
-    partition_mode: str = "shared"
-
 
 # ── Training config ───────────────────────────────────────────────────── #
 
@@ -121,7 +125,9 @@ class TrainingConfig:
 
 @dataclass
 class FederationConfig:
-    num_rounds:        int   = 5
+    partition_mode:    str   = "local" # local or shared
+    num_rounds:        int   = 2
+    num_clients:       int   = 1
     fraction_fit:      float = 1.0
     fraction_evaluate: float = 1.0
 
@@ -141,8 +147,8 @@ class EvaluationConfig:
 @dataclass
 class ExperimentConfig:
     task:       BinaryClassificationConfig = field(default_factory=BinaryClassificationConfig)
-    model:      CNNTransformerConfig       = field(default_factory=CNNTransformerConfig)
-    data:       PowerGridCSVConfig              = field(default_factory=PowerGridCSVConfig)
+    model:      CNNTransformerConfig       = field(default_factory=SupervisedCNNConfig)
+    data:       LeadCSVConfig              = field(default_factory=LeadCSVConfig)
     training:   TrainingConfig             = field(default_factory=TrainingConfig)
     federation: FederationConfig           = field(default_factory=FederationConfig)
     evaluation: EvaluationConfig           = field(default_factory=EvaluationConfig)
