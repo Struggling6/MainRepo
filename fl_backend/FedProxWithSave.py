@@ -3,11 +3,10 @@ from flwr.common import parameters_to_ndarrays, FitRes, Parameters
 from flwr.server.client_proxy import ClientProxy
 import torch
 import torch.nn as nn
-from flwr.common import FitRes, Parameters, parameters_to_ndarrays
-from flwr.server.client_proxy import ClientProxy
-from flwr.server.strategy import FedAvg
-
+from pathlib import Path
+from typing import Union, Optional
 from config import CONFIG
+from models.utils import get_device
 from data.registry import create_dataset_handler
 
 

@@ -94,8 +94,8 @@ class SupervisedCNNConfig:
 @dataclass
 class LeadCSVConfig:
     name:          str  = "lead_csv"
-    file_path:     Path = Path("dataset/LEAD/data{client_index}.csv") #used for shared mode, ignored for local mode, should be the large dataset csv
-    data_dir            = Path("dataset/LEAD")
+    file_path:     Path = Path("datasets/LEAD/data{client_index}.csv") #used for shared mode, ignored for local mode, should be the large dataset csv
+    data_dir            = Path("datasets/LEAD")
     file_pattern        = "data{client_index}.csv"
     target:        str  = "anomaly"
     batch_size:    int  = 64
