@@ -1,3 +1,4 @@
+import torch
 import numpy as np
 import pandas as pd
 import torch
@@ -5,6 +6,7 @@ import torch
 from pathlib import Path
 
 from .time_series_utils import temporal_grouped_split
+from config import CONFIG
 from .BaseDataHandler import BaseDatasetHandler
 
 
@@ -311,11 +313,11 @@ class LeadCSVHandler(BaseDatasetHandler):
                 raise RuntimeError("Metadata requested before dataset was prepared")
 
         return {
-            "input_dim": len(self.feature_cols),
-            "num_classes": self.config.data.num_classes,
-            "num_samples": self.df.shape[0],
-            "task_type": self.config.task.name,
-            "data_format": "tabular",
+            "input_dim"  : len(self.feature_cols),
+            "num_classes": CONFIG.model.num_classes,
+            "num_samples": self.df.shape[0], 
+            "task_type"  : CONFIG.task.name,
+        "data_format": "tabular",
         }
 
     def get_num_partitions(self) -> int:

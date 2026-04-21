@@ -1,14 +1,16 @@
+import torch
+import torch.nn as nn
+import logging
+
 from flwr.server.strategy import FedProx
 from flwr.common import parameters_to_ndarrays, FitRes, Parameters
 from flwr.server.client_proxy import ClientProxy
-import torch
-import torch.nn as nn
 from pathlib import Path
 from typing import Union, Optional
 from config import CONFIG
-from models.utils import get_device
 from data.registry import create_dataset_handler
 
+logger = logging.getLogger(__name__)
 
 class FedProxWithSave(FedProx):
     """
@@ -16,42 +18,25 @@ class FedProxWithSave(FedProx):
     after the final federation round completes.
     """
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-    
-        self.fit_history = []
-        self.eval_history = []
-
-
     def aggregate_fit(
         self,
         server_round: int,
         results: list[tuple[ClientProxy, FitRes]],
         failures: list[Union[tuple[ClientProxy, FitRes], BaseException]],
     ) -> tuple[Optional[Parameters], dict]:
-        
+
+        logger.info(f"Round {server_round}: aggregating {len(results)} clients, {len(failures)} failures")
+
+        # Run standard FedAvg aggregation first
         aggregated_parameters, metrics = super().aggregate_fit(
             server_round, results, failures
         )
 
-        #Saves metric history of clients for plotting
-        for client, fit_res in results:
-            row = {
-                "round": server_round,
-                "client_id": client.cid,
-                "num_examples": fit_res.num_examples,
-            }
+        # Save only after the final round
+        if aggregated_parameters is not None and server_round == CONFIG.federation.num_rounds:
+            logger.info(f"Final round {server_round} complete, saving aggregated model...")
 
-            row.update(fit_res.metrics)
-            self.fit_history.append(row)
-
-        if (
-            aggregated_parameters is not None
-            and server_round == CONFIG.federation.num_rounds
-        ):
-            print(f"Final round {server_round} complete, saving aggregated model...")
-
-            metadata = create_dataset_handler(CONFIG).get_metadata()
+            metadata = create_dataset_handler(CONFIG.data).get_metadata()
             model = CONFIG.model.build(input_dim=metadata["input_dim"])
 
             # Convert Flower parameters back to numpy arrays, then load into model
@@ -69,16 +54,17 @@ class FedProxWithSave(FedProx):
                     "final_round_metrics": metrics,
                 },
             )
+            logger.info(f"Model saved to {CONFIG.evaluation.model_path}")
 
         return aggregated_parameters, metrics
 
     @staticmethod
     def _save_model(
-        model: nn.Module,
-        path: Path,
-        config: object = None,
-        threshold: float = 0.5,
-        metrics: dict = None,
+        model:      nn.Module,
+        path:       Path,
+        config:     object,
+        threshold:  float,
+        metrics:    dict,
     ):
         """
         Save model weights, architecture config, best threshold,
@@ -86,15 +72,16 @@ class FedProxWithSave(FedProx):
         """
 
         if isinstance(path, Path):
-            path.parent.mkdir(parents=True, exist_ok=True)
+            path.parent.mkdir(parents=True, exist_ok=True)  # create checkpoints/ dir if it doesn't exist
 
             checkpoint = {
-                "model_state_dict": model.state_dict(),
-                "model_config": config,
-                "threshold": threshold,
-                "metrics": metrics or {},
+                "model_state_dict": model.state_dict(), # PyTorch convention for saving/loading weights
+                "model_config":     config,
+                "threshold":        threshold,
+                "metrics":          metrics or {},
             }
             torch.save(checkpoint, path)
             print(f"Model saved to {path}")
+
         else:
             raise ValueError("Path must be a pathlib.Path object")
