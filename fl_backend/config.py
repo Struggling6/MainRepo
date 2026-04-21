@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 import torch.nn as nn
-from models import SupervisedTransformerCNN, LSTMModel, MLPModel
+from models import SupervisedCNNTransformer, LSTMModel, MLPModel, SupervisedCNN
 
 
 # ── Task configs ─────────────────────────────────────────────────────── #
@@ -9,10 +9,6 @@ from models import SupervisedTransformerCNN, LSTMModel, MLPModel
 @dataclass
 class BinaryClassificationConfig:
     name: str = "binary_classification"
-
-@dataclass
-class AnomalyDetectionConfig:
-    name: str = "anomaly_detection"
 
 
 # ── Model configs ─────────────────────────────────────────────────────── #
@@ -29,7 +25,7 @@ class CNNTransformerConfig:
     loss_fn:        type  = nn.BCEWithLogitsLoss
 
     def build(self, input_dim: int) -> nn.Module:
-        return SupervisedTransformerCNN(
+        return SupervisedCNNTransformer(
             in_channels=input_dim,
             d_model=self.d_model,
             nhead=self.nhead,
@@ -73,6 +69,23 @@ class MLPConfig:
             in_channels=input_dim,
             hidden_size=self.hidden_size,
             num_layers=self.num_layers,
+            num_classes=self.num_classes,
+            dropout=self.dropout,
+        )
+    
+@dataclass
+class SupervisedCNNConfig:
+    name:           str   = "SupervisedCNN"
+    d_model:        int   = 128
+    dropout:        float = 0.3
+    pos_weight_cap: float = 10.0
+    num_classes:    int   = 1
+    loss_fn:        type  = nn.BCEWithLogitsLoss
+
+    def build(self, input_dim: int) -> nn.Module:
+        return SupervisedCNN(
+            in_channels=input_dim,
+            d_model=self.d_model,
             num_classes=self.num_classes,
             dropout=self.dropout,
         )
@@ -140,7 +153,7 @@ class EvaluationConfig:
 @dataclass
 class ExperimentConfig:
     task:       BinaryClassificationConfig = field(default_factory=BinaryClassificationConfig)
-    model:      CNNTransformerConfig       = field(default_factory=CNNTransformerConfig)
+    model:      SupervisedCNNConfig       = field(default_factory=SupervisedCNNConfig)
     data:       LeadCSVConfig              = field(default_factory=LeadCSVConfig)
     training:   TrainingConfig             = field(default_factory=TrainingConfig)
     federation: FederationConfig           = field(default_factory=FederationConfig)

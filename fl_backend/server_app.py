@@ -1,4 +1,5 @@
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
+from flwr.common import ndarrays_to_parameters
 
 from config import CONFIG
 from FedProxWithSave import FedProxWithSave
