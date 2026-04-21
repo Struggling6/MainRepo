@@ -17,7 +17,7 @@ class BinaryClassificationConfig:
 class CNNTransformerConfig:
     name:           str   = "supervised_cnn_transformer"
     d_model:        int   = 128
-    n_heads:         int   = 4
+    nhead:          int   = 4
     num_layers:     int   = 2
     dropout:        float = 0.3
     pos_weight_cap: float = 10.0
@@ -28,7 +28,7 @@ class CNNTransformerConfig:
         return SupervisedCNNTransformer(
             in_channels=input_dim,
             d_model=self.d_model,
-            n_heads=self.n_heads,
+            nhead=self.nhead,
             num_layers=self.num_layers,
             num_classes=self.num_classes,
             dropout=self.dropout,
@@ -94,15 +94,15 @@ class SupervisedCNNConfig:
 @dataclass
 class LeadCSVConfig:
     name:          str  = "lead_csv"
-    file_path:     Path = Path("datasets/LEAD/train_features.csv")
+    file_path:     Path = Path("datasets/LEAD/train_features.csv") #used for shared mode, ignored for local mode, should be the large dataset csv
+    data_dir            = Path("datasets/LEAD")
+    file_pattern        = "data{client_index}.csv"
     target:        str  = "anomaly"
     batch_size:    int  = 64
     num_classes:   int  = 2
     task_name:     str  = "binary_classification"
-    test_split:   float = 0.4
-    num_clients:   int  = 1
+    test_split:   float = 0.2
     seed:          int  = 42
-    partition_mode: str = "local" #shared or local
 
 @dataclass
 class PowerGridCSVConfig:
@@ -111,13 +111,10 @@ class PowerGridCSVConfig:
     clean_path:   Path  = Path("datasets/EPIC/Scenario_1/EpicLog_clean.csv")
     target:       str   = "marker"
     batch_size:   int   = 32
-    num_clients:  int   = 2
     test_split:   float = 0.2
     normalize:    bool  = True
     noise_level:  float = 0.7
     seed:         int   = 42
-    partition_mode: str = "shared"
-
 
 # ── Training config ───────────────────────────────────────────────────── #
 
@@ -125,7 +122,7 @@ class PowerGridCSVConfig:
 class TrainingConfig:
     learning_rate: float = 1e-4
     weight_decay:  float = 1e-4
-    local_epochs:  int   = 5
+    local_epochs:  int   = 2
     patience:      int   = 10
 
 
@@ -133,9 +130,12 @@ class TrainingConfig:
 
 @dataclass
 class FederationConfig:
-    num_rounds:        int   = 5
+    partition_mode:    str   = "local" # local or shared
+    num_rounds:        int   = 2
+    num_clients:       int   = 1
     fraction_fit:      float = 1.0
     fraction_evaluate: float = 1.0
+    proximal_mu:       float = 0.5
 
 # ── Evaluation config ─────────────────────────────────────────────────── #
 
@@ -153,7 +153,7 @@ class EvaluationConfig:
 @dataclass
 class ExperimentConfig:
     task:       BinaryClassificationConfig = field(default_factory=BinaryClassificationConfig)
-    model:      SupervisedCNNConfig       = field(default_factory=SupervisedCNNConfig)
+    model:      CNNTransformerConfig       = field(default_factory=SupervisedCNNConfig)
     data:       LeadCSVConfig              = field(default_factory=LeadCSVConfig)
     training:   TrainingConfig             = field(default_factory=TrainingConfig)
     federation: FederationConfig           = field(default_factory=FederationConfig)

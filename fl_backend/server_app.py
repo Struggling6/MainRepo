@@ -2,32 +2,62 @@ from flwr.server import ServerApp, ServerAppComponents, ServerConfig
 from flwr.common import ndarrays_to_parameters
 
 from config import CONFIG
-from FedAvgWithSave import FedAvgWithSave
-from data.registry import create_dataset_handler
+from FedProxWithSave import FedProxWithSave
+
+def weighted_average_fit(metrics):
+    total_examples = sum(num_examples for num_examples, _ in metrics)
+    if total_examples == 0:
+        return {}
+
+    aggregated = {}
+
+    for key in ["train_loss", "val_f1"]:
+        values = [
+            num_examples * m[key]
+            for num_examples, m in metrics
+            if key in m
+        ]
+        if values:
+            aggregated[key] = sum(values) / total_examples
+    print(f"[SERVER] Aggregated fit metrics: {aggregated}")
+    return aggregated
+
+
+def weighted_average_evaluate(metrics):
+    total_examples = sum(num_examples for num_examples, _ in metrics)
+    if total_examples == 0:
+        return {}
+
+    aggregated = {}
+
+    for key in ["f1", "pr_auc", "threshold"]:
+        values = [
+            num_examples * m[key]
+            for num_examples, m in metrics
+            if key in m
+        ]
+        if values:
+            aggregated[key] = sum(values) / total_examples
+
+    print(f"[SERVER] Aggregated evaluate metrics: {aggregated}")
+    return aggregated
 
 
 def server_fn(context):
     fed_config = CONFIG.federation
-    num_clients = CONFIG.data.num_clients
+    num_clients = fed_config.num_clients
+    proximal_mu = fed_config.proximal_mu
 
-    # Build initial global model on the server
-    metadata = create_dataset_handler(CONFIG.data).get_metadata()
-    input_dim = metadata["input_dim"]
-    global_model = CONFIG.model.build(input_dim=input_dim)
-
-    initial_ndarrays = [
-        v.detach().cpu().numpy() for _, v in global_model.state_dict().items()
-    ]
-    initial_parameters = ndarrays_to_parameters(initial_ndarrays)
-
-    strategy = FedAvgWithSave(
+    strategy = FedProxWithSave(
         fraction_fit=fed_config.fraction_fit,
         fraction_evaluate=fed_config.fraction_evaluate,
         min_fit_clients=num_clients,
         min_evaluate_clients=num_clients,
         min_available_clients=num_clients,
         on_evaluate_config_fn=lambda server_round: {"round": server_round},
-        initial_parameters=initial_parameters,
+        fit_metrics_aggregation_fn=weighted_average_fit,
+        evaluate_metrics_aggregation_fn=weighted_average_evaluate,
+        proximal_mu=proximal_mu,
     )
 
     config = ServerConfig(num_rounds=fed_config.num_rounds)

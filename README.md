@@ -129,7 +129,7 @@ class MyDatasetHandler(BaseDatasetHandler):
 
         self.file_path = config["file_path"]
         self.batch_size = config.get("batch_size", 32)
-        self.num_clients = config.get("num_clients", 1)
+        self.num_clients = config.get("num_clients")
         self.test_split = config.get("test_split", 0.2)
         self.seed = config.get("seed", 42)
 
