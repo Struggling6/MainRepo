@@ -40,17 +40,17 @@ class LeadCSVHandler(BaseDatasetHandler):
     def __init__(self, config):
         super().__init__(config)
 
-        self.file_path = config.file_path
-        self.target = config.target
-        self.batch_size = config.batch_size
-        self.test_split = config.test_split
-        self.num_clients = config.num_clients
-        self.seed = config.seed
-        self.partition_mode = getattr(config, "partition_mode", "shared")
+        self.file_path = config.data.file_path
+        self.target = config.data.target
+        self.batch_size = config.data.batch_size
+        self.test_split = config.data.test_split
+        self.num_clients = config.federation.num_clients
+        self.seed = config.data.seed
+        self.partition_mode = getattr(config.federation, "partition_mode")
 
         # Optional local-mode settings
-        self.data_dir = getattr(config, "data_dir", None)
-        self.file_pattern = getattr(config, "file_pattern", None)
+        self.data_dir = getattr(config.data, "data_dir", None)
+        self.file_pattern = getattr(config.data, "file_pattern", None)
 
         self._node_col = "building_id"
         self._time_col = "timestamp"
@@ -312,9 +312,9 @@ class LeadCSVHandler(BaseDatasetHandler):
 
         return {
             "input_dim": len(self.feature_cols),
-            "num_classes": self.config.num_classes,
+            "num_classes": self.config.data.num_classes,
             "num_samples": self.df.shape[0],
-            "task_type": self.config.task_name,
+            "task_type": self.config.task.name,
             "data_format": "tabular",
         }
 
