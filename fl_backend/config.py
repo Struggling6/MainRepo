@@ -130,7 +130,7 @@ class TrainingConfig:
 
 @dataclass
 class FederationConfig:
-    partition_mode:    str   = "shared" # local or shared
+    partition_mode:    str   = "local" # local or shared
     num_rounds:        int   = 2
     num_clients:       int   = 1
     fraction_fit:      float = 1.0
@@ -153,7 +153,7 @@ class EvaluationConfig:
 @dataclass
 class ExperimentConfig:
     task:       BinaryClassificationConfig = field(default_factory=BinaryClassificationConfig)
-    model:      SupervisedCNNConfig       = field(default_factory=SupervisedCNNConfig)
+    model:      CNNTransformerConfig       = field(default_factory=SupervisedCNNConfig)
     data:       LeadCSVConfig              = field(default_factory=LeadCSVConfig)
     training:   TrainingConfig             = field(default_factory=TrainingConfig)
     federation: FederationConfig           = field(default_factory=FederationConfig)

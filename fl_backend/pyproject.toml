@@ -15,12 +15,9 @@ dependencies = [
     "scikit-learn",
 ]
 
-[toolp.sources]
-torch = { index = "pytorch-rocm" }
-
 [[tool.pip.indexes]]
 name = "pytorch-rocm"
-url = "https://download.pytorch.org/whl/rocm6.2"
+url = "https://download.pytorch.org/whl/rocm6.3"
 
 [tool.flwr.app]
 publisher = "local"

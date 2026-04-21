@@ -35,7 +35,7 @@ class FedProxWithSave(FedProx):
         ):
             print(f"Final round {server_round} complete, saving aggregated model...")
 
-            metadata = create_dataset_handler(CONFIG.data).get_metadata()
+            metadata = create_dataset_handler(CONFIG).get_metadata()
             model = CONFIG.model.build(input_dim=metadata["input_dim"])
 
             # Convert Flower parameters back to numpy arrays, then load into model
