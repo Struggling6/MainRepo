@@ -66,13 +66,8 @@ ENV/
 
 # =========================
 
-datasets/
-*.csv
-*.tsv
-*.parquet
-*.mat
-*.npz
-*.npy
+datasets/*
+!datasets/.gitkeep
 
 # =========================
 
@@ -147,4 +142,4 @@ htmlcov/
 *.temp
 *.bak
 *.swp
-
+uv.lock
