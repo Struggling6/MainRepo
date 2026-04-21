@@ -1,4 +1,4 @@
-#!/bin/bash
++#!/bin/bash
 #SBATCH --job-name=fl-supernode
 #SBATCH --output=/ceph/home/student.aau.dk/rr68qj/fl_backend/logs/supernode-%j.out
 #SBATCH --error=/ceph/home/student.aau.dk/rr68qj/fl_backend/logs/supernode-%j.err
@@ -37,7 +37,6 @@ srun singularity exec \
   /bin/bash -lc "
     source /scratch/fl_venv/bin/activate
     export PYTHONWARNINGS='ignore:Protobuf gencode version:UserWarning'
-    export PYTHONUNBUFFERED=1
     cd /workspace/fl_backend
     /scratch/fl_venv/bin/flower-supernode \
       --insecure \

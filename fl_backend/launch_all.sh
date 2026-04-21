@@ -8,13 +8,12 @@ FLWR_HOME="/ceph/home/student.aau.dk/rr68qj/.flwr"
 cd "$BASE_DIR"
 mkdir -p "$LOG_DIR"
 
-if [ $# -lt 2 ]; then
-  echo "Usage: bash launch_all.sh <NUM_CLIENTS> <DATASET_NAME>"
+if [ $# -lt 1 ]; then
+  echo "Usage: bash launch_all.sh <NUM_CLIENTS>"
   exit 1
 fi
 
 NUM_CLIENTS="$1"
-DATASET_NAME="$2"
 
 if ! [[ "$NUM_CLIENTS" =~ ^[0-9]+$ ]] || [ "$NUM_CLIENTS" -lt 1 ]; then
   echo "NUM_CLIENTS must be a positive integer."
@@ -44,10 +43,10 @@ cleanup_logs() {
 }
 
 check_datasets() {
-  print_section "Checking dataset files for dataset: ${DATASET_NAME}"
+  print_section "Checking dataset files..."
 
   for ((i=1; i<=NUM_CLIENTS; i++)); do
-    DATASET_PATH="${BASE_DIR}/datasets/${DATASET_NAME}/data${i}.csv"
+    DATASET_PATH="${BASE_DIR}/datasets/data${i}.csv"
     if [ ! -f "$DATASET_PATH" ]; then
       echo "Missing dataset file: $DATASET_PATH"
       exit 1
@@ -168,13 +167,13 @@ wait_for_superlink_ready() {
 }
 
 submit_supernodes() {
-  print_section "Submitting ${NUM_CLIENTS} SuperNode jobs for dataset: ${DATASET_NAME}"
+  print_section "Submitting ${NUM_CLIENTS} SuperNode jobs..."
 
   SUPERNODE_JOB_IDS=()
 
   for ((i=1; i<=NUM_CLIENTS; i++)); do
     FACILITY_ID="client-${i}"
-    DATA_PATH="/workspace/fl_backend/datasets/${DATASET_NAME}/data${i}.csv"
+    DATA_PATH="/workspace/fl_backend/datasets/data${i}.csv"
     PARTITION_ID=$((i - 1))
     CLIENTAPPIO_PORT=$((9093 + i))   # 9094, 9095, 9096, ...
 

@@ -35,7 +35,7 @@ class BaseDatasetHandler(ABC):
 
     _node_col    = "building_id"
     _time_col    = "timestamp"
-    _window_size = 24   # 1 week of hourly data. Den var på 168 før men det var for mange til lead. så if len(train_df) > window_size var aldrig true.
+    _window_size = 168   # 1 week of hourly data
     _stride      = 24    # one window per day
     _gap_hours   = 0     # override if lag features require a gap
 
@@ -77,13 +77,11 @@ class BaseDatasetHandler(ABC):
     @abstractmethod
     def get_metadata(self) -> dict:
         """
-        Return a dictionary of dataset metadata used by the model
-        config's build() method to construct the correct architecture.
-        Must include at least:
-          - input_dim  : number of features per timestep — passed to
-                         build(input_dim=...) as the model's in_channels
+        Return a dictionary of dataset metadata used by create_model
+        to build the correct architecture. Must include at least:
+          - input_dim  : number of features per timestep
           - num_classes: number of output classes
-          - num_samples: total number of raw rows after preprocessing
+          - num_samples: total number of raw rows
           - task_type  : e.g. "binary_classification"
           - data_format: e.g. "tabular"
         """

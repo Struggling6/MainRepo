@@ -12,7 +12,9 @@ args = parser.parse_args()
 
 from .training_utils.OptunaOptimizer import OptunaOptimizer
 from data.lead_csv import LeadCSVHandler
+from models.supervised_cnn_transformer import SupervisedTransformerCNN
 from config import CONFIG
+
 
 
 datahandler = LeadCSVHandler(CONFIG.data)
