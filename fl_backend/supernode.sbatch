@@ -1,4 +1,4 @@
-#!/bin/bash
++#!/bin/bash
 #SBATCH --job-name=fl-supernode
 #SBATCH --output=/ceph/home/student.aau.dk/rr68qj/fl_backend/logs/supernode-%j.out
 #SBATCH --error=/ceph/home/student.aau.dk/rr68qj/fl_backend/logs/supernode-%j.err

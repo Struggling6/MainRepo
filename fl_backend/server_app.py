@@ -1,6 +1,6 @@
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
-from flwr.common import ndarrays_to_parameters
-
+from flwr.common.logger import log
+from logging import INFO
 from config import CONFIG
 from FedProxWithSave import FedProxWithSave
 
@@ -44,9 +44,13 @@ def weighted_average_evaluate(metrics):
 
 
 def server_fn(context):
-    fed_config = CONFIG.federation
+    fed_config  = CONFIG.federation
     num_clients = fed_config.num_clients
     proximal_mu = fed_config.proximal_mu
+
+    log(INFO, "Starting federation: %s rounds, %s clients", fed_config.num_rounds, num_clients)
+    log(INFO, "Model: %s", CONFIG.model.name)
+    log(INFO, "Dataset: %s", CONFIG.data.name)
 
     strategy = FedProxWithSave(
         fraction_fit=fed_config.fraction_fit,

@@ -3,15 +3,12 @@ import numpy as np
 
 from config import ExperimentConfig
 from training.training_utils.Evaluator import Evaluator
-from models.utils import get_device
 from data.registry import create_dataset_handler
 
 def evaluate(config: ExperimentConfig):
-    device       = get_device()
     # Use registry to create the correct handler based on config.data.name
     # This works for LeadCSVHandler, PowerGridCSVHandler, or any future handler
     test_handler = create_dataset_handler(config.evaluation)
-    data_metadata = test_handler.get_metadata()
 
 
     _, _, X_test, y_test = test_handler.run_split()
