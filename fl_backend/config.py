@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Literal
 from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
 from models import SupervisedTransformerCNN, LSTMModel, MLPModel
+from huggingface_hub.dataclasses import strict
 
 # ── Task configs ─────────────────────────────────────────────────────── #
 
@@ -82,8 +83,25 @@ class MLPConfig:
             dropout=self.dropout,
         )
 
+
+# HuggingFace configs use their own @strict decorator instead of plain @dataclass.
+# @strict(accept_kwargs=True) generates a dataclass-style __init__ from the fields
+# below, while also forwarding unknown kwargs to the parent PretrainedConfig.__init__.
+# This prevents crashes from HuggingFace's internal recursive __post_init__ calls.
+@strict(accept_kwargs=True)
 @dataclass
 class PatchTSTConfig(HF_PatchTSTConfig):
+    """
+    PatchTST config extending HuggingFace's PatchTSTConfig with our training fields
+    and alias properties so the pipeline can treat all model configs uniformly.
+
+    PatchTST splits a time series into fixed-length patches and processes them with
+    a Transformer encoder — similar to how Vision Transformers treat image patches.
+
+    Note: HuggingFace uses num_attention_heads / num_hidden_layers / num_labels
+    internally. The nhead / num_layers / num_classes properties below provide
+    uniform naming across all model configs.
+    """
     name:                str   = "patchtst"
     num_input_channels:  int   = 1
     context_length:      int   = 168
@@ -102,28 +120,6 @@ class PatchTSTConfig(HF_PatchTSTConfig):
     norm_type:           Literal["batchnorm", "layernorm"] | None = "batchnorm"
     pos_weight_cap:      float = 10.0
     loss_fn:             type  = nn.BCEWithLogitsLoss
-
-    def __post_init__(self):
-        # Call HuggingFace PretrainedConfig.__init__ to set internal attributes
-        # like _attn_implementation_internal that are required for model init
-        HF_PatchTSTConfig.__init__(
-            self,
-            num_input_channels=self.num_input_channels,
-            context_length=self.context_length,
-            patch_length=self.patch_length,
-            patch_stride=self.patch_stride,
-            d_model=self.d_model,
-            num_attention_heads=self.num_attention_heads,
-            num_hidden_layers=self.num_hidden_layers,
-            ffn_dim=self.ffn_dim,
-            dropout=self.dropout,
-            head_dropout=self.head_dropout,
-            channel_attention=self.channel_attention,
-            attention_dropout=self.attention_dropout,
-            positional_dropout=self.positional_dropout,
-            pre_norm=self.pre_norm,
-            norm_type=self.norm_type,
-        )
 
     @property
     def num_classes(self):
@@ -144,7 +140,6 @@ class PatchTSTConfig(HF_PatchTSTConfig):
             self.context_length = context_length
         return PatchTST(self)
     
-    
 @dataclass
 class TransformerConfig:
     name:           str   = "transformer"
@@ -156,6 +151,8 @@ class TransformerConfig:
     num_classes:    int   = 1
     loss_fn:        type  = nn.BCEWithLogitsLoss
 
+    """
+
     def build(self, input_dim: int, context_length: int = None) -> nn.Module:
         return Transformer(
             in_channels=input_dim,
@@ -166,7 +163,7 @@ class TransformerConfig:
             dropout=self.dropout,
             seq_len=context_length if context_length is not None else 168,
         )
-
+"""
 
 # ── Data configs ──────────────────────────────────────────────────────── #
 
