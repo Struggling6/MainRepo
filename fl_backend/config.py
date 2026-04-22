@@ -230,7 +230,6 @@ class EvaluationConfig:
 class ExperimentConfig:
     task:       BinaryClassificationConfig = field(default_factory=BinaryClassificationConfig)
     model:      CNNTransformerConfig       = field(default_factory=CNNTransformerConfig)
-    model:      TransformerConfig          = field(default_factory=TransformerConfig)
     data:       LeadCSVConfig              = field(default_factory=LeadCSVConfig)
     training:   TrainingConfig             = field(default_factory=TrainingConfig)
     federation: FederationConfig           = field(default_factory=FederationConfig)
