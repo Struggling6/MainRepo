@@ -66,13 +66,9 @@ ENV/
 
 # =========================
 
-datasets/
-*.csv
-*.tsv
-*.parquet
-*.mat
-*.npz
-*.npy
+**/datasets/**
+!**/datasets/
+!**/datasets/**/.gitkeep
 
 # =========================
 

@@ -69,8 +69,6 @@ class OptunaOptimizer(TrainEvalBase):
         if model_name in MODEL_REGISTRY:
             return MODEL_REGISTRY[model_name]
 
-        raise ValueError(f"Unsupported model name: {model_name}")
-
     def _objective(self, trial):
         print(f"\n▶ Trial {trial.number + 1}/{self.n_trials} starting...")
         # Sample hyperparameters for this trial
