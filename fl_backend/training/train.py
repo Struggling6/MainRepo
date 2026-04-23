@@ -2,42 +2,50 @@ import torch
 import torch.nn as nn
 import numpy as np
 from config import TrainingConfig, CNNTransformerConfig
+from training.training_utils.Trainer import Trainer
 from training.training_utils.utils import compute_pos_weight
 
 
 def train_model(
-        model: nn.Module,
-        trainloader: torch.utils.data.DataLoader,
+        model:           nn.Module,
+        trainloader:     torch.utils.data.DataLoader,
+        valloader:       torch.utils.data.DataLoader,
         training_config: TrainingConfig,
-        model_config: CNNTransformerConfig,
-        device: torch.device,
+        model_config:    CNNTransformerConfig,
+        device:          torch.device,
         proximal_mu: float = 0.0,
     ):
     """
     Entry point for Flower's client training loop.
     Trains the model using config-specified loss function and hyperparameters.
     """
+    if hasattr(model_config, "loss_fn"):
+        print("[TRAIN] entering train_model", flush=True)
 
-    print("[TRAIN] entering train_model", flush=True)
+        # --------------------------------------------------
+        # Extract labels (for pos_weight)
+        # --------------------------------------------------
+        print("[TRAIN] extracting labels for pos_weight...", flush=True)
+        y_train = _extract_labels(trainloader)
+        print(f"[TRAIN] labels extracted: shape={y_train.shape}", flush=True)
 
-    # --------------------------------------------------
-    # Extract labels (for pos_weight)
-    # --------------------------------------------------
-    print("[TRAIN] extracting labels for pos_weight...", flush=True)
-    y_train = _extract_labels(trainloader)
-    print(f"[TRAIN] labels extracted: shape={y_train.shape}", flush=True)
+        pos_weight = compute_pos_weight(y_train, cap=model_config.pos_weight_cap)
+        print(f"[TRAIN] pos_weight computed: {pos_weight}", flush=True)
 
-    pos_weight = compute_pos_weight(y_train, cap=model_config.pos_weight_cap)
-    print(f"[TRAIN] pos_weight computed: {pos_weight}", flush=True)
 
-    # --------------------------------------------------
-    # Loss function
-    # --------------------------------------------------
-    print("[TRAIN] creating loss function...", flush=True)
-    loss_fn = model_config.loss_fn(
-        pos_weight=torch.tensor([pos_weight], device=device)
-    )
 
+
+        # --------------------------------------------------
+        # Loss function
+        # --------------------------------------------------
+        print("[TRAIN] creating loss function...", flush=True)
+        loss_fn = model_config.loss_fn(
+            pos_weight=torch.tensor([pos_weight], device=device)
+        ) if model_config.loss_fn == nn.BCEWithLogitsLoss else model_config.loss_fn()
+    else:
+        # HuggingFace models — loss is handled internally, pass None
+        loss_fn = None
+        
     # --------------------------------------------------
     # Convert DataLoader -> numpy arrays (THIS IS HEAVY)
     # --------------------------------------------------
@@ -49,7 +57,6 @@ def train_model(
     # Trainer setup
     # --------------------------------------------------
     print("[TRAIN] initializing Trainer...", flush=True)
-    from training.training_utils.Trainer import Trainer
 
     trainer = Trainer(
         model=model,
@@ -67,7 +74,7 @@ def train_model(
     # Training
     # --------------------------------------------------
     print("[TRAIN] starting training loop...", flush=True)
-    trainer.train(X_train, y_train, X_train, y_train)
+    trainer.train(trainloader, valloader)
     print("[TRAIN] training finished", flush=True)
 
     # --------------------------------------------------

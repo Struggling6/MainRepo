@@ -1,4 +1,4 @@
-#!/bin/bash
++#!/bin/bash
 #SBATCH --job-name=fl-supernode
 #SBATCH --mem=8G
 #SBATCH --gres=gpu:1

@@ -51,7 +51,7 @@ services:
     cpus: "2.0"
     mem_limit: 8g
     group_add:
+      - render
       - video
-      - "988"
     volumes:
       - ./fl_backend/datasets:/app/datasets

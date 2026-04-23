@@ -13,6 +13,8 @@ dependencies = [
     "pandas",
     "numpy",
     "scikit-learn",
+    "matplotlib",
+    "transformers",
 ]
 
 [[tool.pip.indexes]]
