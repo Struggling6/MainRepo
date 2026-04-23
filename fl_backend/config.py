@@ -43,6 +43,7 @@ class CNNTransformerConfig:
             dropout=self.dropout,
         )
 
+
 @dataclass
 class TransformerConfig:
     name:           str   = "transformer"
@@ -54,6 +55,8 @@ class TransformerConfig:
     num_classes:    int   = 1
     loss_fn:        type  = nn.BCEWithLogitsLoss
 
+    """
+
     def build(self, input_dim: int, context_length: int = None) -> nn.Module:
         return Transformer(
             in_channels=input_dim,
@@ -64,6 +67,7 @@ class TransformerConfig:
             dropout=self.dropout,
             seq_len=context_length if context_length is not None else 168,
         )
+"""
 
 @dataclass
 class LSTMConfig:
@@ -109,7 +113,7 @@ class MLPConfig:
 # HF fields through. This ensures HF internals (attn implementation, id2label, etc.)
 # are set up correctly while keeping the clean dataclass field definition style.
 @dataclass
-class PatchTSTConfig(HF_PatchTSTConfig):
+class PatchTSTConfig():
     """
     PatchTST config extending HuggingFace's PatchTSTConfig with our training fields
     and alias properties so the pipeline can treat all model configs uniformly.
@@ -164,49 +168,24 @@ class PatchTSTConfig(HF_PatchTSTConfig):
             positional_dropout=self.positional_dropout,
             pre_norm=self.pre_norm,
             norm_type=self.norm_type,
-            num_targets=1,
+            num_targets=self.num_classes,
         )
         return PatchTST(hf_config)
-    
-@dataclass
-class TransformerConfig:
-    name:           str   = "transformer"
-    d_model:        int   = 128
-    nhead:          int   = 4
-    num_layers:     int   = 2
-    dropout:        float = 0.3
-    pos_weight_cap: float = 10.0
-    num_classes:    int   = 1
-    loss_fn:        type  = nn.BCEWithLogitsLoss
-
-    """
-
-    def build(self, input_dim: int, context_length: int = None) -> nn.Module:
-        return Transformer(
-            in_channels=input_dim,
-            d_model=self.d_model,
-            nhead=self.nhead,
-            num_layers=self.num_layers,
-            num_classes=self.num_classes,
-            dropout=self.dropout,
-            seq_len=context_length if context_length is not None else 168,
-        )
-"""
 
 # ── Data configs ──────────────────────────────────────────────────────── #
 
 @dataclass
 class LeadCSVConfig:
-    name:          str  = "lead_csv"
-    file_path:     Path = Path("datasets/LEAD/train_features.csv") #used for shared mode, ignored for local mode, should be the large dataset csv
-    data_dir            = Path("datasets/LEAD")
-    file_pattern        = "data{client_index}.csv"
-    target:        str  = "anomaly"
-    batch_size:    int  = 64
-    num_classes:   int  = 2
-    task_name:     str  = "binary_classification"
+    name:         str  = "lead_csv"
+    file_path:    Path = Path("datasets/LEAD/train_features.csv") #used for shared mode, ignored for local mode, should be the large dataset csv
+    data_dir:     Path = Path("datasets/LEAD")
+    file_pattern: str  = "data{client_index}.csv"
+    target:       str  = "anomaly"
+    batch_size:   int  = 64
+    num_classes:  int  = 2
+    task_name:    str  = "binary_classification"
     test_split:   float = 0.2
-    seed:          int  = 42
+    seed:         int  = 42
 
     def build_handler(self, config=None):
         from data.lead_csv import LeadCSVHandler
@@ -265,7 +244,7 @@ class EvaluationConfig:
 @dataclass
 class ExperimentConfig:
     task:       BinaryClassificationConfig = field(default_factory=BinaryClassificationConfig)
-    model:      Transformer                = field(default_factory=TransformerConfig)
+    model:      TransformerConfig          = field(default_factory=TransformerConfig)
     data:       LeadCSVConfig              = field(default_factory=LeadCSVConfig)
     training:   TrainingConfig             = field(default_factory=TrainingConfig)
     federation: FederationConfig           = field(default_factory=FederationConfig)

@@ -5,12 +5,11 @@ from training.training_utils.Evaluator import Evaluator
 from models.utils import get_device
 
 def evaluate(config):
-    device       = get_device()
+    device = get_device()
     # Use registry to create the correct handler based on config.data.name
     # This works for LeadCSVHandler, PowerGridCSVHandler, or any future handler
-    test_handler = config.data.build_handler()
+    test_handler  = config.data.build_handler(config)
     data_metadata = test_handler.get_metadata()
-
 
     _, _, X_test, y_test = test_handler.run_split()
 

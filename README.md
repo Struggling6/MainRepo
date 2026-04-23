@@ -37,7 +37,7 @@ python main.py
 
 This runs a single client end-to-end: data loading → training → evaluation. All logs print directly to the terminal.
 
-To test the full federated simulation locally
+To test the full federated simulation locally:
 
 ```bash
 python main.py --simulate
@@ -76,11 +76,11 @@ docker compose up -d
 ### Useful Commands
 
 ```bash
-docker compose ps                        # show running containers
-docker compose down                      # stop and remove containers
-docker compose logs -f                   # follow logs from all containers
-docker logs fl-backend-superexec-serverapp-1   # serverapp logs
-docker logs fl-backend-superexec-clientapp-1-1 # clientapp logs
+docker compose ps                                # show running containers
+docker compose down                              # stop and remove containers
+docker compose logs -f                           # follow logs from all containers
+docker logs fl-backend-superexec-serverapp-1     # serverapp logs
+docker logs fl-backend-superexec-clientapp-1-1   # clientapp logs
 ```
 
 ---
@@ -197,7 +197,7 @@ class MyModelConfig:
 
 The `context_length` argument is optional — only include it if your model needs to know the sequence length (e.g. for positional embeddings).
 
-> **Note on PatchTST:** `PatchTSTConfig` is a special case because it extends a HuggingFace config class. It uses `@strict(accept_kwargs=True)` from `huggingface_hub` instead of plain `@dataclass`. The user-facing interface is identical.
+> **Note on PatchTST:** `PatchTSTConfig` is a plain `@dataclass` that does not inherit from HuggingFace's `PatchTSTConfig`. Instead, `build()` creates a fresh `HF_PatchTSTConfig` internally and passes it to the model. This avoids conflicts with HuggingFace's complex `PretrainedConfig` initialisation chain.
 
 ---
 
@@ -253,9 +253,9 @@ class MyDatasetHandler(BaseDatasetHandler):
 
     def get_metadata(self) -> dict:
         return {
-            "input_dim":    self.X.shape[-1],
-            "num_classes":  1,
-            "task_type":    "binary_classification",
+            "input_dim":   self.X.shape[-1],
+            "num_classes": 1,
+            "task_type":   "binary_classification",
         }
 
     def get_dataloaders(self, partition_id: int):
@@ -267,7 +267,7 @@ class MyDatasetHandler(BaseDatasetHandler):
 
 #### Adding the Config
 
-There is no registry — each data config has its own `build()` method that instantiates the correct handler directly, following the same pattern as model configs. Add the config to `config.py`:
+There is no registry — each data config has its own `build_handler()` method that instantiates the correct handler directly, following the same pattern as model configs. Add the config to `config.py`:
 
 ```python
 @dataclass
@@ -279,9 +279,9 @@ class MyDatasetConfig:
     test_split: float = 0.2
     seed:       int   = 42
 
-    def build(self):
+    def build_handler(self, config=None):
         from data.my_dataset import MyDatasetHandler
-        return MyDatasetHandler(self)
+        return MyDatasetHandler(config or CONFIG)
 ```
 
 Use `Path(__file__).parent` so paths resolve correctly on any machine regardless of working directory.
@@ -297,7 +297,7 @@ CONFIG = ExperimentConfig(
 To use it in code:
 
 ```python
-dataset_handler = config.data.build()
+dataset_handler = config.data.build_handler()
 ```
 
 ---
@@ -322,40 +322,3 @@ python -m training.optimize --trials 50 --epochs 10 --patience 10
 On AI-LAB, `run_optuna.sh` submits one SLURM array task per trial so all trials run in parallel across GPUs, writing results to a shared SQLite database.
 
 ---
-
-## Project Structure
-
-```
-fl_backend/
-├── config.py                    # All experiment configuration
-├── main.py                      # Local single-client test + --simulate mode
-├── client_app.py                # Flower ClientApp
-├── server_app.py                # Flower ServerApp
-├── FedAvgWithSave.py            # FedAvg with model checkpointing
-├── Dockerfile                   # CPU default, --build-arg TORCH_VARIANT for GPU
-├── compose.yml                  # Docker Compose (root level)
-├── data/
-│   ├── base.py                  # BaseDatasetHandler ABC
-│   ├── lead_csv.py              # LEAD building energy dataset handler
-│   ├── powergrid_csv.py         # EPIC power grid dataset handler
-│   └── utils.py                 # Windowing and splitting utilities
-├── models/
-│   ├── supervised_cnn_transformer.py
-│   ├── LSTM.py
-│   ├── mlp.py
-│   ├── PatchTST.py
-│   └── transformer.py
-├── training/
-│   ├── train.py                 # train_model()
-│   ├── evaluate.py              # evaluate()
-│   ├── optimize.py              # Optuna CLI entry point
-│   └── training_utils/
-│       ├── Trainer.py
-│       ├── TrainEvalBase.py
-│       ├── Evaluator.py
-│       └── OptunaOptimizer.py
-└── aiLab_scripts/
-    ├── run_optuna.sh
-    ├── optuna.sbatch
-    └── launch_all.sh
-```

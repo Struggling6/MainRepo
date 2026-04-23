@@ -6,7 +6,6 @@ from training.training_utils.TrainEvalBase import TrainEvalBase
 from training.training_utils.utils import compute_pos_weight
 from models.utils import get_device
 from config import CONFIG
-from models.registry import MODEL_REGISTRY
 
 class OptunaOptimizer(TrainEvalBase):
     """
@@ -35,7 +34,7 @@ class OptunaOptimizer(TrainEvalBase):
         self.in_channels = config.model.in_channels
         self.n_trials    = n_trials
         self.loss_fn     = config.model.loss_fn
-        self.model       = self._resolve_model(config.model.name)
+        self.model       = config.model.build(self.in_channels)
         self.raw_pw      = compute_pos_weight(y_train)  # computed once, reused every trial
 
     # ------------------------------------------------------------------ #
@@ -60,14 +59,6 @@ class OptunaOptimizer(TrainEvalBase):
     # ------------------------------------------------------------------ #
     #  Private helpers                                                     #
     # ------------------------------------------------------------------ #
-
-    def _resolve_model(self, model_name):
-        """Resolve a configured model identifier to a callable model class."""
-        if callable(model_name):
-            return model_name
-
-        if model_name in MODEL_REGISTRY:
-            return MODEL_REGISTRY[model_name]
 
     def _objective(self, trial):
         print(f"\n▶ Trial {trial.number + 1}/{self.n_trials} starting...")
@@ -116,8 +107,10 @@ class OptunaOptimizer(TrainEvalBase):
         )
 
     def _build_model(self, d_model, nhead, num_layers, dropout):
-        return self.model(
-            in_channels=self.in_channels,
+        """Build a fresh model for this trial using trial-specific hyperparameters."""
+        from models.supervised_cnn_transformer import SupervisedCNNTransformer
+        return SupervisedCNNTransformer(
+            in_channels=self.config.evaluation.input_dim,
             d_model=d_model,
             nhead=nhead,
             num_layers=num_layers,
