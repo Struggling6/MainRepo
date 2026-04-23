@@ -29,6 +29,8 @@ services:
     depends_on:
       - superlink
     stop_signal: SIGINT
+    volumes:
+      - ./fl_backend/checkpoints:/app/checkpoints
 
   supernode-1:
     image: flwr/supernode:1.27.0
@@ -68,4 +70,3 @@ services:
       - video
     volumes:
       - ./fl_backend/datasets:/app/datasets
-      - ./fl_backend/checkpoints:/app/checkpoints
