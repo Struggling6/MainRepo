@@ -64,55 +64,90 @@ class OptunaOptimizer(TrainEvalBase):
     def _objective(self, trial):
         print(f"\n▶ Trial {trial.number + 1}/{self.n_trials} starting...")
 
-        d_model = trial.suggest_categorical("d_model", [32, 64, 128])
-        valid_nheads = [n for n in [2, 4, 8] if d_model % n == 0]
-        nhead = trial.suggest_categorical("nhead", valid_nheads)
-        num_layers = trial.suggest_int("num_layers", 1, 3)
-        dropout = trial.suggest_float("dropout", 0.2, 0.5)
-        lr = trial.suggest_float("lr", 1e-4, 1e-2, log=True)
+        # Sample shared hyperparameters
+        lr           = trial.suggest_float("lr",           1e-4, 1e-2, log=True)
         weight_decay = trial.suggest_float("weight_decay", 1e-4, 1e-1, log=True)
-        batch_size = trial.suggest_categorical("batch_size", [32, 64, 128])
+        batch_size   = trial.suggest_categorical("batch_size", [32, 64, 128])
         pos_weight_cap = trial.suggest_float("pos_weight_cap", 5.0, 20.0)
+        dropout      = trial.suggest_float("dropout", 0.1, 0.5)
 
-        loss_fn = self._build_loss(pos_weight_cap)
-        model = self._build_model(d_model, nhead, num_layers, dropout)
+        # Sample model-specific hyperparameters
+        model = self._build_model(trial, dropout)
+
+        loss_fn  = self._build_loss(pos_weight_cap)
         train_dl = self._build_dataloader(self.X_train, self.y_train, batch_size, shuffle=True)
-        val_dl = self._build_dataloader(self.X_val, self.y_val, batch_size, shuffle=False)
+        val_dl   = self._build_dataloader(self.X_val,   self.y_val,   batch_size, shuffle=False)
         optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
 
         best_pr_auc, no_improve = 0.0, 0
 
         for epoch in range(1, self.epochs + 1):
             self._train_epoch(model, train_dl, optimizer, loss_fn)
-            _, val_f1, _, pr_auc = self._val_epoch(model, val_dl, loss_fn)
+            _, val_f1, best_thresh, pr_auc = self._val_epoch(model, val_dl, loss_fn)
 
             trial.report(pr_auc, epoch)
             if trial.should_prune():
                 raise optuna.TrialPruned()
 
             if pr_auc > best_pr_auc:
-                best_pr_auc = pr_auc
-                no_improve = 0
+                best_pr_auc    = pr_auc
+                best_threshold = best_thresh
+                no_improve     = 0
             else:
                 no_improve += 1
                 if no_improve >= self.patience:
                     break
 
+        trial.set_user_attr("best_threshold", float(best_threshold))
         return float(best_pr_auc)
 
+
+    def _build_model(self, trial, dropout) -> nn.Module:
+        """Sample model-specific hyperparameters and build a fresh model for this trial."""
+        from config import CNNTransformerConfig, TransformerConfig, LSTMConfig, MLPConfig, PatchTSTConfig
+
+        model_config = deepcopy(self.config.model)
+
+        if isinstance(model_config, (CNNTransformerConfig, TransformerConfig)):
+            model_config.d_model    = trial.suggest_categorical("d_model", [32, 64, 128])
+            valid_nheads            = [n for n in [2, 4, 8] if model_config.d_model % n == 0]
+            model_config.nhead      = trial.suggest_categorical("nhead", valid_nheads)
+            model_config.num_layers = trial.suggest_int("num_layers", 1, 4)
+            model_config.dropout    = dropout
+
+        elif isinstance(model_config, LSTMConfig):
+            model_config.hidden_size = trial.suggest_categorical("hidden_size", [64, 128, 256])
+            model_config.num_layers  = trial.suggest_int("num_layers", 1, 4)
+            model_config.dropout     = dropout
+
+        elif isinstance(model_config, MLPConfig):
+            model_config.hidden_size = trial.suggest_categorical("hidden_size", [64, 128, 256, 512])
+            model_config.num_layers  = trial.suggest_int("num_layers", 1, 5)
+            model_config.dropout     = dropout
+
+        elif isinstance(model_config, PatchTSTConfig):
+            model_config.d_model             = trial.suggest_categorical("d_model", [32, 64, 128])
+            valid_nheads                     = [n for n in [2, 4, 8] if model_config.d_model % n == 0]
+            model_config.nhead               = trial.suggest_categorical("nhead", valid_nheads)
+            model_config.num_layers          = trial.suggest_int("num_layers", 1, 4)
+            model_config.dropout             = dropout
+            model_config.ffn_dim             = trial.suggest_categorical("ffn_dim", [128, 256, 512])
+
+        else:
+            raise TypeError(
+                f"No search space defined for {type(model_config).__name__}. "
+                f"Add a branch to _build_model() in OptunaOptimizer."
+            )
+
+        return model_config.build(
+            input_dim=self.config.evaluation.input_dim
+        ).to(get_device())
+    
     def _build_loss(self, pos_weight_cap):
         pw = min(self.raw_pw, pos_weight_cap)
         return self.loss_fn(
             pos_weight=torch.tensor([pw], device=get_device())
-        )
-
-    def _build_model(self, d_model, nhead, num_layers, dropout):
-        model_config = deepcopy(self.config.model)
-        model_config.d_model = d_model
-        model_config.nhead = nhead
-        model_config.num_layers = num_layers
-        model_config.dropout = dropout
-        return model_config.build(input_dim=self.in_channels).to(get_device())
+        ) 
 
     def _print_results(self, study):
         print("\n=== Best Trial ===")
