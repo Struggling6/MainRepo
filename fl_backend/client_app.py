@@ -62,7 +62,16 @@ class FlowerClient(NumPyClient):
         print(f"[Client Init] metadata={self.metadata}", flush=True)
 
         print("[Client Init] creating model", flush=True)
-        self.model = self.config.model.build(input_dim=self.metadata["input_dim"])
+        # In client_app.py __init__
+        try:
+            self.model = self.config.model.build(input_dim=self.metadata["input_dim"])
+        except AttributeError as e:
+            log(INFO, "[%s] ERROR: config.model.build() failed — %s", self.facility_id, e)
+            log(INFO, "[%s] Make sure your model config has a build() method defined at class level (not inside another method)", self.facility_id)
+            raise
+        except Exception as e:
+            log(INFO, "[%s] ERROR building model: %s", self.facility_id, e)
+            raise
 
         self.trainloader, self.testloader = self.dataset_handler.get_dataloaders(
             partition_id=self.partition_id
