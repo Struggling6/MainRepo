@@ -10,7 +10,6 @@ from training.training_utils.utils import compute_pos_weight
 from models.utils import get_device
 from config import CONFIG
 
-
 class OptunaOptimizer(TrainEvalBase):
     """
     Runs an Optuna hyperparameter search using the shared train/val

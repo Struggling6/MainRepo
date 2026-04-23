@@ -1,8 +1,8 @@
 from config import CONFIG
-from data.registry import create_dataset_handler
 from training.train import train_model
 from models.utils import get_device
 from training.training_utils.Evaluator import Evaluator
+from plotting.plotting_config import plot_diagrams
 
 import argparse
 parser = argparse.ArgumentParser()
@@ -38,7 +38,7 @@ def main():
     device = get_device()
 
     # ── Dataset ──────────────────────────────────────────────────────── #
-    dataset_handler             = create_dataset_handler(config)
+    dataset_handler             = config.data.build_handler()
     metadata                    = dataset_handler.get_metadata()
     config.evaluation.input_dim = metadata["input_dim"]
     

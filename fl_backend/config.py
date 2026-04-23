@@ -3,8 +3,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
-from models import SupervisedCNNTransformer, LSTMModel, MLPModel
-from models.transformer import Transformer
+from models import SupervisedTransformerCNN, LSTMModel, MLPModel
+
 # ── Task configs ─────────────────────────────────────────────────────── #
 
 @dataclass
@@ -43,6 +43,7 @@ class CNNTransformerConfig:
             dropout=self.dropout,
         )
 
+
 @dataclass
 class TransformerConfig:
     name:           str   = "transformer"
@@ -54,6 +55,8 @@ class TransformerConfig:
     num_classes:    int   = 1
     loss_fn:        type  = nn.BCEWithLogitsLoss
 
+    """
+
     def build(self, input_dim: int, context_length: int = None) -> nn.Module:
         return Transformer(
             in_channels=input_dim,
@@ -64,6 +67,7 @@ class TransformerConfig:
             dropout=self.dropout,
             seq_len=context_length if context_length is not None else 168,
         )
+"""
 
 @dataclass
 class LSTMConfig:
@@ -103,16 +107,37 @@ class MLPConfig:
             dropout=self.dropout,
         )
 
+## HuggingFace configs cannot use @strict alongside @dataclass inheritance without
+# breaking PretrainedConfig's internal __init__ chain. Instead, we use a plain
+# @dataclass and call super().__init__() explicitly in __post_init__, passing all
+# HF fields through. This ensures HF internals (attn implementation, id2label, etc.)
+# are set up correctly while keeping the clean dataclass field definition style.
 @dataclass
-class PatchTSTConfig(HF_PatchTSTConfig):
+class PatchTSTConfig():
+    """
+    PatchTST config extending HuggingFace's PatchTSTConfig with our training fields
+    and alias properties so the pipeline can treat all model configs uniformly.
+
+    PatchTST splits a time series into fixed-length patches and processes them with
+    a Transformer encoder — similar to how Vision Transformers treat image patches.
+
+    HuggingFace uses num_attention_heads / num_hidden_layers internally. The nhead
+    and num_layers properties below provide uniform naming across all model configs.
+    num_classes is stored directly as a field rather than delegating to HuggingFace's
+    num_labels, which requires id2label to be set.
+
+    __post_init__ forwards all relevant fields to PretrainedConfig.__init__ to ensure
+    HuggingFace internals (attention implementation, label mappings, etc.) are
+    properly initialized before the model is built.
+    """
     name:                str   = "patchtst"
     num_input_channels:  int   = 1
     context_length:      int   = 168
     patch_length:        int   = 16
     patch_stride:        int   = 8
     d_model:             int   = 128
-    num_attention_heads: int   = 4
-    num_hidden_layers:   int   = 3
+    nhead:               int   = 4
+    num_layers:          int   = 3
     ffn_dim:             int   = 256
     dropout:             float = 0.2
     head_dropout:        float = 0.2
@@ -123,19 +148,18 @@ class PatchTSTConfig(HF_PatchTSTConfig):
     norm_type:           Literal["batchnorm", "layernorm"] | None = "batchnorm"
     pos_weight_cap:      float = 10.0
     loss_fn:             type  = nn.BCEWithLogitsLoss
+    num_classes:         int   = 1
 
-    def __post_init__(self):
-        # Call HuggingFace PretrainedConfig.__init__ to set internal attributes
-        # like _attn_implementation_internal that are required for model init
-        HF_PatchTSTConfig.__init__(
-            self,
-            num_input_channels=self.num_input_channels,
-            context_length=self.context_length,
+    def build(self, input_dim: int, context_length: int = None) -> nn.Module:
+        from models.PatchTST import PatchTST
+        hf_config = HF_PatchTSTConfig(
+            num_input_channels=input_dim,
+            context_length=context_length or self.context_length,
             patch_length=self.patch_length,
             patch_stride=self.patch_stride,
             d_model=self.d_model,
-            num_attention_heads=self.num_attention_heads,
-            num_hidden_layers=self.num_hidden_layers,
+            num_attention_heads=self.nhead,
+            num_hidden_layers=self.num_layers,
             ffn_dim=self.ffn_dim,
             dropout=self.dropout,
             head_dropout=self.head_dropout,
@@ -144,41 +168,28 @@ class PatchTSTConfig(HF_PatchTSTConfig):
             positional_dropout=self.positional_dropout,
             pre_norm=self.pre_norm,
             norm_type=self.norm_type,
+            num_targets=self.num_classes,
         )
+        return PatchTST(hf_config)
 
-    @property
-    def num_classes(self):
-        return self.num_labels
-
-    @property
-    def nhead(self):
-        return self.num_attention_heads
-
-    @property
-    def num_layers(self):
-        return self.num_hidden_layers
-
-    def build(self, input_dim: int, context_length: int = None) -> nn.Module:
-        from models.PatchTST import PatchTST
-        self.num_input_channels = input_dim
-        if context_length is not None:
-            self.context_length = context_length
-        return PatchTST(self)
-    
 # ── Data configs ──────────────────────────────────────────────────────── #
 
 @dataclass
 class LeadCSVConfig:
-    name:          str  = "lead_csv"
-    file_path:     Path = Path("datasets/LEAD/train_features.csv") #used for shared mode, ignored for local mode, should be the large dataset csv
-    data_dir            = Path("datasets/LEAD")
-    file_pattern        = "data{client_index}.csv"
-    target:        str  = "anomaly"
-    batch_size:    int  = 64
-    num_classes:   int  = 2
-    task_name:     str  = "binary_classification"
+    name:         str  = "lead_csv"
+    file_path:    Path = Path("datasets/LEAD/train_features.csv") #used for shared mode, ignored for local mode, should be the large dataset csv
+    data_dir:     Path = Path("datasets/LEAD")
+    file_pattern: str  = "data{client_index}.csv"
+    target:       str  = "anomaly"
+    batch_size:   int  = 64
+    num_classes:  int  = 2
+    task_name:    str  = "binary_classification"
     test_split:   float = 0.2
-    seed:          int  = 42
+    seed:         int  = 42
+
+    def build_handler(self, config=None):
+        from data.lead_csv import LeadCSVHandler
+        return LeadCSVHandler(config or CONFIG)
 
 @dataclass
 class PowerGridCSVConfig:
@@ -191,6 +202,10 @@ class PowerGridCSVConfig:
     normalize:    bool  = True
     noise_level:  float = 0.7
     seed:         int   = 42
+
+    def build_handler(self, config=None):
+        from data.powergrid_csv import PowerGridCSVHandler
+        return PowerGridCSVHandler(config or CONFIG)
 
 # ── Training config ───────────────────────────────────────────────────── #
 
@@ -211,7 +226,7 @@ class FederationConfig:
     num_clients:       int   = 1
     fraction_fit:      float = 1.0
     fraction_evaluate: float = 1.0
-    proximal_mu:       float = 0.5
+    proximal_mu:       float = 0.1
 
 # ── Evaluation config ─────────────────────────────────────────────────── #
 
@@ -229,7 +244,7 @@ class EvaluationConfig:
 @dataclass
 class ExperimentConfig:
     task:       BinaryClassificationConfig = field(default_factory=BinaryClassificationConfig)
-    model:      Transformer                = field(default_factory=TransformerConfig)
+    model:      TransformerConfig          = field(default_factory=TransformerConfig)
     data:       LeadCSVConfig              = field(default_factory=LeadCSVConfig)
     training:   TrainingConfig             = field(default_factory=TrainingConfig)
     federation: FederationConfig           = field(default_factory=FederationConfig)
@@ -265,4 +280,3 @@ CONFIG = ExperimentConfig(
     model=MLPConfig(hidden_size=64, num_layers=3),
 )
 """
-

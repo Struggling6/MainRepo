@@ -1,3 +1,4 @@
+from logging import INFO
 import torch
 import torch.nn as nn
 import numpy as np
@@ -74,7 +75,11 @@ def train_model(
     # Training
     # --------------------------------------------------
     print("[TRAIN] starting training loop...", flush=True)
-    trainer.train(trainloader, valloader)
+    try:
+        trainer.train(trainloader, valloader)
+    except Exception as e:
+        torch.log(INFO, "Training failed: %s", e)
+        raise
     print("[TRAIN] training finished", flush=True)
 
     # --------------------------------------------------

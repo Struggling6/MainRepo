@@ -34,7 +34,7 @@ packages = ["data", "models", "tasks", "training"]
 include = [
   "client_app.py",
   "server_app.py",
-  "FedAvgWithSave.py",
+  "FedProxWithSave.py",
   "config.py",
   "main.py",
 ]

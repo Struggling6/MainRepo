@@ -6,7 +6,6 @@ from flwr.server.client_proxy import ClientProxy
 from pathlib import Path
 from typing import Union, Optional
 from config import CONFIG
-from data.registry import create_dataset_handler
 
 class FedProxWithSave(FedProx):
     """
@@ -29,7 +28,7 @@ class FedProxWithSave(FedProx):
         # Save only after the final round
         if aggregated_parameters is not None and server_round == CONFIG.federation.num_rounds:
 
-            metadata = create_dataset_handler(CONFIG.data).get_metadata()
+            metadata = CONFIG.data.build_handler().get_metadata()
             model = CONFIG.model.build(input_dim=metadata["input_dim"])
 
             # Convert Flower parameters back to numpy arrays, then load into model
@@ -73,3 +72,4 @@ class FedProxWithSave(FedProx):
 
         else:
             raise ValueError("Path must be a pathlib.Path object")
+

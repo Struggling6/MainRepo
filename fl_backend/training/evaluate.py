@@ -1,15 +1,15 @@
 import torch
 import numpy as np
 
-from config import ExperimentConfig
 from training.training_utils.Evaluator import Evaluator
-from data.registry import create_dataset_handler
+from models.utils import get_device
 
-def evaluate(config: ExperimentConfig):
+def evaluate(config):
+    device = get_device()
     # Use registry to create the correct handler based on config.data.name
     # This works for LeadCSVHandler, PowerGridCSVHandler, or any future handler
-    test_handler = create_dataset_handler(config.evaluation)
-
+    test_handler  = config.data.build_handler(config)
+    data_metadata = test_handler.get_metadata()
 
     _, _, X_test, y_test = test_handler.run_split()
 
