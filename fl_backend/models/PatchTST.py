@@ -1,5 +1,4 @@
 from transformers import set_seed
-from config import PatchTSTConfig
 from .base import BaseModel
 from transformers import (
     PatchTSTForClassification,
@@ -7,7 +6,7 @@ from transformers import (
 set_seed(42)
 
 class PatchTST(BaseModel):
-    def __init__(self, config: PatchTSTConfig):
+    def __init__(self, config):
         super().__init__()
         self.model = PatchTSTForClassification(config)
 
