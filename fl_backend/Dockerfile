@@ -28,6 +28,7 @@ RUN case "${TORCH_VARIANT}" in \
 
 ENV MIOPEN_USER_DB_PATH="/tmp/miopen"
 ENV MIOPEN_SYSTEM_DB_PATH="/tmp/miopen"
+ENV MIOPEN_DISABLE_CACHE=1
 
 WORKDIR /app
 COPY --chown=app:app pyproject.toml .
