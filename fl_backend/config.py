@@ -251,7 +251,11 @@ class ExperimentConfig:
 # Change CONFIG to switch experiments. All fields have defaults so you only
 # need to specify what differs from the defaults.
 
-CONFIG = ExperimentConfig()
+CONFIG = ExperimentConfig(
+    model=PatchTSTConfig(nhead=4, num_layers=3),
+    training=TrainingConfig(local_epochs=5, learning_rate=1e-4),
+)
+
 
 """
 Examples:
@@ -267,9 +271,9 @@ CONFIG = ExperimentConfig(
 
 PatchTST on LEAD dataset:
 CONFIG = ExperimentConfig(
-    model=PatchTSTConfig(num_attention_heads=4, num_hidden_layers=3),
+    model=PatchTSTConfig(nhead=4, num_layers=3),
     data=LeadCSVConfig(batch_size=32),
-    training=TrainingConfig(local_epochs=1, learning_rate=1e-5),
+    training=TrainingConfig(local_epochs=5, learning_rate=1e-5),
 )
 
 MLP baseline on LEAD dataset:

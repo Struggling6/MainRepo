@@ -20,6 +20,11 @@ def train_model(
     Entry point for Flower's client training loop.
     Trains the model using config-specified loss function and hyperparameters.
     """
+
+    gpu_name = torch.cuda.get_device_name(0) if device.type == "cuda" else ""
+    print(f"[TRAIN] device={device}" + (f" ({gpu_name})" if gpu_name else ""), flush=True)
+
+
     if hasattr(model_config, "loss_fn"):
         print("[TRAIN] entering train_model", flush=True)
 
