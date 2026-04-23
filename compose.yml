@@ -61,8 +61,8 @@ services:
     cpus: "2.0"
     mem_limit: 8g
     devices:
-      - /dev/kfd:/dev/kfd
-      - /dev/dri:/dev/dri
+    - /dev/kfd:/dev/kfd
+    - /dev/dri:/dev/dri
     group_add:
       - render
       - video
