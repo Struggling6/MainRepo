@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
-from models import SupervisedTransformerCNN, LSTMModel, MLPModel
+from models import SupervisedCNNTransformer, LSTMModel, MLPModel, Transformer, PatchTST
 
 # ── Task configs ─────────────────────────────────────────────────────── #
 
@@ -55,7 +55,6 @@ class TransformerConfig:
     num_classes:    int   = 1
     loss_fn:        type  = nn.BCEWithLogitsLoss
 
-    """
 
     def build(self, input_dim: int, context_length: int = None) -> nn.Module:
         return Transformer(
@@ -67,7 +66,6 @@ class TransformerConfig:
             dropout=self.dropout,
             seq_len=context_length if context_length is not None else 168,
         )
-"""
 
 @dataclass
 class LSTMConfig:
@@ -151,7 +149,6 @@ class PatchTSTConfig():
     num_classes:         int   = 1
 
     def build(self, input_dim: int, context_length: int = None) -> nn.Module:
-        from models.PatchTST import PatchTST
         hf_config = HF_PatchTSTConfig(
             num_input_channels=input_dim,
             context_length=context_length or self.context_length,

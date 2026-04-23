@@ -1,7 +1,6 @@
 from transformers import set_seed
 from config import PatchTSTConfig
 from .base import BaseModel
-# Third Party
 from transformers import (
     PatchTSTForClassification,
 )
