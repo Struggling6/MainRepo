@@ -1,9 +1,22 @@
-import torch.nn as nn
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
-from models import SupervisedCNNTransformer, LSTMModel, MLPModel, Transformer, PatchTST
+
+
+def resolve_loss_fn(loss_fn):
+    """Resolve a loss function name or class to a torch.nn loss class."""
+    import torch.nn as nn
+
+    if isinstance(loss_fn, str):
+        resolved = getattr(nn, loss_fn, None)
+        if resolved is None:
+            raise ValueError(f"Unknown loss function: {loss_fn}")
+        return resolved
+
+    return loss_fn
 
 # ── Task configs ─────────────────────────────────────────────────────── #
 
@@ -31,9 +44,11 @@ class CNNTransformerConfig:
     dropout:        float = 0.3
     pos_weight_cap: float = 10.0
     num_classes:    int   = 1
-    loss_fn:        type  = nn.BCEWithLogitsLoss
+    loss_fn:        str   = "BCEWithLogitsLoss"
 
-    def build(self, input_dim: int) -> nn.Module:
+    def build(self, input_dim: int):
+        from models.supervised_cnn_transformer import SupervisedCNNTransformer
+
         return SupervisedCNNTransformer(
             in_channels=input_dim,
             d_model=self.d_model,
@@ -53,10 +68,12 @@ class TransformerConfig:
     dropout:        float = 0.3
     pos_weight_cap: float = 10.0
     num_classes:    int   = 1
-    loss_fn:        type  = nn.BCEWithLogitsLoss
+    loss_fn:        str   = "BCEWithLogitsLoss"
 
 
-    def build(self, input_dim: int, context_length: int = None) -> nn.Module:
+    def build(self, input_dim: int, context_length: int = None):
+        from models.transformer import Transformer
+
         return Transformer(
             in_channels=input_dim,
             d_model=self.d_model,
@@ -75,9 +92,11 @@ class LSTMConfig:
     dropout:         float     = 0.3
     num_classes:     int       = 1
     pos_weight_cap:  float     = 10.0
-    loss_fn:         type      = nn.BCEWithLogitsLoss
+    loss_fn:         str       = "BCEWithLogitsLoss"
 
-    def build(self, input_dim: int) -> nn.Module:
+    def build(self, input_dim: int):
+        from models.LSTM import LSTMModel
+
         return LSTMModel(
             in_channels=input_dim,
             hidden_size=self.hidden_size,
@@ -94,9 +113,11 @@ class MLPConfig:
     dropout:        float = 0.3
     num_classes:    int   = 1
     pos_weight_cap: float = 10.0
-    loss_fn:        type  = nn.BCEWithLogitsLoss
+    loss_fn:        str   = "BCEWithLogitsLoss"
 
-    def build(self, input_dim: int) -> nn.Module:
+    def build(self, input_dim: int):
+        from models.mlp import MLPModel
+
         return MLPModel(
             in_channels=input_dim,
             hidden_size=self.hidden_size,
@@ -145,10 +166,12 @@ class PatchTSTConfig():
     pre_norm:            bool  = True
     norm_type:           Literal["batchnorm", "layernorm"] | None = "batchnorm"
     pos_weight_cap:      float = 10.0
-    loss_fn:             type  = nn.BCEWithLogitsLoss
+    loss_fn:             str   = "BCEWithLogitsLoss"
     num_classes:         int   = 1
 
-    def build(self, input_dim: int, context_length: int = None) -> nn.Module:
+    def build(self, input_dim: int, context_length: int = None):
+        from models.PatchTST import PatchTST
+
         hf_config = HF_PatchTSTConfig(
             num_input_channels=input_dim,
             context_length=context_length or self.context_length,
@@ -252,7 +275,7 @@ class ExperimentConfig:
 # need to specify what differs from the defaults.
 
 CONFIG = ExperimentConfig(
-    model=PatchTSTConfig(nhead=4, num_layers=3),
+    model=PatchTSTConfig(nhead=4, num_layers=3, norm_type="layernorm"),
     training=TrainingConfig(local_epochs=1, learning_rate=1e-4),
     federation=FederationConfig(num_rounds=1, num_clients=1, proximal_mu=0.1),
 )
