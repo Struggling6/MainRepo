@@ -1,13 +1,9 @@
 from copy import deepcopy
 from pathlib import Path
-
-import torch
 from flwr.client import ClientApp, NumPyClient
 from flwr.common.logger import log
 from logging import INFO
-
 from config import CONFIG
-from data.registry import create_dataset_handler
 from models.utils import get_device, get_model_parameters, set_model_parameters
 from training.train import train_model
 from training.training_utils.Evaluator import Evaluator
@@ -30,14 +26,14 @@ class FlowerClient(NumPyClient):
             self.config.federation.partition_mode = "local"
 
         print("[Client Init] creating dataset handler", flush=True)
-        self.dataset_handler = create_dataset_handler(self.config)
+        self.dataset_handler = self.config.data.build_handler(self.config)
 
         print("[Client Init] getting metadata", flush=True)
         self.metadata = self.dataset_handler.get_metadata()
         print(f"[Client Init] metadata={self.metadata}", flush=True)
 
         print("[Client Init] creating model", flush=True)
-        self.model = CONFIG.model.build(input_dim=self.metadata["input_dim"])
+        self.model = self.config.model.build(input_dim=self.metadata["input_dim"])
 
         self.trainloader, self.testloader = self.dataset_handler.get_dataloaders(
             partition_id=self.partition_id

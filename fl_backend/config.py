@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Literal
 from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
 from models import SupervisedTransformerCNN, LSTMModel, MLPModel
-from huggingface_hub.dataclasses import strict
 
 # ── Task configs ─────────────────────────────────────────────────────── #
 
@@ -83,12 +82,11 @@ class MLPConfig:
             dropout=self.dropout,
         )
 
-
-# HuggingFace configs use their own @strict decorator instead of plain @dataclass.
-# @strict(accept_kwargs=True) generates a dataclass-style __init__ from the fields
-# below, while also forwarding unknown kwargs to the parent PretrainedConfig.__init__.
-# This prevents crashes from HuggingFace's internal recursive __post_init__ calls.
-@strict(accept_kwargs=True)
+## HuggingFace configs cannot use @strict alongside @dataclass inheritance without
+# breaking PretrainedConfig's internal __init__ chain. Instead, we use a plain
+# @dataclass and call super().__init__() explicitly in __post_init__, passing all
+# HF fields through. This ensures HF internals (attn implementation, id2label, etc.)
+# are set up correctly while keeping the clean dataclass field definition style.
 @dataclass
 class PatchTSTConfig(HF_PatchTSTConfig):
     """
@@ -98,9 +96,14 @@ class PatchTSTConfig(HF_PatchTSTConfig):
     PatchTST splits a time series into fixed-length patches and processes them with
     a Transformer encoder — similar to how Vision Transformers treat image patches.
 
-    Note: HuggingFace uses num_attention_heads / num_hidden_layers / num_labels
-    internally. The nhead / num_layers / num_classes properties below provide
-    uniform naming across all model configs.
+    HuggingFace uses num_attention_heads / num_hidden_layers internally. The nhead
+    and num_layers properties below provide uniform naming across all model configs.
+    num_classes is stored directly as a field rather than delegating to HuggingFace's
+    num_labels, which requires id2label to be set.
+
+    __post_init__ forwards all relevant fields to PretrainedConfig.__init__ to ensure
+    HuggingFace internals (attention implementation, label mappings, etc.) are
+    properly initialized before the model is built.
     """
     name:                str   = "patchtst"
     num_input_channels:  int   = 1
@@ -108,8 +111,8 @@ class PatchTSTConfig(HF_PatchTSTConfig):
     patch_length:        int   = 16
     patch_stride:        int   = 8
     d_model:             int   = 128
-    num_attention_heads: int   = 4
-    num_hidden_layers:   int   = 3
+    nhead:               int   = 4
+    num_layers:          int   = 3
     ffn_dim:             int   = 256
     dropout:             float = 0.2
     head_dropout:        float = 0.2
@@ -120,25 +123,29 @@ class PatchTSTConfig(HF_PatchTSTConfig):
     norm_type:           Literal["batchnorm", "layernorm"] | None = "batchnorm"
     pos_weight_cap:      float = 10.0
     loss_fn:             type  = nn.BCEWithLogitsLoss
-
-    @property
-    def num_classes(self):
-        return self.num_labels
-
-    @property
-    def nhead(self):
-        return self.num_attention_heads
-
-    @property
-    def num_layers(self):
-        return self.num_hidden_layers
+    num_classes:         int   = 1
 
     def build(self, input_dim: int, context_length: int = None) -> nn.Module:
         from models.PatchTST import PatchTST
-        self.num_input_channels = input_dim
-        if context_length is not None:
-            self.context_length = context_length
-        return PatchTST(self)
+        hf_config = HF_PatchTSTConfig(
+            num_input_channels=input_dim,
+            context_length=context_length or self.context_length,
+            patch_length=self.patch_length,
+            patch_stride=self.patch_stride,
+            d_model=self.d_model,
+            num_attention_heads=self.nhead,
+            num_hidden_layers=self.num_layers,
+            ffn_dim=self.ffn_dim,
+            dropout=self.dropout,
+            head_dropout=self.head_dropout,
+            channel_attention=self.channel_attention,
+            attention_dropout=self.attention_dropout,
+            positional_dropout=self.positional_dropout,
+            pre_norm=self.pre_norm,
+            norm_type=self.norm_type,
+            num_targets=1,
+        )
+        return PatchTST(hf_config)
     
 @dataclass
 class TransformerConfig:
@@ -180,6 +187,10 @@ class LeadCSVConfig:
     test_split:   float = 0.2
     seed:          int  = 42
 
+    def build_handler(self, config=None):
+        from data.lead_csv import LeadCSVHandler
+        return LeadCSVHandler(config or CONFIG)
+
 @dataclass
 class PowerGridCSVConfig:
     name:         str   = "powergrid_csv"
@@ -191,6 +202,10 @@ class PowerGridCSVConfig:
     normalize:    bool  = True
     noise_level:  float = 0.7
     seed:         int   = 42
+
+    def build_handler(self, config=None):
+        from data.powergrid_csv import PowerGridCSVHandler
+        return PowerGridCSVHandler(config or CONFIG)
 
 # ── Training config ───────────────────────────────────────────────────── #
 
@@ -269,4 +284,3 @@ CONFIG = ExperimentConfig(
     model=MLPConfig(hidden_size=64, num_layers=3),
 )
 """
-

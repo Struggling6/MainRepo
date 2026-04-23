@@ -5,13 +5,21 @@ services:
     image: flwr/superlink:1.27.0
     command:
       - --insecure
-      - --isolation
-      - process
+      - --serverappio-api-address
+      - 0.0.0.0:9091
+      - --fleet-api-address
+      - 0.0.0.0:9092
+      - --fleet-api-type
+      - grpc-rere
     ports:
       - "9093:9093"
+      - "9091:9091"
+      - "9092:9092"
 
   superexec-serverapp:
-    image: fl-backend-app:latest
+    build:
+      context: ./fl_backend
+      dockerfile: Dockerfile
     command:
       - --insecure
       - --plugin-type
@@ -38,7 +46,9 @@ services:
       - superlink
 
   superexec-clientapp-1:
-    image: fl-backend-app:latest
+    build:
+      context: ./fl_backend
+      dockerfile: Dockerfile
     command:
       - --insecure
       - --plugin-type
