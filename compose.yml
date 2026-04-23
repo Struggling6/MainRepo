@@ -68,3 +68,4 @@ services:
       - video
     volumes:
       - ./fl_backend/datasets:/app/datasets
+      - ./fl_backend/checkpoints:/app/checkpoints
