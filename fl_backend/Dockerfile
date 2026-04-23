@@ -14,7 +14,10 @@ RUN apt-get update \
 RUN /python/venv/bin/pip install uv
 
 ENV PATH="/python/venv/bin:$PATH"
-ENV PYTHONPATH="/app"
+ENV PYTHONPATH="/python/venv/lib/python3.13/site-packages:/app"
+ENV MIOPEN_USER_DB_PATH="/tmp/miopen"
+ENV MIOPEN_SYSTEM_DB_PATH="/tmp/miopen"
+ENV MIOPEN_DISABLE_CACHE=1
 
 ARG TORCH_VARIANT=cpu
 ARG TORCH_ROCM_INDEX_URL=https://download.pytorch.org/whl/rocm6.3
@@ -26,9 +29,6 @@ RUN case "${TORCH_VARIANT}" in \
         *) echo "Unsupported TORCH_VARIANT: ${TORCH_VARIANT}" >&2; exit 1 ;; \
     esac
 
-ENV MIOPEN_USER_DB_PATH="/tmp/miopen"
-ENV MIOPEN_SYSTEM_DB_PATH="/tmp/miopen"
-ENV MIOPEN_DISABLE_CACHE=1
 
 WORKDIR /app
 COPY --chown=app:app pyproject.toml .

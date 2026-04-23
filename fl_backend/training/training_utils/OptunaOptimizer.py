@@ -8,7 +8,7 @@ import torch
 from training.training_utils.TrainEvalBase import TrainEvalBase
 from training.training_utils.utils import compute_pos_weight
 from models.utils import get_device
-from config import CONFIG
+from config import CONFIG, resolve_loss_fn
 
 class OptunaOptimizer(TrainEvalBase):
     """
@@ -144,7 +144,8 @@ class OptunaOptimizer(TrainEvalBase):
     
     def _build_loss(self, pos_weight_cap):
         pw = min(self.raw_pw, pos_weight_cap)
-        return self.loss_fn(
+        loss_cls = resolve_loss_fn(self.loss_fn)
+        return loss_cls(
             pos_weight=torch.tensor([pw], device=get_device())
         ) 
 

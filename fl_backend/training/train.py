@@ -2,7 +2,7 @@ from logging import INFO
 import torch
 import torch.nn as nn
 import numpy as np
-from config import TrainingConfig, CNNTransformerConfig
+from config import TrainingConfig, CNNTransformerConfig, resolve_loss_fn
 from training.training_utils.Trainer import Trainer
 from training.training_utils.utils import compute_pos_weight
 
@@ -45,9 +45,10 @@ def train_model(
         # Loss function
         # --------------------------------------------------
         print("[TRAIN] creating loss function...", flush=True)
-        loss_fn = model_config.loss_fn(
+        loss_cls = resolve_loss_fn(model_config.loss_fn)
+        loss_fn = loss_cls(
             pos_weight=torch.tensor([pos_weight], device=device)
-        ) if model_config.loss_fn == nn.BCEWithLogitsLoss else model_config.loss_fn()
+        ) if loss_cls == nn.BCEWithLogitsLoss else loss_cls()
     else:
         # HuggingFace models — loss is handled internally, pass None
         loss_fn = None

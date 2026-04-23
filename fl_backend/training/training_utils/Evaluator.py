@@ -9,7 +9,7 @@ from sklearn.metrics import (
 )
 from training.training_utils.TrainEvalBase import TrainEvalBase
 from training.training_utils.utils import compute_pos_weight
-from config import CONFIG
+from config import CONFIG, resolve_loss_fn
 
 class Evaluator(TrainEvalBase):
     """
@@ -134,7 +134,8 @@ class Evaluator(TrainEvalBase):
         """Build loss function using pos_weight computed from test labels."""
         y      = self._extract_labels(testloader)
         pw     = compute_pos_weight(y, cap=self.model_config.pos_weight_cap)
-        return self.model_config.loss_fn(
+        loss_cls = resolve_loss_fn(self.model_config.loss_fn)
+        return loss_cls(
             pos_weight=torch.tensor([pw], device=self.device)
         )
 
