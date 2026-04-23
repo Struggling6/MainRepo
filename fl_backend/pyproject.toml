@@ -17,17 +17,12 @@ dependencies = [
     "transformers",
 ]
 
-[[tool.pip.indexes]]
-name = "pytorch-rocm"
-url = "https://download.pytorch.org/whl/rocm6.3"
-
 [tool.flwr.app]
 publisher = "local"
 
 [tool.flwr.app.components]
 clientapp = "client_app:app"
 serverapp = "server_app:app"
-
 
 [tool.hatch.build.targets.wheel]
 packages = ["data", "models", "tasks", "training"]
