@@ -7,8 +7,8 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BASE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+BASE_DIR="${BASE_DIR:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 PARENT_DIR="$(cd "${BASE_DIR}/.." && pwd)"
 
 VENV_DIR="${VENV_DIR:-${PARENT_DIR}/fl_venv}"
@@ -21,6 +21,7 @@ echo "Optuna trial starting"
 echo "  Array task : ${SLURM_ARRAY_TASK_ID:-N/A}"
 echo "  Job ID     : ${SLURM_JOB_ID}"
 echo "  Node       : $(hostname)"
+echo "  SCRIPT_DIR : ${SCRIPT_DIR}"
 echo "  BASE_DIR   : ${BASE_DIR}"
 echo "  VENV_DIR   : ${VENV_DIR}"
 echo "  LOG_DIR    : ${LOG_DIR}"

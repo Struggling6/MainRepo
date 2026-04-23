@@ -118,7 +118,7 @@ wait_for_job_running() {
 
   echo "Waiting for ${label} job to start running..."
 
-  for _ in {1..60}; do
+  for _ in {1..300}; do
     JOB_STATE="$(squeue -j "$job_id" -h -o "%T" || true)"
 
     if [ "$JOB_STATE" = "RUNNING" ]; then
@@ -135,7 +135,10 @@ wait_for_job_running() {
     sleep 2
   done
 
+
   echo "Timed out waiting for ${label} job to start."
+  squeue -j "$job_id" -o "%.18i %.9P %.20j %.8u %.2t %.10M %.6D %R" || true
+  scontrol show job "$job_id" || true
   sacct -j "$job_id" --format=JobID,State,ExitCode || true
   exit 1
 }
