@@ -5,14 +5,14 @@ from .supervised_utils.featureExtractor import FeatureExtractor
 from .supervised_utils.Classifier import Classifier
 from .base import BaseModel
 
-class SupervisedTransformerCNN(BaseModel):
-    def __init__(self, in_channels, d_model, nhead, num_layers, num_classes=1, dropout=0.3):
+class SupervisedCNNTransformer(BaseModel):
+    def __init__(self, in_channels, d_model, n_heads, num_layers, num_classes=1, dropout=0.3):
         super().__init__()
         
         self.feature_extractor = FeatureExtractor(in_channels, d_model, dropout=dropout)
         self.pos_embedding = nn.Embedding(42, d_model)  # 168 → MaxPool → 84 → MaxPool → 42
 
-        encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead, batch_first=True, dropout=dropout)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nheads=n_heads, batch_first=True, dropout=dropout)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
 
         self.classifier = Classifier(d_model, num_classes, dropout=dropout)

@@ -72,7 +72,6 @@ def main():
 
     #plot_diagrams(eval_results["targets"], eval_results["preds"], train_results["train_losses"], train_results["train_accuracies"])
 
-
 if __name__ == "__main__":
     if args.simulate:
         simulate()
