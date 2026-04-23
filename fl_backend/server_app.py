@@ -1,6 +1,4 @@
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
-from flwr.common import ndarrays_to_parameters
-from plotting.plotting_config import plot_diagrams
 from flwr.common.logger import log
 from logging import INFO
 from config import CONFIG
@@ -69,9 +67,10 @@ def server_fn(context):
     config = ServerConfig(num_rounds=fed_config.num_rounds)
     return ServerAppComponents(strategy=strategy, config=config)
 
+"""
 
 def on_train_end(context):
-    """Called after all rounds complete."""
+    #Called after all rounds complete.
     strategy = context.strategy
     
     # Extract metrics from eval_history
@@ -89,4 +88,5 @@ def on_train_end(context):
     
     plot_diagrams(f1_values, pr_values)
 
+"""
 app = ServerApp(server_fn=server_fn)

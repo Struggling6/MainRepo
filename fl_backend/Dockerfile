@@ -6,29 +6,35 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -f render \
     && groupadd -f video \
-    && usermod -aG render,video app
-USER app
+    && usermod -aG render,video app \
+    && ln -sf /python/venv/bin/python3 /usr/local/bin/python3 \
+    && ln -sf /python/venv/bin/python3 /usr/local/bin/python
 
-WORKDIR /app
+# Install uv into the venv
+RUN /python/venv/bin/pip install uv
 
-# ── Install PyTorch first so this layer is cached across code changes ── #
+ENV PATH="/python/venv/bin:$PATH"
+ENV PYTHONPATH="/app"
+
 ARG TORCH_VARIANT=cpu
 ARG TORCH_ROCM_INDEX_URL=https://download.pytorch.org/whl/rocm6.3
 ARG TORCH_CUDA_INDEX_URL=https://download.pytorch.org/whl/cu124
 RUN case "${TORCH_VARIANT}" in \
-        cpu)  python -m pip install --no-cache-dir torch torchvision ;; \
-        cuda) python -m pip install --no-cache-dir torch torchvision --index-url "${TORCH_CUDA_INDEX_URL}" ;; \
-        rocm) python -m pip install --no-cache-dir torch torchvision --index-url "${TORCH_ROCM_INDEX_URL}" ;; \
+        cpu)  uv pip install --python /python/venv/bin/python torch torchvision ;; \
+        cuda) uv pip install --python /python/venv/bin/python torch torchvision --index-url "${TORCH_CUDA_INDEX_URL}" ;; \
+        rocm) uv pip install --python /python/venv/bin/python torch torchvision --index-url "${TORCH_ROCM_INDEX_URL}" ;; \
         *) echo "Unsupported TORCH_VARIANT: ${TORCH_VARIANT}" >&2; exit 1 ;; \
     esac
 
-# ── Install other dependencies before copying source ─────────────────── #
-# Copying pyproject.toml alone lets pip install deps without invalidating
-# the layer when only source files change.
-COPY --chown=app:app pyproject.toml .
-RUN python -m pip install --no-cache-dir --no-deps .
+ENV MIOPEN_USER_DB_PATH="/tmp/miopen"
+ENV MIOPEN_SYSTEM_DB_PATH="/tmp/miopen"
 
-# ── Copy source last — only this layer rebuilds on code changes ───────── #
+WORKDIR /app
+COPY --chown=app:app pyproject.toml .
+RUN uv pip install --python /python/venv/bin/python .
+
+USER app
+
 COPY --chown=app:app . .
 
 ENTRYPOINT ["flower-superexec"]

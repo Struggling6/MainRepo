@@ -25,22 +25,34 @@ class FedProxWithSave(FedProx):
             server_round, results, failures
         )
 
-        # Save only after the final round
         if aggregated_parameters is not None and server_round == CONFIG.federation.num_rounds:
-
             metadata = CONFIG.data.build_handler().get_metadata()
-            model = CONFIG.model.build(input_dim=metadata["input_dim"])
+            model    = CONFIG.model.build(input_dim=metadata["input_dim"])
 
-            # Convert Flower parameters back to numpy arrays, then load into model
             ndarrays    = parameters_to_ndarrays(aggregated_parameters)
             params_dict = zip(model.state_dict().keys(), ndarrays)
             state_dict  = {k: torch.tensor(v) for k, v in params_dict}
             model.load_state_dict(state_dict, strict=True)
 
+            # Aggregate metrics from all clients for the final checkpoint
+            aggregated_metrics = {}
+            if results:
+                num_examples_total = sum(fit_res.num_examples for _, fit_res in results)
+                for key in results[0][1].metrics:
+                    aggregated_metrics[key] = sum(
+                        fit_res.metrics[key] * fit_res.num_examples
+                        for _, fit_res in results
+                    ) / num_examples_total
+
+            # Use threshold from metrics if available, else fall back to config default
+            threshold = aggregated_metrics.pop("threshold", CONFIG.evaluation.threshold)
+
             self._save_model(
                 model=model,
                 path=CONFIG.evaluation.model_path,
                 config=CONFIG.model,
+                threshold=threshold,
+                metrics=aggregated_metrics,
             )
 
         return aggregated_parameters, metrics
