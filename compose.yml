@@ -18,7 +18,7 @@ services:
 
   superexec-serverapp:
     build:
-      context: ./fl_backend
+      context: ./fl-backend
       dockerfile: Dockerfile
     command:
       - --insecure
@@ -30,7 +30,7 @@ services:
       - superlink
     stop_signal: SIGINT
     volumes:
-      - ./fl_backend/checkpoints:/app/checkpoints
+      - ./fl-backend/checkpoints:/app/checkpoints
 
   supernode-1:
     image: flwr/supernode:1.27.0
@@ -49,7 +49,7 @@ services:
 
   superexec-clientapp-1:
     build:
-      context: ./fl_backend
+      context: ./fl-backend
       dockerfile: Dockerfile
     command:
       - --insecure
@@ -69,4 +69,4 @@ services:
       - render
       - video
     volumes:
-      - ./fl_backend/datasets:/app/datasets
+      - ./fl-backend/datasets:/app/datasets

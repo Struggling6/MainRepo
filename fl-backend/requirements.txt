@@ -1,6 +1,5 @@
 --extra-index-url https://download.pytorch.org/whl/rocm6.3
 torch
-torchvision
 flwr[simulation]>=1.20.0
 pandas
 numpy

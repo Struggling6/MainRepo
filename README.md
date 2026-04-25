@@ -6,7 +6,7 @@ Federated anomaly detection backend using [Flower](https://flower.ai/), PyTorch,
 
 ## Setup
 
-Python 3.12 is required.
+Python 3.13 is required.
 
 ```bash
 # Create and activate virtual environment
@@ -15,7 +15,7 @@ source .venv/bin/activate          # Linux/Mac
 .\.venv\Scripts\Activate.ps1       # Windows
 
 # Install dependencies
-pip install -e ./fl_backend
+pip install -e ./fl-backend
 ```
 
 If you install new packages, update `requirements.txt`:
@@ -31,7 +31,7 @@ pip freeze > requirements.txt
 For local development and testing the training pipeline without federation:
 
 ```bash
-cd fl_backend
+cd fl-backend
 python main.py
 ```
 
@@ -69,7 +69,7 @@ docker compose build --build-arg TORCH_VARIANT=cuda
 If you only changed the number of clients, ports, or resource limits — no rebuild needed:
 
 ```bash
-python generate_compose.py --num-clients 4
+python scripts/generate_compose.py --num-clients 4
 docker compose up -d
 ```
 
@@ -87,10 +87,10 @@ docker logs fl-backend-superexec-clientapp-1-1   # clientapp logs
 
 ## Running with Flower CLI
 
-Make sure the Docker containers are running first, then from the `fl_backend/` directory:
+Make sure the Docker containers are running first, then from the `fl-backend/` directory:
 
 ```bash
-cd fl_backend
+cd fl-backend
 flwr run . local-deployment --stream
 ```
 
@@ -116,7 +116,7 @@ Run `flwr config list` to see the config file location and available connections
 Federated training with real clients runs on AAU AI-LAB using SLURM and Singularity. From the AI-LAB frontend:
 
 ```bash
-cd /ceph/project/sw6P6/fl_backend
+cd /ceph/project/sw6P6/fl-backend
 bash aiLab_scripts/launch_all.sh
 ```
 
@@ -130,7 +130,7 @@ Monitor jobs:
 
 ```bash
 squeue --me
-tail -f /ceph/project/sw6P6/fl_backend/logs/optuna_<jobid>_0.out
+tail -f /ceph/project/sw6P6/fl-backend/logs/optuna_<jobid>_0.out
 ```
 
 AI-LAB limits: max 8 concurrent jobs, max 8 GPUs per user, max 12h per job.
@@ -307,7 +307,7 @@ dataset_handler = config.data.build_handler()
 Runs an Optuna study over model hyperparameters and writes the best params back into `CONFIG`.
 
 ```bash
-cd fl_backend
+cd fl-backend
 python -m training.optimize --trials 50 --epochs 10 --patience 10
 ```
 
