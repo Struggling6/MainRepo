@@ -14,15 +14,24 @@ python -m venv .venv
 source .venv/bin/activate          # Linux/Mac
 .\.venv\Scripts\Activate.ps1       # Windows
 
-# Install dependencies
-pip install -e ./fl-backend
+# Generate requirements for your hardware and install
+python scripts/generate_requirements.py
+uv pip install -r requirements.txt
+uv pip install --no-deps -e ./fl-backend
 ```
 
-If you install new packages, update `requirements.txt`:
+`generate_requirements.py` detects your GPU (CPU / CUDA / ROCm) and writes a
+`requirements.txt` with the correct torch index URL. To force a specific variant:
 
 ```bash
-pip freeze > requirements.txt
+python scripts/generate_requirements.py --variant rocm   # AMD
+python scripts/generate_requirements.py --variant cuda   # Nvidia
+python scripts/generate_requirements.py --variant cpu    # CPU only
 ```
+
+`requirements.txt` is the single source of truth for dependencies — do not
+edit it by hand. To add or remove a package, update `BASE_DEPS` in
+`generate_requirements.py`, then regenerate and reinstall.
 
 ---
 
@@ -47,40 +56,34 @@ python main.py --simulate
 
 ## Docker Deployment
 
-Docker is used to run the full federated system locally with multiple isolated containers. After code changes, rebuild and restart:
+Docker is used to run the full federated system locally with multiple isolated
+containers.
+
+### First-time setup or after dependency changes
+
+Generate `requirements.txt` for your hardware, then do a clean build:
+
+```bash
+python scripts/generate_requirements.py
+docker compose build --no-cache
+docker compose up -d
+```
+
+### After code changes (no dependency changes)
 
 ```bash
 docker compose down
 docker compose up --build -d
 ```
 
-The `--build` flag rebuilds the images automatically — no separate `docker build` step needed.
-
-By default images use CPU PyTorch. To build with GPU support pass a build arg:
-
-```bash
-# ROCm (AMD)
-docker compose build --build-arg TORCH_VARIANT=rocm
-
-# CUDA (Nvidia)
-docker compose build --build-arg TORCH_VARIANT=cuda
-```
-
-If you only changed the number of clients, ports, or resource limits — no rebuild needed:
-
-```bash
-python scripts/generate_compose.py --num-clients 4
-docker compose up -d
-```
-
 ### Useful Commands
 
 ```bash
-docker compose ps                                # show running containers
-docker compose down                              # stop and remove containers
-docker compose logs -f                           # follow logs from all containers
-docker logs fl-backend-superexec-serverapp-1     # serverapp logs
-docker logs fl-backend-superexec-clientapp-1-1   # clientapp logs
+docker compose ps                                  # show running containers
+docker compose down                                # stop and remove containers
+docker compose logs -f                             # follow all logs
+docker logs fl-backend-superexec-serverapp-1       # serverapp logs
+docker logs fl-backend-superexec-clientapp-1-1     # clientapp logs
 ```
 
 ---
@@ -94,7 +97,8 @@ cd fl-backend
 flwr run . local-deployment --stream
 ```
 
-The `--stream` flag shows live logs. The `local-deployment` federation connects to the Docker SuperLink at `127.0.0.1:9093`.
+The `--stream` flag shows live logs. The `local-deployment` federation connects
+to the Docker SuperLink at `127.0.0.1:9093`.
 
 Your `~/.flwr/config.toml` should contain:
 
@@ -108,6 +112,16 @@ insecure = true
 ```
 
 Run `flwr config list` to see the config file location and available connections.
+
+> **Note on Exit Code 203:** After the final federation round completes, Flower
+> reports exit code 203 ("SuperLink rejected the request"). This is expected —
+> it means the run finished and the SuperLink cleaned up. It is not an error.
+> Use `run_federation.sh` instead of `flwr run` directly to get a cleaner
+> success message:
+>
+> ```bash
+> ./run_federation.sh
+> ```
 
 ---
 
