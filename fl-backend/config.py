@@ -252,7 +252,9 @@ class FederationConfig:
 
 @dataclass
 class EvaluationConfig:
-    model_path:   Path  = Path("/app/checkpoints/model.pt")
+    model_path:   Path  = None  # set in FedProxWithSave
+
+    
     test_path:    Path  = Path("/app/datasets/LEAD/test_features.csv")
     target:       str   = "anomaly"
     batch_size:   int   = 64
