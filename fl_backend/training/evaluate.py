@@ -1,31 +1,33 @@
+from alembic import config
+from config import CONFIG
+
 import torch
 import numpy as np
+import os
 
 from training.training_utils.Evaluator import Evaluator
-from models.utils import get_device
 
-def evaluate(config):
-    device = get_device()
-    # Use registry to create the correct handler based on config.data.name
-    # This works for LeadCSVHandler, PowerGridCSVHandler, or any future handler
-    test_handler  = config.data.build_handler(config)
-    data_metadata = test_handler.get_metadata()
+os.environ["TORCH_BLAS_PREFER_HIPBLASLT"] = "0"  # Silence ROCm warning
 
-    _, _, X_test, y_test = test_handler.run_split()
+def evaluate():
+    test_handler = CONFIG.data.build_handler(CONFIG)
+    metadata = test_handler.load_metadata()
+    X_test, y_test = test_handler.load_test_set(CONFIG.evaluation.test_path)
 
     testloader = torch.utils.data.DataLoader(
         torch.utils.data.TensorDataset(
             torch.tensor(X_test.astype(np.float32)),
             torch.tensor(y_test.astype(np.float32)),
         ),
-        batch_size=config.evaluation.batch_size,
+        batch_size=CONFIG.evaluation.batch_size,
         shuffle=False,
     )
 
-    evaluator = Evaluator(model_config=config.model)
+    evaluator = Evaluator(model_config=CONFIG.model, metadata=metadata)
 
     return evaluator.evaluate_final(
-        model_path=config.evaluation.model_path,
+        model_path=CONFIG.evaluation.model_path,
         testloader=testloader,
-        threshold=config.evaluation.threshold,
+        threshold=CONFIG.evaluation.threshold,
     )
+    

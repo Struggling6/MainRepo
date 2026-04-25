@@ -31,11 +31,8 @@ RUN case "${TORCH_VARIANT}" in \
 
 
 WORKDIR /app
-COPY --chown=app:app pyproject.toml .
-RUN uv pip install --python /python/venv/bin/python .
-
-USER app
-
 COPY --chown=app:app . .
+RUN uv pip install --python /python/venv/bin/python .
+USER app
 
 ENTRYPOINT ["flower-superexec"]

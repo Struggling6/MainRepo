@@ -1,11 +1,15 @@
-from logging import INFO
 import torch
 import torch.nn as nn
 import numpy as np
+import os
+
+from flwr.common.logger import log
+from logging import INFO
 from config import TrainingConfig, CNNTransformerConfig, resolve_loss_fn
 from training.training_utils.Trainer import Trainer
 from training.training_utils.utils import compute_pos_weight
 
+os.environ["TORCH_BLAS_PREFER_HIPBLASLT"] = "0"  # Silence ROCm warning
 
 def train_model(
         model:           nn.Module,
@@ -84,9 +88,8 @@ def train_model(
     try:
         trainer.train(trainloader, valloader)
     except Exception as e:
-        torch.log(INFO, "Training failed: %s", e)
+        log(INFO, "Training failed: %s", e)
         raise
-    print("[TRAIN] training finished", flush=True)
 
     # --------------------------------------------------
     # Results

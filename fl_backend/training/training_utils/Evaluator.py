@@ -24,12 +24,13 @@ class Evaluator(TrainEvalBase):
     def __init__(
         self,
         model_config,
+        metadata
     ):
         # epochs and patience are irrelevant for evaluation
         # but required by AnomalyTrainerBase.__init__
         super().__init__(num_classes=model_config.num_classes)
         self.model_config = model_config
-
+        self.metadata = metadata
     # ------------------------------------------------------------------ #
     #  Public API                                                          #
     # ------------------------------------------------------------------ #

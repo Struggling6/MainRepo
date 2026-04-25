@@ -1,6 +1,7 @@
 import optuna
 import os
 from copy import deepcopy
+import torch.nn as nn
 
 os.environ["TORCH_BLAS_PREFER_HIPBLASLT"] = "0"  # Silence ROCm warning
 
