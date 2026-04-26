@@ -144,3 +144,4 @@ htmlcov/
 *.bak
 *.swp
 uv.lock
+*.fab

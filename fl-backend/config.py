@@ -252,8 +252,8 @@ class FederationConfig:
 
 @dataclass
 class EvaluationConfig:
-    model_path:   Path  = Path("checkpoints/model.pt")
-    test_path:    Path  = Path("datasets/LEAD/test_features.csv")
+    model_path:   Path  = Path("/app/checkpoints/model.pt")
+    test_path:    Path  = Path("/app/datasets/LEAD/test_features.csv")
     target:       str   = "anomaly"
     batch_size:   int   = 64
     threshold:    float = 0.5   # decision threshold — override with best_thresh from training

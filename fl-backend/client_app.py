@@ -109,7 +109,9 @@ class FlowerClient(NumPyClient):
             device=self.device,
         )
 
-        print(f"[FIT] done facility_id={self.facility_id} results={results}", flush=True)
+        results["input_dim"] = self.metadata["input_dim"]
+        log(INFO, "[FIT] done facility_id=%s results=%s", self.facility_id, results)
+
         return get_model_parameters(self.model), results["num_examples"], results
 
     def evaluate(self, parameters, config):
