@@ -1,145 +1,255 @@
-## Installed dependencies
-See requirements.txt
-## Virtual environment
-Made requirements.txt to install all the packages required and the correct versions.
+# FL Backend
 
-**IMPORTANT**
-Python 3.11 is required to make this project work
+Federated anomaly detection backend using [Flower](https://flower.ai/), PyTorch, and multiple model architectures (CNNTransformer, LSTM, MLP, Transformer, PatchTST) for the LEAD building energy dataset.
 
-To use first make a virtual environment using ``py -3.11 -m venv .venv`` This should take 30 seconds ish and make a new folder
+---
 
+## Setup
 
-To access venv use: ``.\.venv\Scripts\Activate.ps1`` in terminal. it should now look something like :
-
-```(.venv) PS C:\Users\phili\Documents\GitHub\MainRepo> ```
-
-
-After ensuring terminal line looks like the one above, update pip using the command ``python -m pip install --upgrade pip`` and afterwards install the dependencies using: ```pip install -r requirements.txt```  all the dependencies should now be downloaded with the correct versions.
-
-if you install new packages be sure to update ``requirements.txt`` using the command ``pip freeze > requirements.txt``
-
-This was done to be sure to have the correct version of the libraries and is apparently standard practice
-
-
-
-## Docker
-
-### First Time / After Code Changes
-
-Rebuild the image and restart if you changed Python code, `pyproject.toml`, or the `Dockerfile`:
+Python 3.13 is required.
 
 ```bash
-docker build -t fl-backend-app:latest ./fl_backend
+# Create and activate virtual environment
+python -m venv .venv
+source .venv/bin/activate          # Linux/Mac
+.\.venv\Scripts\Activate.ps1       # Windows
+
+# Generate requirements for your hardware and install
+python scripts/generate_requirements.py
+uv pip install -r requirements.txt
+uv pip install --no-deps -e ./fl-backend
+```
+
+`generate_requirements.py` detects your GPU (CPU / CUDA / ROCm) and writes a
+`requirements.txt` with the correct torch index URL. To force a specific variant:
+
+```bash
+python scripts/generate_requirements.py --variant rocm   # AMD
+python scripts/generate_requirements.py --variant cuda   # Nvidia
+python scripts/generate_requirements.py --variant cpu    # CPU only
+```
+
+`requirements.txt` is the single source of truth for dependencies — do not
+edit it by hand. To add or remove a package, update `BASE_DEPS` in
+`generate_requirements.py`, then regenerate and reinstall.
+
+---
+
+## Running Locally (Single Client)
+
+For local development and testing the training pipeline without federation:
+
+```bash
+cd fl-backend
+python main.py
+```
+
+This runs a single client end-to-end: data loading → training → evaluation. All logs print directly to the terminal.
+
+To test the full federated simulation locally:
+
+```bash
+python main.py --simulate
+```
+
+---
+
+## Docker Deployment
+
+Docker is used to run the full federated system locally with multiple isolated
+containers.
+
+### First-time setup or after dependency changes
+
+Generate `requirements.txt` for your hardware, then do a clean build:
+
+```bash
+python scripts/generate_requirements.py
+docker compose build --no-cache
+docker compose up -d
+```
+
+### After code changes (no dependency changes)
+
+```bash
 docker compose down
-docker compose up -d
+docker compose up --build -d
 ```
-
-By default the image uses CPU PyTorch. To build with GPU support:
-
-```bash
-# ROCm (AMD)
-docker build --build-arg TORCH_VARIANT=rocm -t fl-backend-app:latest ./fl_backend
-
-# CUDA (Nvidia)
-docker build --build-arg TORCH_VARIANT=cuda -t fl-backend-app:latest ./fl_backend
-```
-
----
-
-### Config Changes Only
-
-If you only changed the number of clients, ports, or resource limits — no rebuild needed. Just regenerate the compose file and restart:
-
-```bash
-python generate_compose.py --num-clients 4
-docker compose up -d
-```
-
----
 
 ### Useful Commands
 
 ```bash
-docker compose ps        # show running containers
-docker compose down      # stop and remove containers
-docker compose logs -f   # follow logs from all containers
+docker compose ps                                  # show running containers
+docker compose down                                # stop and remove containers
+docker compose logs -f                             # follow all logs
+docker logs fl-backend-superexec-serverapp-1       # serverapp logs
+docker logs fl-backend-superexec-clientapp-1-1     # clientapp logs
 ```
 
+---
 
+## Running with Flower CLI
 
+Make sure the Docker containers are running first, then from the `fl-backend/` directory:
 
-## Flower CLI commands:
-flwr config list
-What it does:
-- Shows your Flower config file location
-- Shows available connections
-
-add this to your flwr config.toml
+```bash
+cd fl-backend
+flwr run . local-deployment --stream
 ```
+
+The `--stream` flag shows live logs. The `local-deployment` federation connects
+to the Docker SuperLink at `127.0.0.1:9093`.
+
+Your `~/.flwr/config.toml` should contain:
+
+```toml
+[superlink]
+default = "local-deployment"
+
 [superlink.local-deployment]
 address = "127.0.0.1:9093"
 insecure = true
 ```
 
-flwr run . local-deployment --stream
- What it does:
-- Runs your Flower app (`.` = current folder)
-- Connects to Docker backend (`local-deployment`)
-- `-stream` = shows logs live
-- remember to cd fl_backend
-# Expanding the backend
+Run `flwr config list` to see the config file location and available connections.
 
-## Making new Dataset handlers
-A dataset handler is responsible for loading a dataset, preparing it for training, splitting it into client partiotions, and returning PyTorch dataloaders for a given client.
+> **Note on Exit Code 203:** After the final federation round completes, Flower
+> reports exit code 203 ("SuperLink rejected the request"). This is expected —
+> it means the run finished and the SuperLink cleaned up. It is not an error.
+> Use `run_federation.sh` instead of `flwr run` directly to get a cleaner
+> success message:
+>
+> ```bash
+> ./run_federation.sh
+> ```
 
-The goal is the the rest of the system should not need to know anything about the raw dataset format. Whether the dataset comes from a csv file, parquet file, database export or a custom preporcessing pipeline, the handler should expose the same interface to the rest of the backend
+---
 
-### Responsibilities of a Dataset handler
+## AI-LAB (HPC)
+
+Federated training with real clients runs on AAU AI-LAB using SLURM and Singularity. From the AI-LAB frontend:
+
+```bash
+cd /ceph/project/sw6P6/fl-backend
+bash aiLab_scripts/launch_all.sh
+```
+
+For Optuna hyperparameter search:
+
+```bash
+bash aiLab_scripts/run_optuna.sh --trials 50 --epochs 10 --patience 10
+```
+
+Monitor jobs:
+
+```bash
+squeue --me
+tail -f /ceph/project/sw6P6/fl-backend/logs/optuna_<jobid>_0.out
+```
+
+AI-LAB limits: max 8 concurrent jobs, max 8 GPUs per user, max 12h per job.
+
+---
+
+## `config.py` — Configuration Guide
+
+All experiment settings live in `config.py`. The single `CONFIG` object at the bottom of the file is the only thing you ever need to change to switch models, datasets, or training parameters.
+
+---
+
+### How It Works
+
+The configuration system is built around Python dataclasses composed together into a top-level `ExperimentConfig`. Every field has a sensible default, so you only specify what differs from those defaults.
+
+```python
+# Uses all defaults
+CONFIG = ExperimentConfig()
+
+# Override only what you need
+CONFIG = ExperimentConfig(
+    model=LSTMConfig(hidden_size=256),
+    training=TrainingConfig(learning_rate=5e-4),
+)
+```
+
+`ExperimentConfig` has six sub-configs: `task`, `model`, `data`, `training`, `federation`, and `evaluation`. Swapping any of them is a one-line change at the bottom of the file.
+
+| Field | Controls |
+|---|---|
+| `model` | Architecture and hyperparameters |
+| `data` | Dataset, file paths, batch size |
+| `training` | Learning rate, epochs per round, early stopping |
+| `federation` | Number of rounds, clients, FedProx regularisation |
+| `evaluation` | Saved model path, classification threshold |
+| `task` | Problem type (binary classification, anomaly detection, etc.) |
+
+One important note on `local_epochs` in `TrainingConfig` — keep it low (1–2) in a federated setting. More local epochs cause each client's model to drift further from the global model before aggregation, which destabilises training across rounds.
+
+---
+
+### Adding a New Model
+
+The model class lives in `models/` and should extend `BaseModel`. The config class lives in `config.py` and must be a `@dataclass` with a `build(input_dim)` method — this is the only contract the pipeline requires. The pipeline always calls `CONFIG.model.build(input_dim=metadata["input_dim"])`, so as long as your config implements `build()`, everything else works automatically.
+
+```python
+@dataclass
+class MyModelConfig:
+    name:           str   = "my_model"
+    hidden_size:    int   = 128
+    num_classes:    int   = 1
+    pos_weight_cap: float = 10.0
+    loss_fn:        type  = nn.BCEWithLogitsLoss
+
+    def build(self, input_dim: int, context_length: int = None) -> nn.Module:
+        from models.my_model import MyModel
+        return MyModel(
+            in_channels=input_dim,
+            hidden_size=self.hidden_size,
+            num_classes=self.num_classes,
+        )
+```
+
+The `context_length` argument is optional — only include it if your model needs to know the sequence length (e.g. for positional embeddings).
+
+> **Note on PatchTST:** `PatchTSTConfig` is a plain `@dataclass` that does not inherit from HuggingFace's `PatchTSTConfig`. Instead, `build()` creates a fresh `HF_PatchTSTConfig` internally and passes it to the model. This avoids conflicts with HuggingFace's complex `PretrainedConfig` initialisation chain.
+
+---
+
+### Adding a New Dataset Handler
+
+A dataset handler is responsible for loading a dataset, preparing it for training, splitting it into client partitions, and returning PyTorch DataLoaders for a given client. The goal is that the rest of the system should not need to know anything about the raw dataset format — whether the data comes from a CSV, Parquet, database export, or a custom pipeline, the handler exposes the same interface to the rest of the backend.
+
+#### Responsibilities
+
 Each dataset handler should:
-- load the raw dataset 
-- validate that required columns or fields exist
-- separate features and labels
-- apply dataset-specific preprocessing
-- optionally normalize or transform the input data
-- partition the dataset across federated clients
-- return train/test dataloaders for a given client
-- expose metadata needed by models and tasks
+- Load the raw dataset and validate that required columns exist
+- Separate features and labels and apply dataset-specific preprocessing
+- Partition the dataset across federated clients
+- Return train/test DataLoaders for a given client partition
+- Expose metadata needed by models and tasks
 
-### Required Interface
-Every dataset handler should inherit from `BaseDatasetHandler` and implement the methods expected by the framework.
+#### Required Interface
 
-a Handler should at minimum provide:
-- get_metadata()
-    - Returns information about the dataset, such as input size, number of classes, and data format.
-- get_dataloaders(partition_id: int)
-    - Returns the train and test dataloaders for a specific client partition.
-- get_num_partitions()
-    - Returns the number of available client partitions.
+Every handler inherits from `BaseDatasetHandler` and must implement:
 
-### General structure
-A typical dataset handler follow this pattern:
+| Method | Description |
+|---|---|
+| `get_metadata()` | Returns input size, number of classes, data format, etc. |
+| `get_dataloaders(partition_id)` | Returns `(trainloader, testloader)` for a given client |
+| `get_num_partitions()` | Returns the number of available client partitions |
 
-1. Read configuration values
-2. Load the dataset
-3. Validate required inputs
-4. Prepare features and labels
-5. Apply preprocessing
-6. Create federated client partitions
-7. Expose dataloaders and metadata
+#### General Structure
 
-A simplified structure looks like this: 
-```Python
+```python
 class MyDatasetHandler(BaseDatasetHandler):
-    def __init__(self, config: dict):
+    def __init__(self, config):
         super().__init__(config)
+        self.file_path  = config.file_path
+        self.batch_size = config.batch_size
+        self.test_split = config.test_split
+        self.seed       = config.seed
 
-        self.file_path = config["file_path"]
-        self.batch_size = config.get("batch_size", 32)
-        self.num_clients = config.get("num_clients")
-        self.test_split = config.get("test_split", 0.2)
-        self.seed = config.get("seed", 42)
-
-        self.data = self._load_data()
+        self.df = self._load_data()
         self._prepare_data()
         self._prepare_partitions()
 
@@ -152,139 +262,77 @@ class MyDatasetHandler(BaseDatasetHandler):
         pass
 
     def _prepare_partitions(self):
-        # Split dataset into client subsets
+        # Split dataset into per-client subsets
         pass
 
-    def get_metadata(self):
-        return {...}
+    def get_metadata(self) -> dict:
+        return {
+            "input_dim":   self.X.shape[-1],
+            "num_classes": 1,
+            "task_type":   "binary_classification",
+        }
 
     def get_dataloaders(self, partition_id: int):
         return trainloader, testloader
 
     def get_num_partitions(self) -> int:
         return self.num_clients
-
 ```
-## Federated Learning with Flower
 
-This project uses Flower to implement a federated learning system with a custom client and server.
+#### Adding the Config
 
-### Overview
+There is no registry — each data config has its own `build_handler()` method that instantiates the correct handler directly, following the same pattern as model configs. Add the config to `config.py`:
 
-The system follows the standard federated learning workflow:
+```python
+@dataclass
+class MyDatasetConfig:
+    name:       str   = "my_dataset"
+    file_path:  Path  = Path(__file__).parent / "datasets" / "MyData" / "data.csv"
+    target:     str   = "label"
+    batch_size: int   = 64
+    test_split: float = 0.2
+    seed:       int   = 42
 
-1. The server sends a global model to clients  
-2. Clients train the model on their local data partitions  
-3. Clients return updated model parameters  
-4. The server aggregates updates using FedAvg  
-5. The process repeats for multiple rounds  
+    def build_handler(self, config=None):
+        from data.my_dataset import MyDatasetHandler
+        return MyDatasetHandler(config or CONFIG)
+```
 
----
+Use `Path(__file__).parent` so paths resolve correctly on any machine regardless of working directory.
 
-### Client
+Then activate it:
 
-The client is implemented by extending `NumPyClient`.
+```python
+CONFIG = ExperimentConfig(
+    data=MyDatasetConfig(),
+)
+```
 
-Each client:
-- Loads its assigned data partition  
-- Builds the model and task  
-- Trains locally on its data  
-- Evaluates the global model  
+To use it in code:
 
-#### Methods
-
-- `get_parameters`: Returns current model parameters  
-- `fit`: Trains the model locally and returns updated parameters and metrics  
-- `evaluate`: Evaluates the model on local test data  
-
-The `client_fn` function creates a client using a partition ID provided by Flower.
-
----
-
-### Server
-
-The server defines the training strategy and number of rounds.
-
-#### Strategy
-
-FedAvg is used to aggregate client updates:
-
-- Model parameters from clients are averaged  
-- Each client’s contribution is weighted by its number of training examples  
-
-#### Configuration
-
-- `fraction_fit`: Fraction of clients used for training each round  
-- `fraction_evaluate`: Fraction of clients used for evaluation  
-- `min_*`: Minimum number of clients required  
+```python
+dataset_handler = config.data.build_handler()
+```
 
 ---
 
-### Data
+## Optuna Hyperparameter Search
 
-- The dataset is split into partitions  
-- Each client trains only on its own partition  
-- No raw data is shared between clients or server  
-
----
-
-### What is Context?
-
-`context` is a Flower-provided object that contains runtime information about the current client or server.
-
-- In the client, it is used to determine which data partition to load  
-- In the server, it can be used for configuration if needed
-
-## Optuna Hyperparameter Optimization
-
-This script runs [Optuna](https://optuna.org/) hyperparameter search over a model, then updates the global `CONFIG` object with the best trial's parameters so downstream training uses them automatically.
-
-### How it works
-
-1. **Parses CLI flags** for epochs, trials, and patience (see below).
-2. **Loads the dataset** via `LeadCSVHandler(CONFIG.data)` and splits it into train/validation tensors using `run_split()`. The split is temporal and grouped by `node_id`, so no node leaks between train and val. (node refers to building, sensor, device, etc.)
-3. **Instantiates `OptunaOptimizer`** with the training/validation tensors and the chosen trial budget.
-4. **Runs the study.** Each Optuna trial samples a hyperparameter combination (model width, number of heads, layers, dropout, learning rate, weight decay, batch size, pos-weight cap) and trains a fresh model for up to `--epochs` number of epochs with early stopping controlled by `--patience`.
-5. **Writes the best trial's parameters back into `CONFIG`** — specifically `CONFIG.model`, `CONFIG.training`, and `CONFIG.data.batch_size` — and prints the updated config to stdout.
-
-### Prerequisites
-
-- You must run the script **from the `fl_backend/` directory**. The imports (`data.lead_csv`, `models.supervised_cnn_transformer`, `config`) resolve relative to that folder.
-- The virtual environment must be activated and all dependencies installed (PyTorch, Optuna, pandas, numpy, etc.).
-- `CONFIG.data.file_path` must as of now point to LEAD CSV file.
-
-### Running
-
-Because `training` is a Python package (a module with an `__init__.py`), run the script with `-m` so relative imports inside `training/` resolve correctly:
+Runs an Optuna study over model hyperparameters and writes the best params back into `CONFIG`.
 
 ```bash
-cd fl_backend
-python -m training.optimize
+cd fl-backend
+python -m training.optimize --trials 50 --epochs 10 --patience 10
 ```
 
-### Command-line arguments
+| Flag | Short | Default | Description |
+|---|---|---|---|
+| `--trials` | `-t` | `50` | Number of Optuna trials |
+| `--epochs` | `-e` | `10` | Max epochs per trial |
+| `--patience` | `-p` | `10` | Early stopping patience |
+| `--storage` | `-s` | None | SQLite URL for shared study (AI-LAB) |
+| `--study-name` | `-n` | `lead_anomaly_detection` | Optuna study name |
 
-All three flags are optional. If omitted, the defaults shown below are used.
+On AI-LAB, `run_optuna.sh` submits one SLURM array task per trial so all trials run in parallel across GPUs, writing results to a shared SQLite database.
 
-| Flag              | Short | Type | Default | Description                                                                 |
-|-------------------|-------|------|---------|-----------------------------------------------------------------------------|
-| `--epochs`        | `-e`  | int  | `10`    | Maximum number of training epochs per Optuna trial.                          |
-| `--trials`        | `-t`  | int  | `50`    | Number of Optuna trials to run in the study.                                 |
-| `--patience`      | `-p`  | int  | `10`    | Early-stopping patience (epochs without val improvement before a trial stops). |
-
-Run `python -m training.optimize --help` to see this same information at the command line.
-
-## Hyperparameters searched
-
-The `OptunaOptimizer` samples and returns values for the following keys in `study.best_trial.params`:
-
-- `d_model` — transformer model dimension
-- `nhead` — number of attention heads
-- `num_layers` — number of transformer encoder layers
-- `dropout` — dropout rate
-- `pos_weight_cap` — cap on the positive-class weight in the loss
-- `lr` — learning rate
-- `weight_decay` — AdamW weight decay
-- `batch_size` — training batch size
-
-See `training/training_utils/OptunaOptimizer.py` for the exact search spaces.
+---

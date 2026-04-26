@@ -66,8 +66,9 @@ ENV/
 
 # =========================
 
-**/datasets/*
-!**/datasets/.gitkeep
+**/datasets/**
+!**/datasets/
+!**/datasets/**/.gitkeep
 
 # =========================
 
