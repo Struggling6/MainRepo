@@ -18,7 +18,7 @@ def loss_over_time_plot(train_losses, train_accuracies):
     axes[1].legend()
 
     plt.tight_layout()
-    plt.savefig("fl-backend/plotting/saved_plots/loss_curve.png", dpi=300)
+    plt.savefig("fl-backend/app/plotting/saved_plots/loss_curve.png", dpi=300)
     plt.close()
 
 '''

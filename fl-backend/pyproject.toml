@@ -8,12 +8,15 @@ version = "0.1.0"
 description = "Federated anomaly detection backend"
 license = {text = "Apache-2.0"}
 dependencies = [
-    "flwr[simulation]>=1.20.0",
+    "flwr[simulation]==1.27.0",
+    "torch",
+    "torchvision",
     "pandas",
     "numpy",
     "scikit-learn",
     "matplotlib",
     "transformers",
+    "captum",
 ]
 
 [tool.flwr.app]
@@ -25,7 +28,7 @@ clientapp = "client_app:app"
 serverapp = "server_app:app"
 
 [tool.hatch.build.targets.wheel]
-packages = ["data", "models", "tasks", "training"]
+packages = ["data", "models", "tasks", "training","plotting"]
 include = [
   "client_app.py",
   "server_app.py",

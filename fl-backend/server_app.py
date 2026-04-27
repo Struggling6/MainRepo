@@ -3,6 +3,7 @@ from flwr.common.logger import log
 from logging import INFO
 from config import CONFIG
 from FedProxWithSave import FedProxWithSave
+from plotting.plotting_config import plot_diagrams
 
 def weighted_average_fit(metrics):
     total_examples = sum(num_examples for num_examples, _ in metrics)
@@ -67,7 +68,7 @@ def server_fn(context):
     config = ServerConfig(num_rounds=fed_config.num_rounds)
     return ServerAppComponents(strategy=strategy, config=config)
 
-"""
+
 
 def on_train_end(context):
     #Called after all rounds complete.
@@ -88,5 +89,5 @@ def on_train_end(context):
     
     plot_diagrams(f1_values, pr_values)
 
-"""
+
 app = ServerApp(server_fn=server_fn)

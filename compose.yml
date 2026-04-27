@@ -31,6 +31,7 @@ services:
     stop_signal: SIGINT
     volumes:
       - ./fl-backend/checkpoints:/app/checkpoints
+      - ./fl-backend/plotting/saved_plots:/app/plotting/saved_plots
 
   supernode-1:
     image: flwr/supernode:1.27.0
@@ -62,9 +63,6 @@ services:
     stop_signal: SIGINT
     cpus: "2.0"
     mem_limit: 8g
-    devices:
-    - /dev/kfd:/dev/kfd
-    - /dev/dri:/dev/dri
     group_add:
       - render
       - video

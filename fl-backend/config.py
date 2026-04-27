@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
-from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
+#from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
 
 
 def resolve_loss_fn(loss_fn):
@@ -239,7 +239,7 @@ class TrainingConfig:
 
 @dataclass
 class FederationConfig:
-    partition_mode:    str   = "shared" # local or shared
+    partition_mode:    str   = "local" # local or shared
     num_rounds:        int   = 2
     num_clients:       int   = 1
     fraction_fit:      float = 1.0

@@ -1,4 +1,4 @@
---extra-index-url https://download.pytorch.org/whl/rocm6.3
+--extra-index-url https://download.pytorch.org/whl/cu124
 torch
 flwr[simulation]>=1.27.0
 pandas
