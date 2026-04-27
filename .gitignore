@@ -1,0 +1,147 @@
+
+# =========================
+
+# Python
+
+# =========================
+
+**pycache**/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+*.egg
+
+# =========================
+
+# Virtual Environments
+
+# =========================
+
+venv/
+.env/
+.envrc
+.venv/
+env/
+ENV/
+
+# =========================
+
+# Jupyter Notebook
+
+# =========================
+
+.ipynb_checkpoints
+*.ipynb_checkpoints
+
+# =========================
+
+# Machine Learning Models
+
+# =========================
+
+*.pt
+*.pth
+*.ckpt
+*.h5
+*.hdf5
+*.onnx
+*.pb
+*.tflite
+
+# =========================
+
+# Large datasets
+
+# =========================
+
+**/datasets/**
+!**/datasets/
+!**/datasets/**/.gitkeep
+
+# =========================
+
+# HuggingFace / Transformers
+
+# =========================
+
+.cache/
+huggingface/
+transformers_cache/
+hf_cache/
+
+# =========================
+
+# Logs
+
+# =========================
+
+logs/
+*.log
+wandb/
+mlruns/
+tensorboard/
+runs/
+
+# =========================
+
+# Experiment outputs
+
+# =========================
+
+outputs/
+checkpoints/
+results/
+predictions/
+
+# =========================
+
+# IDE
+
+# =========================
+
+.vscode/
+.idea/
+
+# =========================
+
+# OS
+
+# =========================
+
+.DS_Store
+Thumbs.db
+
+# =========================
+
+# Testing
+
+# =========================
+
+.pytest_cache/
+.coverage
+htmlcov/
+
+# =========================
+
+# Misc
+
+# =========================
+
+*.tmp
+*.temp
+*.bak
+*.swp
+uv.lock
+*.fab

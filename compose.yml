@@ -1,0 +1,70 @@
+name: fl-backend
+
+services:
+  superlink:
+    image: flwr/superlink:1.27.0
+    command:
+      - --insecure
+      - --serverappio-api-address
+      - 0.0.0.0:9091
+      - --fleet-api-address
+      - 0.0.0.0:9092
+      - --fleet-api-type
+      - grpc-rere
+    ports:
+      - "9093:9093"
+      - "9091:9091"
+      - "9092:9092"
+
+  superexec-serverapp:
+    build:
+      context: ./fl-backend
+      dockerfile: Dockerfile
+    command:
+      - --insecure
+      - --plugin-type
+      - serverapp
+      - --appio-api-address
+      - superlink:9091
+    depends_on:
+      - superlink
+    stop_signal: SIGINT
+    volumes:
+      - ./fl-backend/checkpoints:/app/checkpoints
+      - ./fl-backend/plotting/saved_plots:/app/plotting/saved_plots
+
+  supernode-1:
+    image: flwr/supernode:1.27.0
+    command:
+      - --insecure
+      - --superlink
+      - superlink:9092
+      - --clientappio-api-address
+      - 0.0.0.0:9094
+      - --isolation
+      - process
+      - --node-config
+      - "partition-id=0 num-partitions=1"
+    depends_on:
+      - superlink
+
+  superexec-clientapp-1:
+    build:
+      context: ./fl-backend
+      dockerfile: Dockerfile
+    command:
+      - --insecure
+      - --plugin-type
+      - clientapp
+      - --appio-api-address
+      - supernode-1:9094
+    depends_on:
+      - supernode-1
+    stop_signal: SIGINT
+    cpus: "2.0"
+    mem_limit: 8g
+    group_add:
+      - render
+      - video
+    volumes:
+      - ./fl-backend/datasets:/app/datasets
