@@ -21,7 +21,7 @@ from pathlib import Path
 #  Base dependencies (mirrors pyproject.toml)                         #
 # ------------------------------------------------------------------ #
 BASE_DEPS = [
-    "flwr[simulation]>=1.20.0",
+    "flwr[simulation]>=1.27.0",
     "pandas",
     "numpy",
     "scikit-learn",

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
-from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
+#from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
 
 
 def resolve_loss_fn(loss_fn):
@@ -241,7 +241,7 @@ class TrainingConfig:
 
 @dataclass
 class FederationConfig:
-    partition_mode:    str   = "shared" # local or shared
+    partition_mode:    str   = "local" # local or shared
     num_rounds:        int   = 2
     num_clients:       int   = 1
     fraction_fit:      float = 1.0
@@ -264,7 +264,7 @@ class EvaluationConfig:
 @dataclass
 class ExperimentConfig:
     task:       BinaryClassificationConfig = field(default_factory=BinaryClassificationConfig)
-    model:      TransformerConfig          = field(default_factory=TransformerConfig)
+    model:      CNNTransformerConfig       = field(default_factory=CNNTransformerConfig)
     data:       LeadCSVConfig              = field(default_factory=LeadCSVConfig)
     training:   TrainingConfig             = field(default_factory=TrainingConfig)
     federation: FederationConfig           = field(default_factory=FederationConfig)
@@ -274,11 +274,11 @@ class ExperimentConfig:
 # Change CONFIG to switch experiments. All fields have defaults so you only
 # need to specify what differs from the defaults.
 
-CONFIG = ExperimentConfig(
-    model=PatchTSTConfig(nhead=4, num_layers=3, norm_type="layernorm"),
-    training=TrainingConfig(local_epochs=1, learning_rate=1e-4),
-    federation=FederationConfig(num_rounds=1, num_clients=1, proximal_mu=0.1),
-)
+CONFIG = ExperimentConfig()
+  #  model=CNNTransformerConfig(nhead=4, num_layers=3),
+  #  training=TrainingConfig(local_epochs=1, learning_rate=1e-4),
+   # federation=FederationConfig(num_rounds=1, num_clients=1, proximal_mu=0.1, partition_mode="local"),
+#)
 
 
 """
