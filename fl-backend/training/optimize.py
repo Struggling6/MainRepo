@@ -4,8 +4,8 @@ parser = argparse.ArgumentParser(description="Run Optuna hyperparameter optimiza
 parser.add_argument("--epochs", "-e", type=int, default=10, help="Epochs per trial (default: 10)")
 parser.add_argument("--trials", "-t", type=int, default=50, help="Number of Optuna trials (default: 50)")
 parser.add_argument("--patience", "-p", type=int, default=10, help="Early-stopping patience (default: 10)")
-parser.add_argument("--storage", type=str, required=True, help="Optuna storage URL")
-parser.add_argument("--study-name", type=str, required=True, help="Optuna study name")
+parser.add_argument("--storage", type=str, help="Optuna storage URL")
+parser.add_argument("--study-name", type=str, help="Optuna study name")
 args = parser.parse_args()
 
 from .training_utils.OptunaOptimizer import OptunaOptimizer

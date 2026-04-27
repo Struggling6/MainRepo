@@ -25,8 +25,8 @@ class OptunaOptimizer(TrainEvalBase):
         X_val, y_val,
         config=CONFIG,
         n_trials=50,
-        epochs=10,
-        patience=10,
+        epochs=15,
+        patience=5,
         storage=None,
         study_name=None,
     ):
@@ -36,7 +36,14 @@ class OptunaOptimizer(TrainEvalBase):
         self.y_train = y_train
         self.X_val = X_val
         self.y_val = y_val
-        self.in_channels = X_train.shape[-1]
+
+        if X_train.ndim != 3:
+            raise ValueError(
+                f"Expected X_train to have shape (batch, seq_len, channels), got {X_train.shape}."
+            )
+        self.in_channels = int(X_train.shape[-1])
+        self.config.evaluation.input_dim = self.in_channels
+
         self.n_trials = n_trials
         self.loss_fn = config.model.loss_fn
         self.raw_pw = compute_pos_weight(y_train)
@@ -49,7 +56,7 @@ class OptunaOptimizer(TrainEvalBase):
             study_name=self.study_name,
             storage=self.storage,
             direction="maximize",
-            pruner=optuna.pruners.MedianPruner(n_warmup_steps=10),
+            pruner=optuna.pruners.MedianPruner(n_startup_trials=5,n_warmup_steps=13),
             load_if_exists=True,
         )
         study.optimize(
@@ -80,11 +87,15 @@ class OptunaOptimizer(TrainEvalBase):
         optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
 
         best_pr_auc, no_improve = 0.0, 0
+        best_threshold = 0.5
 
-        for epoch in range(1, self.epochs + 1):
+        pr_auc_history = []
+
+        for epoch in range(self.epochs):
             self._train_epoch(model, train_dl, optimizer, loss_fn)
             _, val_f1, best_thresh, pr_auc = self._val_epoch(model, val_dl, loss_fn)
 
+            pr_auc_history.append(pr_auc)
             trial.report(pr_auc, epoch)
             if trial.should_prune():
                 raise optuna.TrialPruned()
@@ -98,6 +109,7 @@ class OptunaOptimizer(TrainEvalBase):
                 if no_improve >= self.patience:
                     break
 
+        trial.set_user_attr("pr_auc_history", pr_auc_history)
         trial.set_user_attr("best_threshold", float(best_threshold))
         return float(best_pr_auc)
 
@@ -139,9 +151,7 @@ class OptunaOptimizer(TrainEvalBase):
                 f"Add a branch to _build_model() in OptunaOptimizer."
             )
 
-        return model_config.build(
-            input_dim=self.config.evaluation.input_dim
-        ).to(get_device())
+        return model_config.build(input_dim=self.in_channels).to(get_device())
     
     def _build_loss(self, pos_weight_cap):
         pw = min(self.raw_pw, pos_weight_cap)

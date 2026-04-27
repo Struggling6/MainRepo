@@ -266,7 +266,7 @@ class EvaluationConfig:
 @dataclass
 class ExperimentConfig:
     task:       BinaryClassificationConfig = field(default_factory=BinaryClassificationConfig)
-    model:      TransformerConfig          = field(default_factory=TransformerConfig)
+    model:      CNNTransformerConfig       = field(default_factory=CNNTransformerConfig)
     data:       LeadCSVConfig              = field(default_factory=LeadCSVConfig)
     training:   TrainingConfig             = field(default_factory=TrainingConfig)
     federation: FederationConfig           = field(default_factory=FederationConfig)
@@ -277,9 +277,8 @@ class ExperimentConfig:
 # need to specify what differs from the defaults.
 
 CONFIG = ExperimentConfig(
-    model=PatchTSTConfig(nhead=4, num_layers=3, norm_type="layernorm"),
-    training=TrainingConfig(local_epochs=1, learning_rate=1e-4),
-    federation=FederationConfig(num_rounds=1, num_clients=1, proximal_mu=0.1),
+    training=TrainingConfig(local_epochs=10, learning_rate=1e-4),
+    federation=FederationConfig(num_rounds=10, num_clients=10, proximal_mu=0.1),
 )
 
 
