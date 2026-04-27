@@ -234,8 +234,6 @@ class TrainingConfig:
     learning_rate: float = 1e-4
     weight_decay:  float = 1e-4
     local_epochs:  int   = 2
-    patience:      int   = 10
-
 
 # ── Federation config ─────────────────────────────────────────────────── #
 

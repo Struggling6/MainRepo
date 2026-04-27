@@ -74,7 +74,6 @@ def train_model(
         weight_decay=training_config.weight_decay,
         batch_size=trainloader.batch_size,
         epochs=training_config.local_epochs,
-        patience=training_config.patience,
         num_classes=model_config.num_classes,
         proximal_mu=proximal_mu,
     )

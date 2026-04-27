@@ -2,6 +2,8 @@ import optuna
 import os
 from copy import deepcopy
 import torch.nn as nn
+from dataclasses import replace
+
 
 os.environ["TORCH_BLAS_PREFER_HIPBLASLT"] = "0"
 
@@ -34,13 +36,8 @@ class OptunaOptimizer(TrainEvalBase):
         self.config = config
         self.X_train = X_train
         self.y_train = y_train
-        self.X_val = X_val
-        self.y_val = y_val
-
-        if X_train.ndim != 3:
-            raise ValueError(
-                f"Expected X_train to have shape (batch, seq_len, channels), got {X_train.shape}."
-            )
+        self.X_val   = X_val
+        self.y_val   = y_val
         self.in_channels = int(X_train.shape[-1])
         self.config.evaluation.input_dim = self.in_channels
 
@@ -70,7 +67,31 @@ class OptunaOptimizer(TrainEvalBase):
             show_progress_bar=True,
         )
         self._print_results(study)
+
+        self._apply_optuna_params(CONFIG, study.best_trial.params)
         return study
+    
+    def _apply_optuna_params(self, base_config, params):
+        return replace(
+            base_config,
+            model=replace(
+                base_config.model,
+                d_model=params["d_model"],
+                nhead=params["nhead"],
+                num_layers=params["num_layers"],
+                dropout=params["dropout"],
+                pos_weight_cap=params["pos_weight_cap"],
+            ),
+            training=replace(
+                base_config.training,
+                learning_rate=params["lr"],
+                weight_decay=params["weight_decay"],
+            ),
+            data=replace(
+                base_config.data,
+                batch_size=params["batch_size"],
+            ),
+        )
 
     def _objective(self, trial):
         print(f"\n▶ Trial {trial.number + 1}/{self.n_trials} starting...")
@@ -94,7 +115,6 @@ class OptunaOptimizer(TrainEvalBase):
             self._train_epoch(model, train_dl, optimizer, loss_fn)
             _, val_f1, best_thresh, pr_auc = self._val_epoch(model, val_dl, loss_fn)
 
-            pr_auc_history.append(pr_auc)
             trial.report(pr_auc, epoch)
             if trial.should_prune():
                 raise optuna.TrialPruned()
@@ -103,7 +123,6 @@ class OptunaOptimizer(TrainEvalBase):
                 best_pr_auc    = pr_auc
                 best_threshold = best_thresh
 
-        trial.set_user_attr("pr_auc_history", pr_auc_history)
         trial.set_user_attr("best_threshold", float(best_threshold))
         return float(best_pr_auc)
 

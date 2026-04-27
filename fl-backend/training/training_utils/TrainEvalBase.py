@@ -14,13 +14,11 @@ class TrainEvalBase:
 
     def __init__(
         self,
-        epochs: int = 1,
-        patience: int = 1,
-        num_classes: int = 1,
+        epochs: int,
+        num_classes: int,
     ):
         self.device = get_device()
         self.epochs = epochs
-        self.patience = patience
         self.num_classes = num_classes
 
     # ------------------------------------------------------------------ #

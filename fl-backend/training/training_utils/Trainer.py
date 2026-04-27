@@ -11,13 +11,12 @@ class Trainer(TrainEvalBase):
         lr:           float,
         batch_size:   int,
         epochs:       int,
-        patience:     int,
         num_classes:  int,
         weight_decay: float,
         proximal_mu: float = 0.0,
         global_params: list[torch.Tensor] | None = None,
     ):
-        super().__init__(epochs, patience, num_classes)
+        super().__init__(epochs, num_classes)
         self.model = model.to(self.device)
         self.loss_fn = loss_fn
         self.batch_size = batch_size
