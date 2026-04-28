@@ -22,9 +22,9 @@ ENV MIOPEN_DISABLE_CACHE=1
 ENV AMDGPU_IDS_PATH="/dev/null"
 
 # requirements.txt is generated before build via:
-#   python generate_requirements.py --variant <cpu|cuda|rocm>
+# python generate_requirements.py --variant <cpu|cuda|rocm>
 COPY requirements.txt .
-RUN uv pip install --python /python/venv/bin/python -r requirements.txt
+RUN uv pip install --python /python/venv/bin/python --index-strategy unsafe-best-match -r requirements.txt
 
 WORKDIR /app
 COPY --chown=app:app . .
