@@ -1,6 +1,6 @@
 --extra-index-url https://download.pytorch.org/whl/rocm6.3
 torch
-flwr[simulation]>=1.20.0
+flwr[simulation]>=1.27.0
 pandas
 numpy
 scikit-learn
