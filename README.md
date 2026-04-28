@@ -37,8 +37,10 @@ python scripts/generate.py --cpus 2.0 --mem-limit 8g
 ```
  
 `fl-backend/requirements.txt` is the single source of truth for dependencies —
-do not edit it by hand. To add or remove a package, update `REQUIREMENTS` in
-`generate.py`, then regenerate and reinstall.
+do not edit it by hand. To add or remove a package, update
+`REQUIREMENTS_BASE` in `generate.py` (and `TORCH_PINS` /
+`TORCH_INDEX_URLS` if you need to change torch-specific pins or index URLs),
+then regenerate and reinstall.
  
 ---
 

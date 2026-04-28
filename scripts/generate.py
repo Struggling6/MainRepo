@@ -5,9 +5,9 @@ Detects GPU type (CPU / CUDA / ROCm), then generates:
   - compose.yml                   with the correct device mappings
 
 Usage:
-    python preflight.py
-    python preflight.py --variant rocm
-    python preflight.py --num-clients 3 --cpus 2.0 --mem-limit 8g
+    python scripts/generate.py
+    python scripts/generate.py --variant rocm
+    python scripts/generate.py --num-clients 3 --cpus 2.0 --mem-limit 8g
 """
 
 import argparse
@@ -180,7 +180,7 @@ services:
       - "9092:9092"
 
   superexec-serverapp:
-        image: *superexec_image
+    image: *superexec_image
     build:
       context: {BUILD_CONTEXT}
       dockerfile: {DOCKERFILE}
@@ -264,7 +264,7 @@ def write_compose(variant: str, args: argparse.Namespace) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser(
-        description="Generate requirements.txt and compose.yml for the detected GPU variant."
+        description="Generate requirements.txt and compose.yml based on GPU detection and user config"
     )
     p.add_argument("--variant", choices=["cpu", "cuda", "rocm"], default=None,
                    help="Force a GPU variant instead of auto-detecting")
@@ -274,8 +274,6 @@ def main() -> None:
                    help='CPU limit per clientapp, e.g. "2.0"')
     p.add_argument("--mem-limit", dest="mem_limit", default=None,
                    help='Hard memory limit per clientapp, e.g. "8g"')
-    p.add_argument("--mem-reservation", dest="mem_reservation", default=None,
-                   help='Soft memory limit per clientapp, e.g. "6g"')
     args = p.parse_args()
 
     if args.num_clients < 1:

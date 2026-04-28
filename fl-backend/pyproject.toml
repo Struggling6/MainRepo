@@ -40,4 +40,4 @@ include = [
 url = "https://pypi.org/simple"
 
 [[tool.uv.index]]
-url = "https://download.pytorch.org/whl/rocm6.3"
+url = "https://download.pytorch.org/whl/rocm7.3"
