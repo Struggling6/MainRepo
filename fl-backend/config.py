@@ -242,8 +242,8 @@ class TrainingConfig:
 @dataclass
 class FederationConfig:
     partition_mode:    str   = "local" # local or shared
-    num_rounds:        int   = 2
-    num_clients:       int   = 1
+    num_rounds:        int   = 15
+    num_clients:       int   = 2
     fraction_fit:      float = 1.0
     fraction_evaluate: float = 1.0
     proximal_mu:       float = 0.1
@@ -252,12 +252,29 @@ class FederationConfig:
 
 @dataclass
 class EvaluationConfig:
-    model_path:   Path  = Path("/app/checkpoints/model.pt")
+    #model_path:   Path  = Path("/app/checkpoints/model.pt") #use this when doing fed run
+    model_path:    Path = Path("checkpoints/model.pt") #use this when doing ig
     test_path:    Path  = Path("/app/datasets/LEAD/test_features.csv")
     target:       str   = "anomaly"
     batch_size:   int   = 64
     threshold:    float = 0.5   # decision threshold — override with best_thresh from training
     input_dim:    int   = 0     # set after data loading
+
+
+# ── Interpretability config ─────────────────────────────────────────── #
+@dataclass
+class InterpretabilityConfig:
+    # Number of steps in Integrated Gradients
+    ig_steps: int = 50
+
+    # Baseline type: "zero", "mean", or "sample"
+    ig_baseline: str = "zero"
+
+    # Whether to use probabilities instead of raw logits
+    ig_use_probability: bool = False
+
+    # Where to save IG outputs
+    ig_output_path: Path = Path("plotting/saved_plots/integrated_gradients.npz")
 
 # ── Top-level experiment config ───────────────────────────────────────── #
 
@@ -269,7 +286,7 @@ class ExperimentConfig:
     training:   TrainingConfig             = field(default_factory=TrainingConfig)
     federation: FederationConfig           = field(default_factory=FederationConfig)
     evaluation: EvaluationConfig           = field(default_factory=EvaluationConfig)
-
+    interpretability: InterpretabilityConfig = field(default_factory=InterpretabilityConfig)
 # ── Active experiment ─────────────────────────────────────────────────── #
 # Change CONFIG to switch experiments. All fields have defaults so you only
 # need to specify what differs from the defaults.

@@ -4,7 +4,13 @@ from pathlib import Path
 from typing import Any
 
 
-def build_header(image_name: str) -> str:
+def build_block(context: str, dockerfile: str) -> str:
+    return f"""build:
+      context: {context}
+      dockerfile: {dockerfile}"""
+
+
+def build_header(build_context: str, dockerfile: str, image_name: str) -> str:
     return f"""name: fl-backend
 
 services:
@@ -12,13 +18,22 @@ services:
     image: flwr/superlink:1.27.0
     command:
       - --insecure
-      - --isolation
-      - process
+      - --serverappio-api-address
+      - 0.0.0.0:9091
+      - --fleet-api-address
+      - 0.0.0.0:9092
+      - --fleet-api-type
+      - grpc-rere
     ports:
       - "9093:9093"
+      - "9091:9091"
+      - "9092:9092"
 
   superexec-serverapp:
     image: {image_name}
+    build:
+      context: {build_context}
+      dockerfile: {dockerfile}
     command:
       - --insecure
       - --plugin-type
@@ -28,6 +43,9 @@ services:
     depends_on:
       - superlink
     stop_signal: SIGINT
+    volumes:
+      - {build_context}/checkpoints:/app/checkpoints
+      - {build_context}/plotting/saved_plots:/app/plotting/saved_plots
 
 """
 
@@ -61,6 +79,8 @@ def generate_resource_block(resources: dict[str, Any]) -> str:
     pids_limit = resources.get("pids_limit")
     shm_size = resources.get("shm_size")
     ulimits = resources.get("ulimits")
+    group_add = resources.get("group_add")
+    volumes = resources.get("volumes")
 
     if cpus is not None:
         lines.append(f'cpus: "{cpus}"')
@@ -79,6 +99,16 @@ def generate_resource_block(resources: dict[str, Any]) -> str:
 
     if shm_size is not None:
         lines.append(f"shm_size: {shm_size}")
+
+    if group_add:
+        lines.append("group_add:")
+        for group in group_add:
+            lines.append(f"  - {group}")
+
+    if volumes:
+        lines.append("volumes:")
+        for volume in volumes:
+            lines.append(f"  - {volume}")
 
     if ulimits:
         lines.append("ulimits:")
@@ -143,18 +173,34 @@ def merge_resources(defaults: dict[str, Any], override: dict[str, Any]) -> dict[
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate Docker Compose file for Flower clients.")
-    parser.add_argument("--num-clients", type=int, default=2, help="Number of federated clients")
-    parser.add_argument("--start-port", type=int, default=9094, help="Starting port for clientapp IO")
-    parser.add_argument("--output", type=str, default="compose.yml", help="Output compose file")
-    parser.add_argument("--image-name", type=str, default="fl-backend-app:latest", help="Shared image name for server/client app")
 
-    parser.add_argument("--cpus", type=str, default=None, help='Example: "1.0"')
-    parser.add_argument("--cpuset", type=str, default=None, help='Example: "0-1" or "2,3"')
-    parser.add_argument("--mem-limit", type=str, default=None, help='Example: "512m" or "2g"')
-    parser.add_argument("--mem-reservation", type=str, default=None, help='Example: "256m"')
-    parser.add_argument("--pids-limit", type=int, default=None, help="Example: 256")
-    parser.add_argument("--shm-size", type=str, default=None, help='Example: "256m"')
-    parser.add_argument("--client-overrides", type=str, default=None, help="Path to JSON file with per-client overrides")
+    parser.add_argument("--num-clients", type=int, default=1)
+    parser.add_argument("--start-port", type=int, default=9094)
+    parser.add_argument("--output", type=str, default="compose.yml")
+
+    parser.add_argument("--build-context", type=str, default="./fl-backend")
+    parser.add_argument("--dockerfile", type=str, default="Dockerfile")
+
+    parser.add_argument("--cpus", type=str, default="2.0")
+    parser.add_argument("--cpuset", type=str, default=None)
+    parser.add_argument("--mem-limit", type=str, default="8g")
+    parser.add_argument("--mem-reservation", type=str, default=None)
+    parser.add_argument("--pids-limit", type=int, default=None)
+    parser.add_argument("--shm-size", type=str, default=None)
+
+    parser.add_argument(
+        "--client-overrides",
+        type=str,
+        default=None,
+        help="Path to JSON file with per-client overrides",
+    )
+
+    parser.add_argument(
+        "--image-name",
+        type=str,
+        default="fl-backend-app:latest",
+        help="Shared image name for server/client app",
+    )
 
     args = parser.parse_args()
 
@@ -168,11 +214,15 @@ def main() -> None:
         "mem_reservation": args.mem_reservation,
         "pids_limit": args.pids_limit,
         "shm_size": args.shm_size,
+        "group_add": ["render", "video"],
+        "volumes": [
+            f"{args.build_context}/datasets:/app/datasets",
+        ],
     }
 
     overrides = load_overrides(args.client_overrides)
 
-    parts = [build_header(args.image_name)]
+    parts = [build_header(args.build_context, args.dockerfile, args.image_name)]
 
     for i in range(args.num_clients):
         node_num = i + 1
@@ -183,10 +233,14 @@ def main() -> None:
         resources = merge_resources(default_resources, client_override)
 
         parts.append(generate_supernode(node_num, partition_id, port, args.num_clients))
-        parts.append(generate_clientapp(node_num, port, args.image_name, resources))
+        parts.append(generate_clientapp(node_num, port, args.image_name, resources)) 
 
     Path(args.output).write_text("".join(parts), encoding="utf-8")
-    print(f"Generated {args.output} with {args.num_clients} clients using image {args.image_name}.")
+
+    print(
+        f"Generated {args.output} with {args.num_clients} clients "
+        f"using build context {args.build_context}."
+    )
 
 
 if __name__ == "__main__":

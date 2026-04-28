@@ -1,5 +1,8 @@
 from pathlib import Path
 from torch import nn
+import torch 
+torch.set_num_threads(1)
+torch.set_num_interop_threads(1)
 from flwr.client import ClientApp, NumPyClient
 from training.training_utils.Evaluator import Evaluator
 from flwr.common.logger import log

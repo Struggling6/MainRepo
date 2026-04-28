@@ -27,6 +27,7 @@ BASE_DEPS = [
     "scikit-learn",
     "matplotlib",
     "transformers",
+    "captum",
 ]
 
 TORCH_DEPS = ["torch"]

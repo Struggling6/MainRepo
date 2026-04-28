@@ -17,6 +17,7 @@ services:
       - "9092:9092"
 
   superexec-serverapp:
+    image: fl-backend-app:latest
     build:
       context: ./fl-backend
       dockerfile: Dockerfile
@@ -44,14 +45,12 @@ services:
       - --isolation
       - process
       - --node-config
-      - "partition-id=0 num-partitions=1"
+      - "partition-id=0 num-partitions=2"
     depends_on:
       - superlink
 
   superexec-clientapp-1:
-    build:
-      context: ./fl-backend
-      dockerfile: Dockerfile
+    image: fl-backend-app:latest
     command:
       - --insecure
       - --plugin-type
@@ -68,3 +67,38 @@ services:
       - video
     volumes:
       - ./fl-backend/datasets:/app/datasets
+
+  supernode-2:
+    image: flwr/supernode:1.27.0
+    command:
+      - --insecure
+      - --superlink
+      - superlink:9092
+      - --clientappio-api-address
+      - 0.0.0.0:9095
+      - --isolation
+      - process
+      - --node-config
+      - "partition-id=1 num-partitions=2"
+    depends_on:
+      - superlink
+
+  superexec-clientapp-2:
+    image: fl-backend-app:latest
+    command:
+      - --insecure
+      - --plugin-type
+      - clientapp
+      - --appio-api-address
+      - supernode-2:9095
+    depends_on:
+      - supernode-2
+    stop_signal: SIGINT
+    cpus: "2.0"
+    mem_limit: 8g
+    group_add:
+      - render
+      - video
+    volumes:
+      - ./fl-backend/datasets:/app/datasets
+
