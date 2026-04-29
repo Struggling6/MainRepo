@@ -2,7 +2,6 @@ import optuna
 import os
 from copy import deepcopy
 import torch.nn as nn
-from dataclasses import replace
 
 
 os.environ["TORCH_BLAS_PREFER_HIPBLASLT"] = "0"
@@ -22,13 +21,16 @@ class OptunaOptimizer(TrainEvalBase):
 
     optuna.logging.set_verbosity(optuna.logging.WARNING)
 
+    def _logger(self, msg: str):
+        print(f"[Optuna] {msg}", flush=True)
+
     def __init__(
         self,
         X_train, y_train,
         X_val, y_val,
         config=CONFIG,
         n_trials=50,
-        epochs=40,
+        epochs=20,
         storage=None,
         study_name=None,
     ):
@@ -49,6 +51,12 @@ class OptunaOptimizer(TrainEvalBase):
         self.study_name = study_name
 
     def run(self):
+        self._logger(
+            f"Starting study name={self.study_name}, trials={self.n_trials}, epochs={self.epochs}, "
+            f"train_shape={self.X_train.shape}, val_shape={self.X_val.shape}"
+            f"device={get_device()}"
+            
+        )
         study = optuna.create_study(
             study_name=self.study_name,
             storage=self.storage,
@@ -69,54 +77,48 @@ class OptunaOptimizer(TrainEvalBase):
         self._print_results(study)
 
         self._apply_optuna_params(CONFIG, study.best_trial.params)
+        self._logger("Study finished and best params applied to CONFIG")
         return study
-    
-    def _apply_optuna_params(self, base_config, params):
-        return replace(
-            base_config,
-            model=replace(
-                base_config.model,
-                d_model=params["d_model"],
-                nhead=params["nhead"],
-                num_layers=params["num_layers"],
-                dropout=params["dropout"],
-                pos_weight_cap=params["pos_weight_cap"],
-            ),
-            training=replace(
-                base_config.training,
-                learning_rate=params["lr"],
-                weight_decay=params["weight_decay"],
-            ),
-            data=replace(
-                base_config.data,
-                batch_size=params["batch_size"],
-            ),
-        )
 
     def _objective(self, trial):
         print(f"\n▶ Trial {trial.number + 1}/{self.n_trials} starting...")
 
-        lr             = trial.suggest_float("lr",             1e-4, 1e-2, log=True)
-        weight_decay   = trial.suggest_float("weight_decay",   1e-4, 1e-1, log=True)
-        batch_size     = trial.suggest_categorical("batch_size", [32, 64, 128])
-        pos_weight_cap = trial.suggest_float("pos_weight_cap", 5.0, 20.0)
-        dropout        = trial.suggest_float("dropout",        0.1, 0.5)
-
-        model     = self._build_model(trial, dropout)
-        loss_fn   = self._build_loss(pos_weight_cap)
-        train_dl  = self._build_dataloader(self.X_train, self.y_train, batch_size, shuffle=True)
-        val_dl    = self._build_dataloader(self.X_val,   self.y_val,   batch_size, shuffle=False)
-        optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+        lr                = trial.suggest_float("lr",                   1e-6, 1e-1, log=True)
+        weight_decay      = trial.suggest_float("weight_decay",         1e-4, 1e-1, log=True)
+        num_layers        = trial.suggest_int("num_layers",             1, 10)
+        batch_size        = trial.suggest_categorical("batch_size",     [8, 16, 32, 64, 128, 256])
+        pos_weight_cap    = trial.suggest_categorical("pos_weight_cap", [1, 2, 5, 10, 20, 50, 100])
+        dropout           = trial.suggest_float("dropout",              0.1, 0.5)
+        hidden_size       = trial.suggest_categorical("hidden_size",     [16, 32, 64, 128, 256])
+        self._logger(
+            f"Trial {trial.number}: sampled lr={lr:.3e}, wd={weight_decay:.3e}, "
+            f"layers={num_layers}, batch_size={batch_size}, dropout={dropout:.3f}, hidden={hidden_size}, "
+            f"pos_weight_cap={pos_weight_cap}"
+        )
+        model             = self._build_model(trial, dropout, num_layers, hidden_size, batch_size)
+        loss_fn           = self._build_loss(pos_weight_cap)
+        train_dl          = self._build_dataloader(self.X_train, self.y_train, batch_size, shuffle=True)
+        val_dl            = self._build_dataloader(self.X_val,   self.y_val,   batch_size, shuffle=False)
+        self._logger(
+            f"Trial {trial.number}: dataloaders built train_batches={len(train_dl)}, val_batches={len(val_dl)}"
+        )
+        optimizer         = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
 
         best_pr_auc, best_threshold = 0.0, 0.5
-        pr_auc_history = []
 
         for epoch in range(self.epochs):  # 0-indexed for Hyperband
-            self._train_epoch(model, train_dl, optimizer, loss_fn)
-            _, val_f1, best_thresh, pr_auc = self._val_epoch(model, val_dl, loss_fn)
+            train_loss = self._train_epoch(model, train_dl, optimizer, loss_fn)
+            val_loss, val_f1, best_thresh, pr_auc = self._val_epoch(model, val_dl, loss_fn)
+
+            self._logger(
+                f"Trial {trial.number} epoch {epoch + 1}/{self.epochs}: "
+                f"train_loss={train_loss:.6f}, val_loss={val_loss:.6f}, val_f1={val_f1:.4f}, "
+                f"pr_auc={pr_auc:.4f}, best_thresh={best_thresh:.2f}"
+            )
 
             trial.report(pr_auc, epoch)
             if trial.should_prune():
+                self._logger(f"Trial {trial.number} pruned at epoch {epoch + 1} with pr_auc={pr_auc:.4f}")
                 raise optuna.TrialPruned()
 
             if pr_auc > best_pr_auc:
@@ -124,49 +126,81 @@ class OptunaOptimizer(TrainEvalBase):
                 best_threshold = best_thresh
 
         trial.set_user_attr("best_threshold", float(best_threshold))
+        self._logger(
+            f"Trial {trial.number} complete: best_pr_auc={best_pr_auc:.4f}, "
+            f"best_threshold={best_threshold:.2f}"
+        )
         return float(best_pr_auc)
 
-    def _build_model(self, trial, dropout) -> nn.Module:
-        from config import CNNTransformerConfig, TransformerConfig, LSTMConfig, MLPConfig, PatchTSTConfig
-
+    def _build_model(self, trial, dropout, num_layers, hidden_size, batch_size) -> nn.Module:
+        from config import CNNTransformerConfig, TransformerConfig, LSTMConfig, PatchTSTConfig
+        
         model_config = deepcopy(self.config.model)
 
+        model_config.batch_size = batch_size
+        model_config.num_layers = num_layers
+
+        def valid_nheads():
+            return [n for n in [2, 4, 8, 16] if model_config.d_model % n == 0]
+
+        # For transformer-based models, ensure nhead divides d_model
+        if hasattr(model_config, "nhead") and valid_nheads():
+            model_config.nhead = trial.suggest_categorical("nhead", valid_nheads)
+            self._logger(f"Trial {trial.number}: valid_nheads={valid_nheads}, selected_nhead={model_config.nhead}")
+
+        def valid_patch_lengths(context_length):
+            return [p for p in [4, 8, 16, 32] if context_length % p == 0]
+
         if isinstance(model_config, (CNNTransformerConfig, TransformerConfig)):
-            model_config.d_model    = trial.suggest_categorical("d_model", [32, 64, 128])
-            valid_nheads            = [n for n in [2, 4, 8] if model_config.d_model % n == 0]
-            model_config.nhead      = trial.suggest_categorical("nhead", valid_nheads)
-            model_config.num_layers = trial.suggest_int("num_layers", 1, 4)
-            model_config.dropout    = dropout
+            model_config.d_model     = trial.suggest_categorical("d_model", [32, 64, 128])
+            model_config.dropout     = dropout
+
+            self._logger(
+                f"Trial {trial.number}: building {type(model_config).__name__} "
+                f"d_model={model_config.d_model}, num_layers={model_config.num_layers}, dropout={model_config.dropout:.3f}"
+            )
 
         elif isinstance(model_config, LSTMConfig):
-            model_config.hidden_size = trial.suggest_categorical("hidden_size", [64, 128, 256])
-            model_config.num_layers  = trial.suggest_int("num_layers", 1, 4)
+            model_config.hidden_size = hidden_size
             model_config.dropout     = dropout
-
-        elif isinstance(model_config, MLPConfig):
-            model_config.hidden_size = trial.suggest_categorical("hidden_size", [64, 128, 256, 512])
-            model_config.num_layers  = trial.suggest_int("num_layers", 1, 5)
-            model_config.dropout     = dropout
+            self._logger(
+                f"Trial {trial.number}: building LSTMConfig hidden_size={model_config.hidden_size}, "
+                f"num_layers={model_config.num_layers}, dropout={model_config.dropout:.3f}"
+            )
 
         elif isinstance(model_config, PatchTSTConfig):
-            model_config.d_model    = trial.suggest_categorical("d_model", [32, 64, 128])
-            valid_nheads            = [n for n in [2, 4, 8] if model_config.d_model % n == 0]
-            model_config.nhead      = trial.suggest_categorical("nhead", valid_nheads)
-            model_config.num_layers = trial.suggest_int("num_layers", 1, 4)
-            model_config.dropout    = dropout
-            model_config.ffn_dim    = trial.suggest_categorical("ffn_dim", [128, 256, 512])
-
+            patch_candidates = valid_patch_lengths(model_config.context_length)
+            model_config.d_model     = trial.suggest_categorical("d_model", [32, 64, 128])
+            model_config.patch_length = trial.suggest_categorical("patch_length", patch_candidates)
+            model_config.patch_stride = trial.suggest_int("patch_stride", 1, model_config.patch_length)
+            model_config.ffn_dim    = trial.suggest_categorical("ffn_dim", [32, 64, 128, 256, 512])
+            model_config.channel_attention = trial.suggest_categorical("channel_attention", [True, False])
+            model_config.attention_dropout = trial.suggest_float("attention_dropout", 0.1, 0.5)
+            model_config.positional_dropout = trial.suggest_float("positional_dropout", 0.1, 0.5)
+            model_config.head_dropout = trial.suggest_float("head_dropout", 0.1, 0.5)
+            model_config.pre_norm = trial.suggest_categorical("pre_norm", [True, False])
+            model_config.norm_type = trial.suggest_categorical("norm_type", ["batchnorm", "layernorm"])
+            self._logger(
+                f"Trial {trial.number}: building PatchTSTConfig context_length={model_config.context_length}, "
+                f"patch_candidates={patch_candidates}, selected_patch_length={model_config.patch_length}, "
+                f"patch_stride={model_config.patch_stride}, d_model={model_config.d_model}, ffn_dim={model_config.ffn_dim}"
+            )
         else:
             raise TypeError(
                 f"No search space defined for {type(model_config).__name__}. "
                 f"Add a branch to _build_model() in OptunaOptimizer."
             )
+        self._logger(f"Trial {trial.number}: model moved to device={get_device()}")
 
         return model_config.build(input_dim=self.in_channels).to(get_device())
 
     def _build_loss(self, pos_weight_cap):
         pw = min(self.raw_pw, pos_weight_cap)
         loss_cls = resolve_loss_fn(self.loss_fn)
+        self._logger(
+            f"Loss setup: loss_fn={self.loss_fn}, raw_pos_weight={self.raw_pw:.4f}, "
+            f"cap={pos_weight_cap}, effective_pos_weight={pw:.4f}"
+        )
         return loss_cls(pos_weight=torch.tensor([pw], device=get_device()))
 
     def _print_results(self, study):

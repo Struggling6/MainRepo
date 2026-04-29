@@ -41,7 +41,7 @@ class LeadCSVHandler(BaseDatasetHandler):
 
         self.file_path = config.data.file_path
         self.target = config.data.target
-        self.batch_size = config.data.batch_size
+        self.batch_size = config.model.batch_size
         self.test_split = config.data.test_split
         self.num_clients = config.federation.num_clients
         self.seed = config.data.seed

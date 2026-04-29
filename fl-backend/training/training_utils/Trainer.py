@@ -6,20 +6,22 @@ from training.training_utils.TrainEvalBase import TrainEvalBase
 class Trainer(TrainEvalBase):
     def __init__(
         self,
-        model:        nn.Module,
-        loss_fn:      nn.Module | None, # Optionally pass None for HuggingFace models that compute loss internally
-        lr:           float,
-        batch_size:   int,
-        epochs:       int,
-        num_classes:  int,
-        weight_decay: float,
-        proximal_mu: float = 0.0,
+        model:         nn.Module,
+        loss_fn:       nn.Module | None, # Optionally pass None for HuggingFace models that compute loss internally
+        lr:            float,
+        batch_size:    int,
+        epochs:        int,
+        num_classes:   int,
+        weight_decay:  float,
+        patience:      int,
+        proximal_mu:   float = 0.0,
         global_params: list[torch.Tensor] | None = None,
     ):
-        super().__init__(epochs, num_classes)
+        super().__init__(epochs, num_classes, patience)
         self.model = model.to(self.device)
         self.loss_fn = loss_fn
         self.batch_size = batch_size
+        self.patience = patience
         self.optimizer = torch.optim.AdamW(
             model.parameters(), lr=lr, weight_decay=weight_decay
         )
