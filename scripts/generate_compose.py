@@ -3,6 +3,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+# Example : python generate_compose.py --num-clients 2
+# husk at ændre config selv så mængden af klienter er ensartet 
 
 def build_header(image_name: str) -> str:
     return f"""name: fl-backend

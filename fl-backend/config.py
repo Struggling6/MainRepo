@@ -192,6 +192,30 @@ class PatchTSTConfig():
         )
         return PatchTST(hf_config)
 
+@dataclass
+class TimesNetConfig:
+    name:           str   = "timesnet"
+    d_model:        int   = 128
+    nhead:          int   = 4
+    num_layers:     int   = 2
+    dropout:        float = 0.3
+    pos_weight_cap: float = 10.0
+    num_classes:    int   = 1
+    loss_fn:        str   = "BCEWithLogitsLoss"
+
+
+    def build(self, input_dim: int, context_length: int = None):
+        from models.TimesNet import TimesNetModel
+
+        return TimesNetModel(
+            in_channels=input_dim,
+            d_model=self.d_model,
+            nhead=self.nhead,
+            num_layers=self.num_layers,
+            num_classes=self.num_classes,
+            dropout=self.dropout,
+            seq_len=context_length if context_length is not None else 168,
+        )
 # ── Data configs ──────────────────────────────────────────────────────── #
 
 @dataclass
@@ -274,15 +298,22 @@ class ExperimentConfig:
 # Change CONFIG to switch experiments. All fields have defaults so you only
 # need to specify what differs from the defaults.
 
-CONFIG = ExperimentConfig()
-  #  model=CNNTransformerConfig(nhead=4, num_layers=3),
-  #  training=TrainingConfig(local_epochs=1, learning_rate=1e-4),
-   # federation=FederationConfig(num_rounds=1, num_clients=1, proximal_mu=0.1, partition_mode="local"),
-#)
+
+CONFIG = ExperimentConfig(
+    model=CNNTransformerConfig(nhead=4, num_layers=3),
+    training=TrainingConfig(local_epochs=1, learning_rate=1e-4),
+    federation=FederationConfig(num_rounds=1, num_clients=1, proximal_mu=0.1, partition_mode="local"),
+)
 
 
 """
 Examples:
+
+CONFIG = ExperimentConfig(
+    model=TimesNetConfig(nhead=4, num_layers=3),
+    training=TrainingConfig(local_epochs=1, learning_rate=1e-4),
+    federation=FederationConfig(num_rounds=1, num_clients=1, proximal_mu=0.1, partition_mode="local"),
+)
 
 FedProx with LSTM on PowerGrid dataset:
 CONFIG = ExperimentConfig(

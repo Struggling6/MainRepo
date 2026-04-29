@@ -1,0 +1,78 @@
+name: fl-backend
+
+services:
+  superlink:
+    image: flwr/superlink:1.27.0
+    command:
+      - --insecure
+      - --isolation
+      - process
+    ports:
+      - "9093:9093"
+
+  superexec-serverapp:
+    image: fl-backend-app:latest
+    command:
+      - --insecure
+      - --plugin-type
+      - serverapp
+      - --appio-api-address
+      - superlink:9091
+    depends_on:
+      - superlink
+    stop_signal: SIGINT
+
+  supernode-1:
+    image: flwr/supernode:1.27.0
+    command:
+      - --insecure
+      - --superlink
+      - superlink:9092
+      - --clientappio-api-address
+      - 0.0.0.0:9094
+      - --isolation
+      - process
+      - --node-config
+      - "partition-id=0 num-partitions=2"
+    depends_on:
+      - superlink
+
+  superexec-clientapp-1:
+    image: fl-backend-app:latest
+    command:
+      - --insecure
+      - --plugin-type
+      - clientapp
+      - --appio-api-address
+      - supernode-1:9094
+    depends_on:
+      - supernode-1
+    stop_signal: SIGINT
+
+  supernode-2:
+    image: flwr/supernode:1.27.0
+    command:
+      - --insecure
+      - --superlink
+      - superlink:9092
+      - --clientappio-api-address
+      - 0.0.0.0:9095
+      - --isolation
+      - process
+      - --node-config
+      - "partition-id=1 num-partitions=2"
+    depends_on:
+      - superlink
+
+  superexec-clientapp-2:
+    image: fl-backend-app:latest
+    command:
+      - --insecure
+      - --plugin-type
+      - clientapp
+      - --appio-api-address
+      - supernode-2:9095
+    depends_on:
+      - supernode-2
+    stop_signal: SIGINT
+

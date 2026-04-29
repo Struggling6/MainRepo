@@ -17,6 +17,7 @@ dependencies = [
     "matplotlib",
     "transformers",
     "captum",
+    "pypots",
 ]
 
 [tool.flwr.app]
