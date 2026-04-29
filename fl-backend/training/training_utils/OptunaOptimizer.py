@@ -76,8 +76,7 @@ class OptunaOptimizer(TrainEvalBase):
         )
         self._print_results(study)
 
-        self._apply_optuna_params(CONFIG, study.best_trial.params)
-        self._logger("Study finished and best params applied to CONFIG")
+        self._logger("Study finished")
         return study
 
     def _objective(self, trial):

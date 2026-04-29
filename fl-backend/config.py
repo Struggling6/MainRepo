@@ -253,7 +253,7 @@ class ExperimentConfig:
 # need to specify what differs from the defaults.
 
 CONFIG = ExperimentConfig(
-    model=LSTMConfig(hidden_size=64, num_layers=3),
+    model=CNNTransformerConfig(nhead=4, num_layers=2, d_model=128, dropout=0.3),
     training=TrainingConfig(local_epochs=10, learning_rate=1e-4),
     federation=FederationConfig(num_rounds=10, num_clients=10, proximal_mu=0.1, partition_mode="shared"),
 )
