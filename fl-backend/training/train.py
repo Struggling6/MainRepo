@@ -72,7 +72,7 @@ def train_model(
         loss_fn=loss_fn,
         lr=training_config.learning_rate,
         weight_decay=training_config.weight_decay,
-        patience=training_config.early_stopping_patience,
+        patience=training_config.patience,
         batch_size=trainloader.batch_size,
         epochs=training_config.local_epochs,
         num_classes=model_config.num_classes,

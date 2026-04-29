@@ -17,11 +17,10 @@ class Trainer(TrainEvalBase):
         proximal_mu:   float = 0.0,
         global_params: list[torch.Tensor] | None = None,
     ):
-        super().__init__(epochs, num_classes, patience)
+        super().__init__(epochs, num_classes)
         self.model = model.to(self.device)
         self.loss_fn = loss_fn
         self.batch_size = batch_size
-        self.patience = patience
         self.optimizer = torch.optim.AdamW(
             model.parameters(), lr=lr, weight_decay=weight_decay
         )

@@ -34,7 +34,7 @@ class OptunaOptimizer(TrainEvalBase):
         storage=None,
         study_name=None,
     ):
-        super().__init__(epochs, num_classes=1)
+        super().__init__(num_classes=1, epochs=epochs)
         self.config = config
         self.X_train = X_train
         self.y_train = y_train
@@ -88,13 +88,12 @@ class OptunaOptimizer(TrainEvalBase):
         batch_size        = trial.suggest_categorical("batch_size",     [8, 16, 32, 64, 128, 256])
         pos_weight_cap    = trial.suggest_categorical("pos_weight_cap", [1, 2, 5, 10, 20, 50, 100])
         dropout           = trial.suggest_float("dropout",              0.1, 0.5)
-        hidden_size       = trial.suggest_categorical("hidden_size",     [16, 32, 64, 128, 256])
         self._logger(
             f"Trial {trial.number}: sampled lr={lr:.3e}, wd={weight_decay:.3e}, "
-            f"layers={num_layers}, batch_size={batch_size}, dropout={dropout:.3f}, hidden={hidden_size}, "
+            f"layers={num_layers}, batch_size={batch_size}, dropout={dropout:.3f}"
             f"pos_weight_cap={pos_weight_cap}"
         )
-        model             = self._build_model(trial, dropout, num_layers, hidden_size, batch_size)
+        model             = self._build_model(trial, dropout, num_layers, batch_size)
         loss_fn           = self._build_loss(pos_weight_cap)
         train_dl          = self._build_dataloader(self.X_train, self.y_train, batch_size, shuffle=True)
         val_dl            = self._build_dataloader(self.X_val,   self.y_val,   batch_size, shuffle=False)
@@ -131,7 +130,7 @@ class OptunaOptimizer(TrainEvalBase):
         )
         return float(best_pr_auc)
 
-    def _build_model(self, trial, dropout, num_layers, hidden_size, batch_size) -> nn.Module:
+    def _build_model(self, trial, dropout, num_layers, batch_size) -> nn.Module:
         from config import CNNTransformerConfig, TransformerConfig, LSTMConfig, PatchTSTConfig
         
         model_config = deepcopy(self.config.model)
@@ -160,7 +159,7 @@ class OptunaOptimizer(TrainEvalBase):
             )
 
         elif isinstance(model_config, LSTMConfig):
-            model_config.hidden_size = hidden_size
+            model_config.hidden_size = trial.suggest_categorical("hidden_size", [16, 32, 64, 128, 256])
             model_config.dropout     = dropout
             self._logger(
                 f"Trial {trial.number}: building LSTMConfig hidden_size={model_config.hidden_size}, "
