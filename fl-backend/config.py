@@ -196,25 +196,28 @@ class PatchTSTConfig():
 class TimesNetConfig:
     name:           str   = "timesnet"
     d_model:        int   = 128
-    nhead:          int   = 4
     num_layers:     int   = 2
+    top_k:          int   = 3
+    d_ffn:          int   = 256
+    n_kernels:      int   = 6
     dropout:        float = 0.3
     pos_weight_cap: float = 10.0
     num_classes:    int   = 1
     loss_fn:        str   = "BCEWithLogitsLoss"
 
-
     def build(self, input_dim: int, context_length: int = None):
         from models.TimesNet import TimesNetModel
 
         return TimesNetModel(
-            in_channels=input_dim,
+            n_steps=context_length if context_length is not None else 168,
+            n_features=input_dim,
+            n_classes=self.num_classes,
+            n_layers=self.num_layers,
+            top_k=self.top_k,
             d_model=self.d_model,
-            nhead=self.nhead,
-            num_layers=self.num_layers,
-            num_classes=self.num_classes,
+            d_ffn=self.d_ffn,
+            n_kernels=self.n_kernels,
             dropout=self.dropout,
-            seq_len=context_length if context_length is not None else 168,
         )
 # ── Data configs ──────────────────────────────────────────────────────── #
 
@@ -300,9 +303,9 @@ class ExperimentConfig:
 
 
 CONFIG = ExperimentConfig(
-    model=CNNTransformerConfig(nhead=4, num_layers=3),
+    model=TimesNetConfig(num_layers=3,d_model=128,top_k=3,d_ffn=256,n_kernels=6,dropout=0.3,num_classes=1,loss_fn="BCEWithLogitsLoss",),
     training=TrainingConfig(local_epochs=1, learning_rate=1e-4),
-    federation=FederationConfig(num_rounds=1, num_clients=1, proximal_mu=0.1, partition_mode="local"),
+    federation=FederationConfig(num_rounds=1,num_clients=1, proximal_mu=0.1,partition_mode="local",),
 )
 
 
@@ -311,6 +314,12 @@ Examples:
 
 CONFIG = ExperimentConfig(
     model=TimesNetConfig(nhead=4, num_layers=3),
+    training=TrainingConfig(local_epochs=1, learning_rate=1e-4),
+    federation=FederationConfig(num_rounds=1, num_clients=1, proximal_mu=0.1, partition_mode="local"),
+)
+
+CONFIG = ExperimentConfig(
+    model=CNNTransformerConfig(nhead=4, num_layers=3),
     training=TrainingConfig(local_epochs=1, learning_rate=1e-4),
     federation=FederationConfig(num_rounds=1, num_clients=1, proximal_mu=0.1, partition_mode="local"),
 )
