@@ -305,7 +305,7 @@ class ExperimentConfig:
 CONFIG = ExperimentConfig(
     model=TimesNetConfig(num_layers=3,d_model=128,top_k=3,d_ffn=256,n_kernels=6,dropout=0.3,num_classes=1,loss_fn="BCEWithLogitsLoss",),
     training=TrainingConfig(local_epochs=1, learning_rate=1e-4),
-    federation=FederationConfig(num_rounds=1,num_clients=1, proximal_mu=0.1,partition_mode="local",),
+    federation=FederationConfig(num_rounds=2,num_clients=1, proximal_mu=0.1,partition_mode="local",),
 )
 
 

@@ -55,3 +55,4 @@ class TimesNetModel(BaseModel):
 
         # For CrossEntropyLoss / multiclass beholdes shape [batch_size, n_classes]
         return logits
+

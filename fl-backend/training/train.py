@@ -5,7 +5,7 @@ import os
 
 from flwr.common.logger import log
 from logging import INFO
-from config import TrainingConfig, CNNTransformerConfig, resolve_loss_fn
+from config import TrainingConfig, CNNTransformerConfig, resolve_loss_fn, TimesNetConfig
 from training.training_utils.Trainer import Trainer
 from training.training_utils.utils import compute_pos_weight
 
@@ -16,7 +16,7 @@ def train_model(
         trainloader:     torch.utils.data.DataLoader,
         valloader:       torch.utils.data.DataLoader,
         training_config: TrainingConfig,
-        model_config:    CNNTransformerConfig,
+        model_config:    TimesNetConfig,
         device:          torch.device,
         proximal_mu: float = 0.0,
     ):
