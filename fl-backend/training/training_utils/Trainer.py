@@ -25,7 +25,19 @@ class Trainer(TrainEvalBase):
             model.parameters(), lr=lr, weight_decay=weight_decay
         )
         self.proximal_mu = proximal_mu
-        self.global_params = global_params
+
+        # FedProx saves the global model before the client starts local training.
+        # The copy is kept on the training device so we do not move it every batch.
+        if global_params is None:
+            self.global_params = [
+                p.detach().clone().to(self.device)
+                for p in self.model.parameters()
+            ]
+        else:
+            self.global_params = [
+                p.detach().clone().to(self.device)
+                for p in global_params
+            ]
 
     def train(
         self,
@@ -66,6 +78,37 @@ class Trainer(TrainEvalBase):
             print(f"Restored best model (val F1: {best_f1:.4f})")
 
         return self.model
+
+    def _train_epoch(self, model, loader, optimizer, loss_fn):
+        model.train()
+        total_loss, total_samples = 0.0, 0
+
+        for features, labels in loader:
+            features = features.to(self.device)
+            labels = labels.to(self.device).float()
+
+            optimizer.zero_grad()
+            logits = model(features)
+            loss = loss_fn(logits, labels)
+
+            # FedProx penalty: keep the local client model close to the global model.
+            if self.proximal_mu > 0:
+                prox_term = 0.0
+
+                # Sum the squared distance between current local weights and saved global weights.
+                for local_param, global_param in zip(model.parameters(), self.global_params):
+                    prox_term += torch.sum((local_param - global_param) ** 2)
+
+                # Add the FedProx term to the normal loss: loss + (mu / 2) * distance.
+                loss = loss + (self.proximal_mu / 2.0) * prox_term
+
+            loss.backward()
+            optimizer.step()
+
+            total_loss += loss.item() * features.size(0)
+            total_samples += features.size(0)
+
+        return total_loss / total_samples
 
     def _print_epoch(self, m):
         print(
