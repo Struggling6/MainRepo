@@ -143,8 +143,8 @@ class OptunaOptimizer(TrainEvalBase):
 
         # For transformer-based models, ensure nhead divides d_model
         if hasattr(model_config, "nhead") and valid_nheads():
-            model_config.nhead = trial.suggest_categorical("nhead", valid_nheads)
-            self._logger(f"Trial {trial.number}: valid_nheads={valid_nheads}, selected_nhead={model_config.nhead}")
+            model_config.nhead = trial.suggest_categorical("nhead", valid_nheads())
+            self._logger(f"Trial {trial.number}: valid_nheads={valid_nheads()}, selected_nhead={model_config.nhead}")
 
         def valid_patch_lengths(context_length):
             return [p for p in [4, 8, 16, 32] if context_length % p == 0]
