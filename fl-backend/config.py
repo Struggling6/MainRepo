@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
-#from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
+from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
 
 
 def resolve_loss_fn(loss_fn):

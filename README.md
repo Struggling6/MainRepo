@@ -1,38 +1,47 @@
 # FL Backend
-
+ 
 Federated anomaly detection backend using [Flower](https://flower.ai/), PyTorch, and multiple model architectures (CNNTransformer, LSTM, MLP, Transformer, PatchTST) for the LEAD building energy dataset.
-
+ 
 ---
 
 ## Setup
-
+ 
 Python 3.13 is required.
-
+ 
 ```bash
 # Create and activate virtual environment
 python -m venv .venv
 source .venv/bin/activate          # Linux/Mac
 .\.venv\Scripts\Activate.ps1       # Windows
-
-# Generate requirements for your hardware and install
-python scripts/generate_requirements.py
-uv pip install -r requirements.txt
-uv pip install --no-deps -e ./fl-backend
+ 
+# Detect hardware and generate requirements.txt + compose.yml
+python scripts/generate.py
+uv pip install -r fl-backend/requirements.txt
+uv pip install --no-deps -e ./fl-backend # -e for editable build
 ```
-
-`generate_requirements.py` detects your GPU (CPU / CUDA / ROCm) and writes a
-`requirements.txt` with the correct torch index URL. To force a specific variant:
-
+ 
+`generate.py` detects your GPU (CPU / CUDA / ROCm) and writes both
+`fl-backend/requirements.txt` (with the correct torch index URL) and
+`compose.yml` (with the correct device mappings). To force a specific variant:
+ 
 ```bash
-python scripts/generate_requirements.py --variant rocm   # AMD
-python scripts/generate_requirements.py --variant cuda   # Nvidia
-python scripts/generate_requirements.py --variant cpu    # CPU only
+python scripts/generate.py --variant rocm   # AMD
+python scripts/generate.py --variant cuda   # Nvidia
+python scripts/generate.py --variant cpu    # CPU only
 ```
-
-`requirements.txt` is the single source of truth for dependencies — do not
-edit it by hand. To add or remove a package, update `BASE_DEPS` in
-`generate_requirements.py`, then regenerate and reinstall.
-
+ 
+To limit resources per client container:
+ 
+```bash
+python scripts/generate.py --cpus 2.0 --mem-limit 8g
+```
+ 
+`fl-backend/requirements.txt` is the single source of truth for dependencies —
+do not edit it by hand. To add or remove a package, update
+`REQUIREMENTS_BASE` in `generate.py` (and `TORCH_PINS` /
+`TORCH_INDEX_URLS` if you need to change torch-specific pins or index URLs),
+then regenerate and reinstall.
+ 
 ---
 
 ## Running Locally (Single Client)
@@ -55,29 +64,28 @@ python main.py --simulate
 ---
 
 ## Docker Deployment
-
-Docker is used to run the full federated system locally with multiple isolated
-containers.
-
+ 
+Docker is used to run the full federated system locally with multiple isolated containers.
+ 
 ### First-time setup or after dependency changes
-
-Generate `requirements.txt` for your hardware, then do a clean build:
-
+ 
+Run `generate.py` to regenerate both config files for your hardware, then rebuild:
+ 
 ```bash
-python scripts/generate_requirements.py
+python scripts/generate.py
 docker compose build --no-cache
 docker compose up -d
 ```
-
+ 
 ### After code changes (no dependency changes)
-
+ 
 ```bash
 docker compose down
 docker compose up --build -d
 ```
-
+ 
 ### Useful Commands
-
+ 
 ```bash
 docker compose ps                                  # show running containers
 docker compose down                                # stop and remove containers
@@ -85,7 +93,7 @@ docker compose logs -f                             # follow all logs
 docker logs fl-backend-superexec-serverapp-1       # serverapp logs
 docker logs fl-backend-superexec-clientapp-1-1     # clientapp logs
 ```
-
+ 
 ---
 
 ## Running with Flower CLI
@@ -116,12 +124,7 @@ Run `flwr config list` to see the config file location and available connections
 > **Note on Exit Code 203:** After the final federation round completes, Flower
 > reports exit code 203 ("SuperLink rejected the request"). This is expected —
 > it means the run finished and the SuperLink cleaned up. It is not an error.
-> Use `run_federation.sh` instead of `flwr run` directly to get a cleaner
-> success message:
 >
-> ```bash
-> ./run_federation.sh
-> ```
 
 ---
 
