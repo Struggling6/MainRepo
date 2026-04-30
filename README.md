@@ -140,7 +140,7 @@ bash aiLab_scripts/launch_all.sh
 For Optuna hyperparameter search:
 
 ```bash
-bash aiLab_scripts/run_optuna.sh --trials 50 --epochs 10 --patience 10
+bash aiLab_scripts/run_optuna.sh --trials 50 --epochs 10
 ```
 
 Monitor jobs:
@@ -325,14 +325,13 @@ Runs an Optuna study over model hyperparameters and writes the best params back 
 
 ```bash
 cd fl-backend
-python -m training.optimize --trials 50 --epochs 10 --patience 10
+python -m training.optimize --trials 50 --epochs 10
 ```
 
 | Flag | Short | Default | Description |
 |---|---|---|---|
 | `--trials` | `-t` | `50` | Number of Optuna trials |
 | `--epochs` | `-e` | `10` | Max epochs per trial |
-| `--patience` | `-p` | `10` | Early stopping patience |
 | `--storage` | `-s` | None | SQLite URL for shared study (AI-LAB) |
 | `--study-name` | `-n` | `lead_anomaly_detection` | Optuna study name |
 

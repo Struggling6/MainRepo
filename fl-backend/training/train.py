@@ -43,8 +43,6 @@ def train_model(
         print(f"[TRAIN] pos_weight computed: {pos_weight}", flush=True)
 
 
-
-
         # --------------------------------------------------
         # Loss function
         # --------------------------------------------------
@@ -74,9 +72,9 @@ def train_model(
         loss_fn=loss_fn,
         lr=training_config.learning_rate,
         weight_decay=training_config.weight_decay,
+        patience=training_config.patience,
         batch_size=trainloader.batch_size,
         epochs=training_config.local_epochs,
-        patience=training_config.patience,
         num_classes=model_config.num_classes,
         proximal_mu=proximal_mu,
     )

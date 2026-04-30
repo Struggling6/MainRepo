@@ -91,9 +91,12 @@ class FedProxWithSave(FedProx):
                     CONFIG.evaluation.threshold,
                 )
 
+                path = Path(f"/app/checkpoints/{CONFIG.model.name}_{CONFIG.data.name}.pt")
+                CONFIG.evaluation.model_path = path
+
                 self._save_model(
                     model=model,
-                    path=CONFIG.evaluation.model_path,
+                    path = path,
                     config=CONFIG.model,
                     threshold=threshold,
                     metrics=aggregated_metrics,

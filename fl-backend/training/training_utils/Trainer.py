@@ -6,18 +6,18 @@ from training.training_utils.TrainEvalBase import TrainEvalBase
 class Trainer(TrainEvalBase):
     def __init__(
         self,
-        model:        nn.Module,
-        loss_fn:      nn.Module | None, # Optionally pass None for HuggingFace models that compute loss internally
-        lr:           float,
-        batch_size:   int,
-        epochs:       int,
-        patience:     int,
-        num_classes:  int,
-        weight_decay: float,
-        proximal_mu: float = 0.0,
+        model:         nn.Module,
+        loss_fn:       nn.Module | None, # Optionally pass None for HuggingFace models that compute loss internally
+        lr:            float,
+        batch_size:    int,
+        epochs:        int,
+        num_classes:   int,
+        weight_decay:  float,
+        patience:      int,
+        proximal_mu:   float = 0.0,
         global_params: list[torch.Tensor] | None = None,
     ):
-        super().__init__(epochs, patience, num_classes)
+        super().__init__(epochs, num_classes)
         self.model = model.to(self.device)
         self.loss_fn = loss_fn
         self.batch_size = batch_size
@@ -27,13 +27,8 @@ class Trainer(TrainEvalBase):
         self.proximal_mu = proximal_mu
         self.global_params = global_params
 
-    def train(
-        self,
-        train_loader: torch.utils.data.DataLoader,
-        val_loader:   torch.utils.data.DataLoader,
-    ) -> nn.Module:
-        """Train the model directly from DataLoaders and restore the best checkpoint."""
-        best_f1, best_state, epochs_without_improvement = -1.0, None, 0
+    def train(self, train_loader, val_loader) -> nn.Module:
+        best_pr_auc, best_state, epochs_without_improvement = 0.0, None, 0  # ← val_f1 → pr_auc
         self.history = []
 
         for epoch in range(1, self.epochs + 1):
@@ -51,19 +46,19 @@ class Trainer(TrainEvalBase):
             self.history.append(metrics)
             self._print_epoch(metrics)
 
-            if val_f1 > best_f1:
-                best_f1    = val_f1
-                best_state = {k: v.clone() for k, v in self.model.state_dict().items()}
+            if pr_auc > best_pr_auc:                                      
+                best_pr_auc = pr_auc
+                best_state  = {k: v.clone() for k, v in self.model.state_dict().items()}
                 epochs_without_improvement = 0
             else:
                 epochs_without_improvement += 1
                 if epochs_without_improvement >= self.patience:
-                    print(f"Early stopping at epoch {epoch} (best val F1: {best_f1:.4f})")
+                    print(f"Early stopping at epoch {epoch} (best PR-AUC: {best_pr_auc:.4f})")
                     break
 
         if best_state is not None:
             self.model.load_state_dict(best_state)
-            print(f"Restored best model (val F1: {best_f1:.4f})")
+            print(f"Restored best model (PR-AUC: {best_pr_auc:.4f})")
 
         return self.model
 

@@ -38,7 +38,6 @@ srun singularity exec --nv \
     exec python -m training.optimize \
       --trials 1 \
       --epochs \"${OPTUNA_EPOCHS}\" \
-      --patience \"${OPTUNA_PATIENCE}\" \
       --storage \"${OPTUNA_STORAGE}\" \
       --study-name \"${OPTUNA_STUDY}\"
   "
