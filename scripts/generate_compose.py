@@ -28,6 +28,9 @@ services:
       - "9093:9093"
       - "9091:9091"
       - "9092:9092"
+    cpus: "0.25"
+    mem_limit: 512m
+
 
   superexec-serverapp:
     image: {image_name}
@@ -43,6 +46,9 @@ services:
     depends_on:
       - superlink
     stop_signal: SIGINT
+    cpus: "1.0"
+    mem_limit: 2g
+
     volumes:
       - {build_context}/checkpoints:/app/checkpoints
       - {build_context}/plotting/saved_plots:/app/plotting/saved_plots
@@ -65,6 +71,9 @@ def generate_supernode(node_num: int, partition_id: int, port: int, num_clients:
       - "partition-id={partition_id} num-partitions={num_clients}"
     depends_on:
       - superlink
+    cpus: "0.25"
+    mem_limit: 512m
+  
 
 """
 

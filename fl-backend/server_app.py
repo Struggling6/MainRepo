@@ -56,8 +56,8 @@ def server_fn(context):
     strategy = FedProxWithSave(
         fraction_fit=fed_config.fraction_fit,
         fraction_evaluate=fed_config.fraction_evaluate,
-        min_fit_clients=num_clients,
-        min_evaluate_clients=num_clients,
+        min_fit_clients=max(1, int(num_clients * fed_config.fraction_fit)),
+        min_evaluate_clients=max(1, int(num_clients * fed_config.fraction_evaluate)),
         min_available_clients=num_clients,
         on_evaluate_config_fn=lambda server_round: {"round": server_round},
         fit_metrics_aggregation_fn=weighted_average_fit,
@@ -67,27 +67,6 @@ def server_fn(context):
 
     config = ServerConfig(num_rounds=fed_config.num_rounds)
     return ServerAppComponents(strategy=strategy, config=config)
-
-
-
-def on_train_end(context):
-    #Called after all rounds complete.
-    strategy = context.strategy
-    
-    # Extract metrics from eval_history
-    f1_values = []
-    pr_values = []
-    
-    for eval_round in strategy.eval_history:
-        if "f1" in eval_round:
-            f1_values.append(eval_round["f1"])
-        if "pr_auc" in eval_round:
-            pr_values.append(eval_round["pr_auc"])
-    
-    print(f"F1 values: {f1_values}")
-    print(f"PR-AUC values: {pr_values}")
-    
-    plot_diagrams(f1_values, pr_values)
 
 
 app = ServerApp(server_fn=server_fn)
