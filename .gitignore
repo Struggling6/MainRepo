@@ -104,6 +104,9 @@ outputs/
 checkpoints/
 results/
 predictions/
+plots/
+fl-backend/plotting/saved_plots/
+
 
 # =========================
 
@@ -133,6 +136,7 @@ Thumbs.db
 .coverage
 htmlcov/
 
+
 # =========================
 
 # Misc
@@ -145,3 +149,5 @@ htmlcov/
 *.swp
 uv.lock
 *.fab
+requirements.txt
+compose.yml

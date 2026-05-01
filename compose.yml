@@ -1,5 +1,7 @@
 name: fl-backend
 
+x-superexec-image: &superexec_image fl-backend-superexec:local
+
 services:
   superlink:
     image: flwr/superlink:1.27.0
@@ -17,6 +19,7 @@ services:
       - "9092:9092"
 
   superexec-serverapp:
+    image: *superexec_image
     build:
       context: ./fl-backend
       dockerfile: Dockerfile
@@ -31,7 +34,6 @@ services:
     stop_signal: SIGINT
     volumes:
       - ./fl-backend/checkpoints:/app/checkpoints
-      - ./fl-backend/plotting/saved_plots:/app/plotting/saved_plots
 
   supernode-1:
     image: flwr/supernode:1.27.0
@@ -44,11 +46,12 @@ services:
       - --isolation
       - process
       - --node-config
-      - "partition-id=0 num-partitions=1"
+      - "partition-id=0 num-partitions=3"
     depends_on:
       - superlink
 
   superexec-clientapp-1:
+    image: *superexec_image
     build:
       context: ./fl-backend
       dockerfile: Dockerfile
@@ -61,10 +64,76 @@ services:
     depends_on:
       - supernode-1
     stop_signal: SIGINT
-    cpus: "2.0"
-    mem_limit: 8g
-    group_add:
-      - render
-      - video
     volumes:
       - ./fl-backend/datasets:/app/datasets
+    cpus: "1.0"
+    mem_limit: 3g
+
+  supernode-2:
+    image: flwr/supernode:1.27.0
+    command:
+      - --insecure
+      - --superlink
+      - superlink:9092
+      - --clientappio-api-address
+      - 0.0.0.0:9095
+      - --isolation
+      - process
+      - --node-config
+      - "partition-id=1 num-partitions=3"
+    depends_on:
+      - superlink
+
+  superexec-clientapp-2:
+    image: *superexec_image
+    build:
+      context: ./fl-backend
+      dockerfile: Dockerfile
+    command:
+      - --insecure
+      - --plugin-type
+      - clientapp
+      - --appio-api-address
+      - supernode-2:9095
+    depends_on:
+      - supernode-2
+    stop_signal: SIGINT
+    volumes:
+      - ./fl-backend/datasets:/app/datasets
+    cpus: "1.0"
+    mem_limit: 3g
+
+  supernode-3:
+    image: flwr/supernode:1.27.0
+    command:
+      - --insecure
+      - --superlink
+      - superlink:9092
+      - --clientappio-api-address
+      - 0.0.0.0:9096
+      - --isolation
+      - process
+      - --node-config
+      - "partition-id=2 num-partitions=3"
+    depends_on:
+      - superlink
+
+  superexec-clientapp-3:
+    image: *superexec_image
+    build:
+      context: ./fl-backend
+      dockerfile: Dockerfile
+    command:
+      - --insecure
+      - --plugin-type
+      - clientapp
+      - --appio-api-address
+      - supernode-3:9096
+    depends_on:
+      - supernode-3
+    stop_signal: SIGINT
+    volumes:
+      - ./fl-backend/datasets:/app/datasets
+    cpus: "1.0"
+    mem_limit: 3g
+

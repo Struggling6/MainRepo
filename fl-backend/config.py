@@ -3,8 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
-#from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
-
+from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
 
 def resolve_loss_fn(loss_fn):
     """Resolve a loss function name or class to a torch.nn loss class."""
@@ -24,20 +23,12 @@ def resolve_loss_fn(loss_fn):
 class BinaryClassificationConfig:
     name: str = "binary_classification"
 
-@dataclass
-class AnomalyDetectionConfig:
-    name: str = "anomaly_detection"
-
-@dataclass
-class MultiClassClassificationConfig:
-    name: str = "multi_class_classification"
-
-
 # ── Model configs ─────────────────────────────────────────────────────── #
 
 @dataclass
 class CNNTransformerConfig:
     name:           str   = "supervised_cnn_transformer"
+    batch_size:     int   = 64
     d_model:        int   = 128
     nhead:          int   = 4
     num_layers:     int   = 2
@@ -62,6 +53,7 @@ class CNNTransformerConfig:
 @dataclass
 class TransformerConfig:
     name:           str   = "transformer"
+    batch_size:   int     = 64
     d_model:        int   = 128
     nhead:          int   = 4
     num_layers:     int   = 2
@@ -71,7 +63,7 @@ class TransformerConfig:
     loss_fn:        str   = "BCEWithLogitsLoss"
 
 
-    def build(self, input_dim: int, context_length: int = None):
+    def build(self, input_dim: int, context_length: int = 0):
         from models.transformer import Transformer
 
         return Transformer(
@@ -87,6 +79,7 @@ class TransformerConfig:
 @dataclass
 class LSTMConfig:
     name:            str       = "lstm"
+    batch_size:      int       = 64
     hidden_size:     int       = 128
     num_layers:      int       = 2
     dropout:         float     = 0.3
@@ -105,26 +98,6 @@ class LSTMConfig:
             dropout=self.dropout,
         )
 
-@dataclass
-class MLPConfig:
-    name:           str   = "mlp"
-    hidden_size:    int   = 128
-    num_layers:     int   = 2
-    dropout:        float = 0.3
-    num_classes:    int   = 1
-    pos_weight_cap: float = 10.0
-    loss_fn:        str   = "BCEWithLogitsLoss"
-
-    def build(self, input_dim: int):
-        from models.mlp import MLPModel
-
-        return MLPModel(
-            in_channels=input_dim,
-            hidden_size=self.hidden_size,
-            num_layers=self.num_layers,
-            num_classes=self.num_classes,
-            dropout=self.dropout,
-        )
 
 ## HuggingFace configs cannot use @strict alongside @dataclass inheritance without
 # breaking PretrainedConfig's internal __init__ chain. Instead, we use a plain
@@ -150,7 +123,7 @@ class PatchTSTConfig():
     properly initialized before the model is built.
     """
     name:                str   = "patchtst"
-    num_input_channels:  int   = 1
+    batch_size:          int   = 64
     context_length:      int   = 168
     patch_length:        int   = 16
     patch_stride:        int   = 8
@@ -158,18 +131,17 @@ class PatchTSTConfig():
     nhead:               int   = 4
     num_layers:          int   = 3
     ffn_dim:             int   = 256
-    dropout:             float = 0.2
-    head_dropout:        float = 0.2
     channel_attention:   bool  = True
-    attention_dropout:   float = 0.0
-    positional_dropout:  float = 0.0
+    attention_dropout:   float = 0.1
+    positional_dropout:  float = 0.1
+    head_dropout:        float = 0.1
     pre_norm:            bool  = True
-    norm_type:           Literal["batchnorm", "layernorm"] | None = "batchnorm"
+    norm_type:           Literal["batchnorm", "layernorm"] = "batchnorm"
     pos_weight_cap:      float = 10.0
     loss_fn:             str   = "BCEWithLogitsLoss"
     num_classes:         int   = 1
 
-    def build(self, input_dim: int, context_length: int = None):
+    def build(self, input_dim: int, context_length = None):
         from models.PatchTST import PatchTST
 
         hf_config = HF_PatchTSTConfig(
@@ -181,16 +153,35 @@ class PatchTSTConfig():
             num_attention_heads=self.nhead,
             num_hidden_layers=self.num_layers,
             ffn_dim=self.ffn_dim,
-            dropout=self.dropout,
+            positional_dropout=self.positional_dropout,
+            attention_dropout=self.attention_dropout,
             head_dropout=self.head_dropout,
             channel_attention=self.channel_attention,
-            attention_dropout=self.attention_dropout,
-            positional_dropout=self.positional_dropout,
             pre_norm=self.pre_norm,
             norm_type=self.norm_type,
             num_targets=self.num_classes,
         )
         return PatchTST(hf_config)
+    
+@dataclass
+class SupervisedCNNConfig:
+    name:           str   = "supervised_cnn"
+    d_model:        int   = 128
+    dropout:        float = 0.3
+    pos_weight_cap: float = 10.0
+    num_classes:    int   = 1
+    loss_fn:        str   = "BCEWithLogitsLoss"
+
+    def build(self, input_dim: int):
+        from models.SupervisedCNN import SupervisedCNN
+
+        return SupervisedCNN(
+            in_channels=input_dim,
+            d_model=self.d_model,
+            num_classes=self.num_classes,
+            dropout=self.dropout,
+        )
+
 
 @dataclass
 class TimesNetConfig:
@@ -222,17 +213,15 @@ class TimesNetConfig:
 # ── Data configs ──────────────────────────────────────────────────────── #
 
 @dataclass
-class LeadCSVConfig:
-    name:         str  = "lead_csv"
-    file_path:    Path = Path("datasets/LEAD/train_features.csv") #used for shared mode, ignored for local mode, should be the large dataset csv
-    data_dir:     Path = Path("datasets/LEAD")
-    file_pattern: str  = "data{client_index}.csv"
-    target:       str  = "anomaly"
-    batch_size:   int  = 64
-    num_classes:  int  = 2
-    task_name:    str  = "binary_classification"
+class LeadCSVConfig: 
+    name:         str   = "lead_csv"
+    file_path:    Path  = Path("datasets/LEAD/train_features.csv") #used for shared mode, ignored for local mode, should be the large dataset csv
+    data_dir:     Path  = Path("datasets/LEAD")
+    file_pattern: str   = "data{client_index}.csv"
+    target:       str   = "anomaly"
+    task_name:    str   = "binary_classification"
     test_split:   float = 0.2
-    seed:         int  = 42
+    seed:         int   = 42
 
     def build_handler(self, config=None):
         from data.lead_csv import LeadCSVHandler
@@ -244,7 +233,6 @@ class PowerGridCSVConfig:
     file_path:    Path  = Path("datasets/EPIC/Scenario_1/EpicLog_noisy.csv")
     clean_path:   Path  = Path("datasets/EPIC/Scenario_1/EpicLog_clean.csv")
     target:       str   = "marker"
-    batch_size:   int   = 32
     test_split:   float = 0.2
     normalize:    bool  = True
     noise_level:  float = 0.7
@@ -261,8 +249,7 @@ class TrainingConfig:
     learning_rate: float = 1e-4
     weight_decay:  float = 1e-4
     local_epochs:  int   = 2
-    patience:      int   = 10
-
+    patience:      int   = 5
 
 # ── Federation config ─────────────────────────────────────────────────── #
 
@@ -270,28 +257,30 @@ class TrainingConfig:
 class FederationConfig:
     partition_mode:    str   = "local" # local or shared
     num_rounds:        int   = 2
-    num_clients:       int   = 1
+    num_clients:       int   = 3
     fraction_fit:      float = 1.0
     fraction_evaluate: float = 1.0
-    proximal_mu:       float = 0.1
+    proximal_mu:       float = 2.0
 
 # ── Evaluation config ─────────────────────────────────────────────────── #
 
 @dataclass
 class EvaluationConfig:
-    model_path:   Path  = Path("/app/checkpoints/model.pt")
-    test_path:    Path  = Path("/app/datasets/LEAD/test_features.csv")
-    target:       str   = "anomaly"
-    batch_size:   int   = 64
-    threshold:    float = 0.5   # decision threshold — override with best_thresh from training
-    input_dim:    int   = 0     # set after data loading
+    model_path:   Path | None  = None  # set in FedProxWithSave
+    test_path:    Path         = Path("/app/datasets/LEAD/test_features.csv")
+    target:       str          = "anomaly"
+    batch_size:   int          = 64
+    threshold:    float        = 0.5   # decision threshold — override with best_thresh from training
+    input_dim:    int          = 0     # set after data loading
 
 # ── Top-level experiment config ───────────────────────────────────────── #
+
+    
 
 @dataclass
 class ExperimentConfig:
     task:       BinaryClassificationConfig = field(default_factory=BinaryClassificationConfig)
-    model:      CNNTransformerConfig       = field(default_factory=CNNTransformerConfig)
+    model:      SupervisedCNNConfig       = field(default_factory=SupervisedCNNConfig)
     data:       LeadCSVConfig              = field(default_factory=LeadCSVConfig)
     training:   TrainingConfig             = field(default_factory=TrainingConfig)
     federation: FederationConfig           = field(default_factory=FederationConfig)
@@ -301,11 +290,10 @@ class ExperimentConfig:
 # Change CONFIG to switch experiments. All fields have defaults so you only
 # need to specify what differs from the defaults.
 
-
 CONFIG = ExperimentConfig(
-    model=TimesNetConfig(num_layers=3,d_model=128,top_k=3,d_ffn=256,n_kernels=6,dropout=0.3,num_classes=1,loss_fn="BCEWithLogitsLoss",),
-    training=TrainingConfig(local_epochs=1, learning_rate=1e-4),
-    federation=FederationConfig(num_rounds=2,num_clients=1, proximal_mu=0.1,partition_mode="local",),
+    model=CNNTransformerConfig(nhead=4, num_layers=2, d_model=128, dropout=0.3),
+    training=TrainingConfig(local_epochs=10, learning_rate=1e-4),
+    federation=FederationConfig(num_rounds=10, num_clients=10, proximal_mu=0.1, partition_mode="shared"),
 )
 
 
@@ -313,20 +301,14 @@ CONFIG = ExperimentConfig(
 Examples:
 
 CONFIG = ExperimentConfig(
-    model=TimesNetConfig(nhead=4, num_layers=3),
+    model=TimesNetConfig(num_layers=3,d_model=128,top_k=3,d_ffn=256,n_kernels=6,dropout=0.3,num_classes=1,loss_fn="BCEWithLogitsLoss",),
     training=TrainingConfig(local_epochs=1, learning_rate=1e-4),
-    federation=FederationConfig(num_rounds=1, num_clients=1, proximal_mu=0.1, partition_mode="local"),
+    federation=FederationConfig(num_rounds=2,num_clients=1, proximal_mu=0.1,partition_mode="local",),
 )
-
-CONFIG = ExperimentConfig(
-    model=CNNTransformerConfig(nhead=4, num_layers=3),
-    training=TrainingConfig(local_epochs=1, learning_rate=1e-4),
-    federation=FederationConfig(num_rounds=1, num_clients=1, proximal_mu=0.1, partition_mode="local"),
-)
-
+    
 FedProx with LSTM on PowerGrid dataset:
 CONFIG = ExperimentConfig(
-    model=LSTMConfig(hidden_size=256, dropout=0.2),
+    model=ModelConfig(model=LSTMConfig(hidden_size=256, dropout=0.2)),
     data=PowerGridCSVConfig(),
     training=TrainingConfig(learning_rate=5e-4, local_epochs=1),
     federation=FederationConfig(num_rounds=10, num_clients=3, proximal_mu=0.1),

@@ -6,18 +6,18 @@ from training.training_utils.TrainEvalBase import TrainEvalBase
 class Trainer(TrainEvalBase):
     def __init__(
         self,
-        model:        nn.Module,
-        loss_fn:      nn.Module | None, # Optionally pass None for HuggingFace models that compute loss internally
-        lr:           float,
-        batch_size:   int,
-        epochs:       int,
-        patience:     int,
-        num_classes:  int,
-        weight_decay: float,
-        proximal_mu: float = 0.0,
+        model:         nn.Module,
+        loss_fn:       nn.Module | None, # Optionally pass None for HuggingFace models that compute loss internally
+        lr:            float,
+        batch_size:    int,
+        epochs:        int,
+        num_classes:   int,
+        weight_decay:  float,
+        patience:      int,
+        proximal_mu:   float = 0.0,
         global_params: list[torch.Tensor] | None = None,
     ):
-        super().__init__(epochs, patience, num_classes)
+        super().__init__(epochs, num_classes)
         self.model = model.to(self.device)
         self.loss_fn = loss_fn
         self.batch_size = batch_size
@@ -25,15 +25,22 @@ class Trainer(TrainEvalBase):
             model.parameters(), lr=lr, weight_decay=weight_decay
         )
         self.proximal_mu = proximal_mu
-        self.global_params = global_params
 
-    def train(
-        self,
-        train_loader: torch.utils.data.DataLoader,
-        val_loader:   torch.utils.data.DataLoader,
-    ) -> nn.Module:
-        """Train the model directly from DataLoaders and restore the best checkpoint."""
-        best_f1, best_state, epochs_without_improvement = -1.0, None, 0
+        # FedProx saves the global model before the client starts local training.
+        # The copy is kept on the training device so we do not move it every batch.
+        if global_params is None:
+            self.global_params = [
+                p.detach().clone().to(self.device)
+                for p in self.model.parameters()
+            ]
+        else:
+            self.global_params = [
+                p.detach().clone().to(self.device)
+                for p in global_params
+            ]
+
+    def train(self, train_loader, val_loader) -> nn.Module:
+        best_pr_auc, best_state, epochs_without_improvement = 0.0, None, 0  # ← val_f1 → pr_auc
         self.history = []
 
         for epoch in range(1, self.epochs + 1):
@@ -51,21 +58,52 @@ class Trainer(TrainEvalBase):
             self.history.append(metrics)
             self._print_epoch(metrics)
 
-            if val_f1 > best_f1:
-                best_f1    = val_f1
-                best_state = {k: v.clone() for k, v in self.model.state_dict().items()}
+            if pr_auc > best_pr_auc:                                      
+                best_pr_auc = pr_auc
+                best_state  = {k: v.clone() for k, v in self.model.state_dict().items()}
                 epochs_without_improvement = 0
             else:
                 epochs_without_improvement += 1
                 if epochs_without_improvement >= self.patience:
-                    print(f"Early stopping at epoch {epoch} (best val F1: {best_f1:.4f})")
+                    print(f"Early stopping at epoch {epoch} (best PR-AUC: {best_pr_auc:.4f})")
                     break
 
         if best_state is not None:
             self.model.load_state_dict(best_state)
-            print(f"Restored best model (val F1: {best_f1:.4f})")
+            print(f"Restored best model (PR-AUC: {best_pr_auc:.4f})")
 
         return self.model
+
+    def _train_epoch(self, model, loader, optimizer, loss_fn):
+        model.train()
+        total_loss, total_samples = 0.0, 0
+
+        for features, labels in loader:
+            features = features.to(self.device)
+            labels = labels.to(self.device).float()
+
+            optimizer.zero_grad()
+            logits = model(features)
+            loss = loss_fn(logits, labels)
+
+            # FedProx penalty: keep the local client model close to the global model.
+            if self.proximal_mu > 0:
+                prox_term = 0.0
+
+                # Sum the squared distance between current local weights and saved global weights.
+                for local_param, global_param in zip(model.parameters(), self.global_params):
+                    prox_term += torch.sum((local_param - global_param) ** 2)
+
+                # Add the FedProx term to the normal loss: loss + (mu / 2) * distance.
+                loss = loss + (self.proximal_mu / 2.0) * prox_term
+
+            loss.backward()
+            optimizer.step()
+
+            total_loss += loss.item() * features.size(0)
+            total_samples += features.size(0)
+
+        return total_loss / total_samples
 
     def _print_epoch(self, m):
         print(

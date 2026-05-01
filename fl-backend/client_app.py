@@ -98,7 +98,8 @@ class FlowerClient(NumPyClient):
         log(INFO, "[%s] FIT start | round=%s", self.facility_id, round_num)
         set_model_parameters(self.model, parameters)
 
-        proximal_mu = config.get("proximal-mu", self.config.federation.proximal_mu)
+        # Flower FedProx sends this value to tell the client how strong the penalty is.
+        proximal_mu = config.get("proximal_mu", self.config.federation.proximal_mu)
 
         results = train_model(
             model=self.model,
@@ -107,6 +108,7 @@ class FlowerClient(NumPyClient):
             training_config=self.config.training,
             model_config=self.config.model,
             device=self.device,
+            proximal_mu=proximal_mu,
         )
 
         results["input_dim"] = self.metadata["input_dim"]
