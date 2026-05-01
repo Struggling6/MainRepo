@@ -62,7 +62,7 @@ class OptunaOptimizer(TrainEvalBase):
             storage=self.storage,
             direction="maximize",
             pruner=optuna.pruners.HyperbandPruner(
-                min_resource=5,
+                min_resource=10,
                 max_resource=40,
                 reduction_factor=3,
             ),
@@ -73,6 +73,7 @@ class OptunaOptimizer(TrainEvalBase):
             n_trials=self.n_trials,
             callbacks=[self._pretty_trial_callback],
             show_progress_bar=True,
+            
         )
         self._print_results(study)
 
@@ -82,14 +83,14 @@ class OptunaOptimizer(TrainEvalBase):
     def _objective(self, trial):
         print(f"\n▶ Trial {trial.number + 1}/{self.n_trials} starting...")
 
-        lr                = trial.suggest_float("lr",                   1e-6, 1e-1, log=True)
-        weight_decay      = trial.suggest_float("weight_decay",         1e-4, 1e-1, log=True)
-        num_layers        = trial.suggest_int("num_layers",             1, 10)
+        lr                = trial.suggest_float("lr",                   3e-5, 3e-3, log=True)
+        weight_decay      = trial.suggest_float("weight_decay",         1e-4, 1e-2, log=True)
+        num_layers        = trial.suggest_int("num_layers",             1, 5)
         batch_size        = trial.suggest_categorical("batch_size",     [8, 16, 32, 64, 128, 256])
-        pos_weight_cap    = trial.suggest_categorical("pos_weight_cap", [1, 2, 5, 10, 20, 50, 100])
+        pos_weight_cap    = trial.suggest_categorical("pos_weight_cap", [ 20, 50, 70, 100])
         dropout           = trial.suggest_float("dropout",              0.1, 0.5)
         self._logger(
-            f"Trial {trial.number}: sampled lr={lr:.3e}, wd={weight_decay:.3e}, "
+            f"Trial {trial.number + 1}: sampled lr={lr:.3e}, wd={weight_decay:.3e}, "
             f"layers={num_layers}, batch_size={batch_size}, dropout={dropout:.3f}"
             f"pos_weight_cap={pos_weight_cap}"
         )
@@ -98,7 +99,7 @@ class OptunaOptimizer(TrainEvalBase):
         train_dl          = self._build_dataloader(self.X_train, self.y_train, batch_size, shuffle=True)
         val_dl            = self._build_dataloader(self.X_val,   self.y_val,   batch_size, shuffle=False)
         self._logger(
-            f"Trial {trial.number}: dataloaders built train_batches={len(train_dl)}, val_batches={len(val_dl)}"
+            f"Trial {trial.number + 1}: dataloaders built train_batches={len(train_dl)}, val_batches={len(val_dl)}"
         )
         optimizer         = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
 
@@ -108,24 +109,40 @@ class OptunaOptimizer(TrainEvalBase):
             train_loss = self._train_epoch(model, train_dl, optimizer, loss_fn)
             val_loss, val_f1, best_thresh, pr_auc = self._val_epoch(model, val_dl, loss_fn)
 
-            self._logger(
-                f"Trial {trial.number} epoch {epoch + 1}/{self.epochs}: "
-                f"train_loss={train_loss:.6f}, val_loss={val_loss:.6f}, val_f1={val_f1:.4f}, "
-                f"pr_auc={pr_auc:.4f}, best_thresh={best_thresh:.2f}"
-            )
-
-            trial.report(pr_auc, epoch)
-            if trial.should_prune():
-                self._logger(f"Trial {trial.number} pruned at epoch {epoch + 1} with pr_auc={pr_auc:.4f}")
-                raise optuna.TrialPruned()
-
+            # Track best-so-far PR-AUC and the threshold that achieved it.
+            # We update this BEFORE reporting to the pruner so the value
+            # passed to Hyperband is a non-decreasing curve.
             if pr_auc > best_pr_auc:
                 best_pr_auc    = pr_auc
                 best_threshold = best_thresh
 
+            self._logger(
+                f"Trial {trial.number + 1} epoch {epoch + 1}/{self.epochs}: "
+                f"train_loss={train_loss:.6f}, val_loss={val_loss:.6f}, val_f1={val_f1:.4f}, "
+                f"pr_auc={pr_auc:.4f}, best_pr_auc={best_pr_auc:.4f}, best_thresh={best_thresh:.2f}"
+            )
+
+            # Hyperband (and Optuna pruners in general) compares the value
+            # reported at step `epoch` across trials. If we feed the raw
+            # per-epoch PR-AUC, a single noisy dip can mask a trial that is
+            # actually trending upward and lead to premature pruning.
+            #
+            # Reporting the running maximum (`best_pr_auc`) yields a
+            # monotonically non-decreasing curve, which is the contract
+            # Hyperband implicitly assumes ("more resource = at least as
+            # good"). This stabilises pruning decisions without changing
+            # which trial wins overall (the final return value is unchanged).
+            trial.report(best_pr_auc, epoch)
+            if trial.should_prune():
+                self._logger(
+                    f"Trial {trial.number + 1} pruned at epoch {epoch + 1} "
+                    f"with best_pr_auc={best_pr_auc:.4f} (last_epoch_pr_auc={pr_auc:.4f})"
+                )
+                raise optuna.TrialPruned()
+
         trial.set_user_attr("best_threshold", float(best_threshold))
         self._logger(
-            f"Trial {trial.number} complete: best_pr_auc={best_pr_auc:.4f}, "
+            f"Trial {trial.number + 1} complete: best_pr_auc={best_pr_auc:.4f}, "
             f"best_threshold={best_threshold:.2f}"
         )
         return float(best_pr_auc)
@@ -144,7 +161,7 @@ class OptunaOptimizer(TrainEvalBase):
         # For transformer-based models, ensure nhead divides d_model
         if hasattr(model_config, "nhead") and valid_nheads():
             model_config.nhead = trial.suggest_categorical("nhead", valid_nheads())
-            self._logger(f"Trial {trial.number}: valid_nheads={valid_nheads()}, selected_nhead={model_config.nhead}")
+            self._logger(f"Trial {trial.number + 1}: valid_nheads={valid_nheads()}, selected_nhead={model_config.nhead}")
 
         def valid_patch_lengths(context_length):
             return [p for p in [4, 8, 16, 32] if context_length % p == 0]
@@ -154,7 +171,7 @@ class OptunaOptimizer(TrainEvalBase):
             model_config.dropout     = dropout
 
             self._logger(
-                f"Trial {trial.number}: building {type(model_config).__name__} "
+                f"Trial {trial.number + 1}: building {type(model_config).__name__} "
                 f"d_model={model_config.d_model}, num_layers={model_config.num_layers}, dropout={model_config.dropout:.3f}"
             )
 
@@ -162,7 +179,7 @@ class OptunaOptimizer(TrainEvalBase):
             model_config.hidden_size = trial.suggest_categorical("hidden_size", [16, 32, 64, 128, 256])
             model_config.dropout     = dropout
             self._logger(
-                f"Trial {trial.number}: building LSTMConfig hidden_size={model_config.hidden_size}, "
+                f"Trial {trial.number + 1}: building LSTMConfig hidden_size={model_config.hidden_size}, "
                 f"num_layers={model_config.num_layers}, dropout={model_config.dropout:.3f}"
             )
 
@@ -179,7 +196,7 @@ class OptunaOptimizer(TrainEvalBase):
             model_config.pre_norm = trial.suggest_categorical("pre_norm", [True, False])
             model_config.norm_type = trial.suggest_categorical("norm_type", ["batchnorm", "layernorm"])
             self._logger(
-                f"Trial {trial.number}: building PatchTSTConfig context_length={model_config.context_length}, "
+                f"Trial {trial.number + 1}: building PatchTSTConfig context_length={model_config.context_length}, "
                 f"patch_candidates={patch_candidates}, selected_patch_length={model_config.patch_length}, "
                 f"patch_stride={model_config.patch_stride}, d_model={model_config.d_model}, ffn_dim={model_config.ffn_dim}"
             )
@@ -188,7 +205,7 @@ class OptunaOptimizer(TrainEvalBase):
                 f"No search space defined for {type(model_config).__name__}. "
                 f"Add a branch to _build_model() in OptunaOptimizer."
             )
-        self._logger(f"Trial {trial.number}: model moved to device={get_device()}")
+        self._logger(f"Trial {trial.number + 1}: model moved to device={get_device()}")
 
         return model_config.build(input_dim=self.in_channels).to(get_device())
 
@@ -209,11 +226,11 @@ class OptunaOptimizer(TrainEvalBase):
             print(f"    {k}: {v}")
 
     def _pretty_trial_callback(self, study: optuna.Study, trial: optuna.trial.FrozenTrial):
-        is_best = study.best_trial.number == trial.number
+        is_best = study.best_trial.number == trial.number + 1
         marker   = "★ NEW BEST" if is_best else ""
         duration = trial.duration.total_seconds() if trial.duration else 0.0
 
-        print(f"\n── Trial {trial.number:>3}  {marker}")
+        print(f"\n── Trial {trial.number + 1:>3}  {marker}")
         print(f"   value    : {trial.value:.6f}")
         print(f"   duration : {duration:6.1f}s")
         print(f"   params   :")

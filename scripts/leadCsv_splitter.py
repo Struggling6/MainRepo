@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """
-Split train_features.csv into multiple client CSV files by whole building_id groups.
+Split the LEAD training CSV into multiple client CSV files by whole building_id groups.
+
+Default input is `train_features_clean.csv` (produced by
+scripts/clean_lead_features.py). Override with --input-file to operate on the
+raw `train_features.csv` if needed.
 
 Assumptions:
-- train_features.csv is in the same directory as this script
+- input file is in the same directory as this script unless --input-file is given
 - output folder is provided by the user
 - each building_id is placed in exactly one output file
 
@@ -26,7 +30,7 @@ from pathlib import Path
 import pandas as pd
 
 
-INPUT_FILENAME = "train_features.csv"
+INPUT_FILENAME = "train_features_clean.csv"
 
 
 def parse_args() -> argparse.Namespace:
@@ -47,7 +51,7 @@ def parse_args() -> argparse.Namespace:
         "--input-file",
         type=Path,
         default=None,
-        help="Optional explicit path to input CSV. Defaults to train_features.csv in the same folder as this script.",
+        help="Optional explicit path to input CSV. Defaults to train_features_clean.csv in the same folder as this script.",
     )
     return parser.parse_args()
 

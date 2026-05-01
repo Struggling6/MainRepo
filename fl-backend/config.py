@@ -1,9 +1,7 @@
 from __future__ import annotations
-
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
-from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
 
 def resolve_loss_fn(loss_fn):
     """Resolve a loss function name or class to a torch.nn loss class."""
@@ -131,6 +129,7 @@ class PatchTSTConfig():
     HuggingFace internals (attention implementation, label mappings, etc.) are
     properly initialized before the model is built.
     """
+
     name:                str   = "patchtst"
     batch_size:          int   = 64
     context_length:      int   = 168
@@ -152,6 +151,8 @@ class PatchTSTConfig():
 
     def build(self, input_dim: int, context_length = None):
         from models.PatchTST import PatchTST
+
+        from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
 
         hf_config = HF_PatchTSTConfig(
             num_input_channels=input_dim,
@@ -177,7 +178,7 @@ class PatchTSTConfig():
 @dataclass
 class LeadCSVConfig: 
     name:         str   = "lead_csv"
-    file_path:    Path  = Path("datasets/LEAD/train_features.csv") #used for shared mode, ignored for local mode, should be the large dataset csv
+    file_path:    Path  = Path("datasets/LEAD/train_features_clean.csv") #used for shared mode, ignored for local mode, should be the large dataset csv (sentinel-cleaned by scripts/clean_lead_features.py)
     data_dir:     Path  = Path("datasets/LEAD")
     file_pattern: str   = "data{client_index}.csv"
     target:       str   = "anomaly"
@@ -229,7 +230,7 @@ class FederationConfig:
 @dataclass
 class EvaluationConfig:
     model_path:   Path | None  = None  # set in FedProxWithSave
-    test_path:    Path         = Path("/app/datasets/LEAD/test_features.csv")
+    test_path:    Path         = Path("/app/datasets/LEAD/test_features_clean.csv")
     target:       str          = "anomaly"
     batch_size:   int          = 64
     threshold:    float        = 0.5   # decision threshold — override with best_thresh from training
@@ -253,9 +254,9 @@ class ExperimentConfig:
 # need to specify what differs from the defaults.
 
 CONFIG = ExperimentConfig(
-    model=CNNTransformerConfig(nhead=4, num_layers=2, d_model=128, dropout=0.3),
-    training=TrainingConfig(local_epochs=10, learning_rate=1e-4),
-    federation=FederationConfig(num_rounds=10, num_clients=10, proximal_mu=0.1, partition_mode="shared"),
+    model=CNNTransformerConfig(nhead=4, num_layers=1, batch_size=128, pos_weight_cap=100, dropout=0.1250780386573224, d_model=64),
+    training=TrainingConfig(local_epochs=20, learning_rate=0.00016273524419282967, weight_decay=0.0001000950072852069),
+    federation=FederationConfig(num_rounds=10, num_clients=2, proximal_mu=0.1, partition_mode="shared"),
 )
 
 

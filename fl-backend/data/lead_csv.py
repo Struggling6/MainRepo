@@ -111,7 +111,9 @@ class LeadCSVHandler(BaseDatasetHandler):
             "dew_temperature",
             "precip_depth_1_hr",
             "sea_level_pressure",
-            "wind_direction",
+            # wind_direction (raw degrees) is replaced by cyclic encoding below.
+            "wind_dir_x",
+            "wind_dir_y",
             "wind_speed",
             "air_temperature_mean_lag7",
             "air_temperature_max_lag7",
@@ -135,6 +137,17 @@ class LeadCSVHandler(BaseDatasetHandler):
             "meter_diff_1",
             "meter_diff_24",
             "meter_zscore_24",
+            # Missingness indicators emitted by scripts/clean_lead_features.py.
+            # Each flag is 1.0 when the corresponding raw feature was a sentinel
+            # in the source CSV and was replaced by an imputed value.
+            "cloud_coverage_was_missing",
+            "year_built_was_missing",
+            "floor_count_was_missing",
+            "wind_dir_missing",
+            "wind_speed_was_missing",
+            "precip_depth_was_missing",
+            "air_temp_std_lag7_was_missing",
+            "air_temp_std_lag73_was_missing",
         ]
 
         primary_use_cols = [
