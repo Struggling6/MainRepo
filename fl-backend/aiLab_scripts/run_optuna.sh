@@ -15,20 +15,18 @@ MAX_PARALLEL="${MAX_PARALLEL:-8}"
 # ── Defaults ──────────────────────────────────────────────────────────── #
 TRIALS=50
 EPOCHS=10
-PATIENCE=10
 
 # ── Argument parsing ──────────────────────────────────────────────────── #
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --trials|-t)   TRIALS="$2"; shift 2 ;;
         --epochs|-e)   EPOCHS="$2"; shift 2 ;;
-        --patience|-p) PATIENCE="$2"; shift 2 ;;
         --study-name|-s) STUDY_NAME="$2"; shift 2 ;;
         --max-parallel|-m) MAX_PARALLEL="$2"; shift 2 ;;
         --storage) STORAGE="$2"; shift 2 ;;
         *)
             echo "Unknown argument: $1"
-            echo "Usage: bash run_optuna.sh [--trials N] [--epochs N] [--patience N] [--study-name NAME] [--max-parallel N] [--storage URI]"
+            echo "Usage: bash run_optuna.sh [--trials N] [--epochs N] [--study-name NAME] [--max-parallel N] [--storage URI]"
             exit 1
             ;;
     esac
@@ -45,7 +43,6 @@ mkdir -p "${LOG_DIR}"
 print_section "Optuna Hyperparameter Search"
 echo "  Trials       : ${TRIALS}"
 echo "  Epochs       : ${EPOCHS}"
-echo "  Patience     : ${PATIENCE}"
 echo "  Study name   : ${STUDY_NAME}"
 echo "  Storage      : ${STORAGE}"
 echo "  Max parallel : ${MAX_PARALLEL}"
@@ -78,7 +75,7 @@ while [ "$REMAINING" -gt 0 ]; do
         --chdir="${BASE_DIR}" \
         --output="${LOG_DIR}/optuna_%A_%a.out" \
         --error="${LOG_DIR}/optuna_%A_%a.err" \
-        --export=ALL,BASE_DIR="${BASE_DIR}",VENV_DIR="${VENV_DIR}",LOG_DIR="${LOG_DIR}",CONTAINER="${CONTAINER}",OPTUNA_EPOCHS="${EPOCHS}",OPTUNA_PATIENCE="${PATIENCE}",OPTUNA_STORAGE="${STORAGE}",OPTUNA_STUDY="${STUDY_NAME}" \
+        --export=ALL,BASE_DIR="${BASE_DIR}",VENV_DIR="${VENV_DIR}",LOG_DIR="${LOG_DIR}",CONTAINER="${CONTAINER}",OPTUNA_EPOCHS="${EPOCHS}",OPTUNA_STORAGE="${STORAGE}",OPTUNA_STUDY="${STUDY_NAME}" \
         "${SCRIPT_DIR}/optuna.sbatch")
 
     echo "  -> Job ID: ${JOB_ID}"

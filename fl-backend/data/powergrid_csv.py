@@ -14,7 +14,7 @@ class PowerGridCSVHandler(BaseDatasetHandler):
         self.file_path = config.data.file_path
 
         #Use from config if provided, otherwise default to 32
-        self.batch_size = config.data.batch_size 
+        self.batch_size = config.model.batch_size 
 
         #How many clients to split data into. Default is 1
         self.num_clients = config.federation.num_clients

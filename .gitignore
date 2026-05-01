@@ -145,3 +145,4 @@ htmlcov/
 *.swp
 uv.lock
 *.fab
+requirements.txt

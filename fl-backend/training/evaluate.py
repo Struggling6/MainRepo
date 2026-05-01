@@ -1,4 +1,3 @@
-from alembic import config
 from config import CONFIG
 
 import torch
