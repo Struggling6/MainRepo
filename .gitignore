@@ -135,6 +135,15 @@ htmlcov/
 
 # =========================
 
+# Docker
+
+# =========================
+
+compose.yaml
+requirements.txt
+
+# =========================
+
 # Misc
 
 # =========================
@@ -145,4 +154,3 @@ htmlcov/
 *.swp
 uv.lock
 *.fab
-requirements.txt
