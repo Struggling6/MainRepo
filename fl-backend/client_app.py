@@ -1,8 +1,6 @@
-from pathlib import Path
-from torch import nn
 import torch 
-torch.set_num_threads(1)
-torch.set_num_interop_threads(1)
+from torch import nn
+from pathlib import Path
 from flwr.client import ClientApp, NumPyClient
 from training.training_utils.Evaluator import Evaluator
 from flwr.common.logger import log
@@ -13,6 +11,8 @@ from training.train import train_model
 from copy import deepcopy
 from config import CONFIG
 
+torch.set_num_threads(1)
+torch.set_num_interop_threads(1)
 
 def _resolve_real_model(model):
     """Return the actual nn.Module containing weights."""

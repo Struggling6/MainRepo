@@ -49,6 +49,7 @@ class LeadCSVHandler(BaseDatasetHandler):
         self.seed = config.data.seed
         self.partition_mode = getattr(config.federation, "partition_mode")
 
+        # Optional local-mode settings
         self.data_dir = getattr(config.data, "data_dir", None)
         self.file_pattern = getattr(config.data, "file_pattern", None)
 
@@ -74,6 +75,7 @@ class LeadCSVHandler(BaseDatasetHandler):
             self.features, self.labels = self._prepare_data(self.df)
             self._prepare_partitions()
 
+        # In local mode each client gets its own file later in get_dataloaders(...)
         elif self.partition_mode == "local":
             self.client_indices = list(range(self.num_clients))
 
@@ -93,7 +95,7 @@ class LeadCSVHandler(BaseDatasetHandler):
                 client_index=client_index
             )
         else:
-            path = Path(self.file_path)
+            path = Path(self.file_path) # Fallback to single-file behavior if no local pattern is configured
 
         if not path.exists():
             raise FileNotFoundError(
