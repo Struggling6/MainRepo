@@ -37,32 +37,22 @@ class TrainEvalBase:
     def _train_epoch(self, model, loader, optimizer, loss_fn):
         model.train()
         total_loss, total_samples = 0.0, 0
-        print(f"[DEBUG] _train_epoch starting, loader has ~{len(loader)} batches")
 
-        for batch_idx, (features, labels) in enumerate(loader):
-            print(f"[DEBUG] Batch {batch_idx}: features shape={features.shape}, labels shape={labels.shape}")
-            
+        for batch_idx, (features, labels) in enumerate(loader):            
             features = features.to(self.device)
             labels   = labels.to(self.device).float()
 
-            print(f"[DEBUG] Computing forward pass...")
             optimizer.zero_grad()
             logits = model(features)
-            print(f"[DEBUG] Forward done, logits shape={logits.shape}")
-            
-            print(f"[DEBUG] Computing loss...")
+
             loss   = loss_fn(logits, labels)
-            print(f"[DEBUG] Loss={loss.item()}")
             
-            print(f"[DEBUG] Backward pass...")
             loss.backward()
             optimizer.step()
-            print(f"[DEBUG] Batch {batch_idx} complete")
 
             total_loss    += loss.item() * features.size(0)
             total_samples += features.size(0)
 
-        print(f"[DEBUG] Epoch done, avg_loss={total_loss / total_samples}")
         return total_loss / total_samples
 
     def _val_epoch(self, model, loader, loss_fn):
