@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
-from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
 
 def resolve_loss_fn(loss_fn):
     """Resolve a loss function name or class to a torch.nn loss class."""
@@ -152,6 +151,8 @@ class PatchTSTConfig():
 
     def build(self, input_dim: int, context_length = None):
         from models.PatchTST import PatchTST
+        from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
+
 
         hf_config = HF_PatchTSTConfig(
             num_input_channels=input_dim,
