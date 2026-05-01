@@ -46,7 +46,7 @@ services:
       - --isolation
       - process
       - --node-config
-      - "partition-id=0 num-partitions=2"
+      - "partition-id=0 num-partitions=3"
     depends_on:
       - superlink
 
@@ -66,12 +66,8 @@ services:
     stop_signal: SIGINT
     volumes:
       - ./fl-backend/datasets:/app/datasets
-    devices:
-      - /dev/kfd:/dev/kfd
-      - /dev/dri:/dev/dri
-    group_add:
-      - render
-      - video
+    cpus: "1.0"
+    mem_limit: 3g
 
   supernode-2:
     image: flwr/supernode:1.27.0
@@ -84,7 +80,7 @@ services:
       - --isolation
       - process
       - --node-config
-      - "partition-id=1 num-partitions=2"
+      - "partition-id=1 num-partitions=3"
     depends_on:
       - superlink
 
@@ -104,10 +100,40 @@ services:
     stop_signal: SIGINT
     volumes:
       - ./fl-backend/datasets:/app/datasets
-    devices:
-      - /dev/kfd:/dev/kfd
-      - /dev/dri:/dev/dri
-    group_add:
-      - render
-      - video
+    cpus: "1.0"
+    mem_limit: 3g
+
+  supernode-3:
+    image: flwr/supernode:1.27.0
+    command:
+      - --insecure
+      - --superlink
+      - superlink:9092
+      - --clientappio-api-address
+      - 0.0.0.0:9096
+      - --isolation
+      - process
+      - --node-config
+      - "partition-id=2 num-partitions=3"
+    depends_on:
+      - superlink
+
+  superexec-clientapp-3:
+    image: *superexec_image
+    build:
+      context: ./fl-backend
+      dockerfile: Dockerfile
+    command:
+      - --insecure
+      - --plugin-type
+      - clientapp
+      - --appio-api-address
+      - supernode-3:9096
+    depends_on:
+      - supernode-3
+    stop_signal: SIGINT
+    volumes:
+      - ./fl-backend/datasets:/app/datasets
+    cpus: "1.0"
+    mem_limit: 3g
 

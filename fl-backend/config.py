@@ -23,15 +23,6 @@ def resolve_loss_fn(loss_fn):
 class BinaryClassificationConfig:
     name: str = "binary_classification"
 
-@dataclass
-class AnomalyDetectionConfig:
-    name: str = "anomaly_detection"
-
-@dataclass
-class MultiClassClassificationConfig:
-    name: str = "multi_class_classification"
-
-
 # ── Model configs ─────────────────────────────────────────────────────── #
 
 @dataclass
@@ -171,6 +162,26 @@ class PatchTSTConfig():
             num_targets=self.num_classes,
         )
         return PatchTST(hf_config)
+    
+@dataclass
+class SupervisedCNNConfig:
+    name:           str   = "supervised_cnn"
+    d_model:        int   = 128
+    dropout:        float = 0.3
+    pos_weight_cap: float = 10.0
+    num_classes:    int   = 1
+    loss_fn:        str   = "BCEWithLogitsLoss"
+
+    def build(self, input_dim: int):
+        from models.SupervisedCNN import SupervisedCNN
+
+        return SupervisedCNN(
+            in_channels=input_dim,
+            d_model=self.d_model,
+            num_classes=self.num_classes,
+            dropout=self.dropout,
+        )
+
 
 # ── Data configs ──────────────────────────────────────────────────────── #
 
@@ -219,10 +230,10 @@ class TrainingConfig:
 class FederationConfig:
     partition_mode:    str   = "local" # local or shared
     num_rounds:        int   = 2
-    num_clients:       int   = 1
+    num_clients:       int   = 3
     fraction_fit:      float = 1.0
     fraction_evaluate: float = 1.0
-    proximal_mu:       float = 0.1
+    proximal_mu:       float = 2.0
 
 # ── Evaluation config ─────────────────────────────────────────────────── #
 
@@ -242,7 +253,7 @@ class EvaluationConfig:
 @dataclass
 class ExperimentConfig:
     task:       BinaryClassificationConfig = field(default_factory=BinaryClassificationConfig)
-    model:      CNNTransformerConfig       = field(default_factory=CNNTransformerConfig)
+    model:      SupervisedCNNConfig       = field(default_factory=SupervisedCNNConfig)
     data:       LeadCSVConfig              = field(default_factory=LeadCSVConfig)
     training:   TrainingConfig             = field(default_factory=TrainingConfig)
     federation: FederationConfig           = field(default_factory=FederationConfig)
