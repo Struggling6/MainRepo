@@ -30,15 +30,9 @@ def create_windowed_data(
     # range(start=0, stop=last valid start, step=stride)
     # last valid start ensures the window i..i+window_size never
     # falls off the end of the array
-    label_lookback = 24
-
     for i in range(0, len(data) - window_size, stride):
         X_windows.append(data[i : i + window_size])
-
-        label_start = max(i, i + window_size - label_lookback)
-        label_end = i + window_size + 1
-
-        y_windows.append(labels[label_start:label_end].max())
+        y_windows.append(labels[i + window_size])
 
     return np.array(X_windows), np.array(y_windows)
 

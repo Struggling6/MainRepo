@@ -36,7 +36,7 @@ def train_model(
         # Extract labels (for pos_weight)
         # --------------------------------------------------
         print("[TRAIN] extracting labels for pos_weight...", flush=True)
-        y_train = _extract_labels_fast (trainloader)
+        y_train = _extract_labels(trainloader)
         print(f"[TRAIN] labels extracted: shape={y_train.shape}", flush=True)
 
         pos_weight = compute_pos_weight(y_train, cap=model_config.pos_weight_cap)
@@ -60,9 +60,9 @@ def train_model(
     # --------------------------------------------------
     # Convert DataLoader -> numpy arrays (THIS IS HEAVY)
     # --------------------------------------------------
-    #print("[TRAIN] converting dataloader to arrays...", flush=True)
-    #X_train, y_train = _dataloader_to_arrays(trainloader)
-    #print(f"[TRAIN] arrays created: X={X_train.shape}, y={y_train.shape}", flush=True)
+    print("[TRAIN] converting dataloader to arrays...", flush=True)
+    X_train, y_train = _dataloader_to_arrays(trainloader)
+    print(f"[TRAIN] arrays created: X={X_train.shape}, y={y_train.shape}", flush=True)
 
     # --------------------------------------------------
     # Trainer setup
@@ -149,16 +149,3 @@ def _extract_labels(loader):
 
     print("[TRAIN] _extract_labels done", flush=True)
     return y
-
-def _extract_labels_fast(loader):
-    dataset = loader.dataset
-
-    if hasattr(dataset, "tensors"):
-        return dataset.tensors[1].detach().cpu().numpy()
-
-    if hasattr(dataset, "dataset") and hasattr(dataset.dataset, "tensors"):
-        indices = dataset.indices
-        labels = dataset.dataset.tensors[1][indices]
-        return labels.detach().cpu().numpy()
-
-    return _extract_labels(loader)

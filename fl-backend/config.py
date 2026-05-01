@@ -38,8 +38,8 @@ class MultiClassClassificationConfig:
 @dataclass
 class CNNTransformerConfig:
     name:           str   = "supervised_cnn_transformer"
-    d_model:        int   = 64
-    nhead:          int   = 2
+    d_model:        int   = 128
+    nhead:          int   = 4
     num_layers:     int   = 2
     dropout:        float = 0.3
     pos_weight_cap: float = 10.0
@@ -201,10 +201,7 @@ class LeadCSVConfig:
     data_dir:     Path = Path("datasets/LEAD")
     file_pattern: str  = "data{client_index}.csv"
     target:       str  = "anomaly"
-    cache_preprocessed: bool = True
-    cache_windowed: bool = True
-    cache_dir: Path | None = Path("datasets/LEAD/cache")
-    batch_size:   int  = 128
+    batch_size:   int  = 64
     num_classes:  int  = 2
     task_name:    str  = "binary_classification"
     test_split:   float = 0.2
@@ -236,7 +233,7 @@ class PowerGridCSVConfig:
 class TrainingConfig:
     learning_rate: float = 1e-4
     weight_decay:  float = 1e-4
-    local_epochs:  int   = 1
+    local_epochs:  int   = 2
     patience:      int   = 10
 
 
@@ -245,10 +242,10 @@ class TrainingConfig:
 @dataclass
 class FederationConfig:
     partition_mode:    str   = "local" # local or shared
-    num_rounds:        int   = 10
-    num_clients:       int   = 10
-    fraction_fit:      float = 0.4
-    fraction_evaluate: float = 0.5
+    num_rounds:        int   = 15
+    num_clients:       int   = 2
+    fraction_fit:      float = 1.0
+    fraction_evaluate: float = 1.0
     proximal_mu:       float = 0.1
 
 # ── Evaluation config ─────────────────────────────────────────────────── #

@@ -60,10 +60,6 @@ class FlowerClient(NumPyClient):
         print("[Client Init] creating dataset handler", flush=True)
         self.dataset_handler = self.config.data.build_handler(self.config)
 
-        self.trainloader, self.testloader = self.dataset_handler.get_dataloaders(
-            partition_id=self.partition_id
-        )
-
         print("[Client Init] getting metadata", flush=True)
         self.metadata = self.dataset_handler.get_metadata()
         print(f"[Client Init] metadata={self.metadata}", flush=True)
@@ -80,7 +76,9 @@ class FlowerClient(NumPyClient):
             log(INFO, "[%s] ERROR building model: %s", self.facility_id, e)
             raise
 
-       
+        self.trainloader, self.testloader = self.dataset_handler.get_dataloaders(
+            partition_id=self.partition_id
+        )
 
         log(INFO, "[%s] initialised | partition=%s | data=%s | mode=%s | device=%s",
             self.facility_id,
@@ -112,14 +110,10 @@ class FlowerClient(NumPyClient):
             training_config=self.config.training,
             model_config=self.config.model,
             device=self.device,
-            proximal_mu=proximal_mu,
         )
 
         results["input_dim"] = self.metadata["input_dim"]
         log(INFO, "[FIT] done facility_id=%s results=%s", self.facility_id, results)
-
-
-    
 
         return get_model_parameters(self.model), results["num_examples"], results
 
