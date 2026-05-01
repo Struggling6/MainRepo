@@ -139,7 +139,7 @@ htmlcov/
 
 # =========================
 
-compose.yaml
+compose.yml
 requirements.txt
 
 # =========================
