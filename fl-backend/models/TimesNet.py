@@ -16,7 +16,6 @@ class TimesNetModel(BaseModel):
     ):
         super().__init__()
 
-        # PyPOTS wrapper. Vi bruger kun dens interne torch-model.
         pypots_model = PyPOTSTimesNet(
             n_steps=n_steps,
             n_features=n_features,
@@ -28,8 +27,6 @@ class TimesNetModel(BaseModel):
             n_kernels=n_kernels,
             dropout=dropout,
 
-            # Disse er mest relevante for PyPOTS' egen .fit().
-            # Din egen training loop bruger dem typisk ikke.
             batch_size=32,
             epochs=1,
             patience=None,
@@ -38,7 +35,6 @@ class TimesNetModel(BaseModel):
             verbose=False,
         )
 
-        # Dette er den rigtige torch.nn.Module-del.
         self.model = pypots_model.model
 
     def forward(self, x):
@@ -53,6 +49,5 @@ class TimesNetModel(BaseModel):
         if logits.shape[-1] == 1:
             return logits.squeeze(-1)
 
-        # For CrossEntropyLoss / multiclass beholdes shape [batch_size, n_classes]
         return logits
 
