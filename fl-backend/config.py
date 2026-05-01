@@ -272,7 +272,7 @@ class ExperimentConfig:
 CONFIG = ExperimentConfig(
     model=CNNTransformerConfig(nhead=4, num_layers=2, d_model=128, dropout=0.3),
     training=TrainingConfig(local_epochs=10, learning_rate=1e-4),
-    federation=FederationConfig(num_rounds=10, num_clients=10, proximal_mu=0.1, partition_mode="shared"),
+    federation=FederationConfig(num_rounds=1, num_clients=5, proximal_mu=0.1, partition_mode="shared", fraction_fit=0.2, fraction_evaluate=0.2),
 )
 
 

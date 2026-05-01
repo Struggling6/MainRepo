@@ -14,3 +14,10 @@ tests
 *.pth
 *.csv
 *.json
+# Stale FAB bundles produced by `flwr run` / `flwr build` on the host
+*.fab
+# Miscellaneous local-only files
+.flwr
+*.egg-info
+build
+dist
