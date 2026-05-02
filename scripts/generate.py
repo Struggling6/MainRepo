@@ -28,7 +28,7 @@ REQUIREMENTS_BASE = [
     "matplotlib==3.10.9",
     "transformers==5.6.2",
     "captum==0.9.0",
-    "pypots>=1.4",
+    "pypots==1.3",
 ]
 
 TORCH_PINS = {
