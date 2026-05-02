@@ -187,6 +187,7 @@ class SupervisedCNNConfig:
 @dataclass
 class TimesNetConfig:
     name:           str   = "timesnet"
+    batch_size:     int   = 64
     d_model:        int   = 128
     num_layers:     int   = 2
     top_k:          int   = 3
@@ -258,7 +259,7 @@ class TrainingConfig:
 class FederationConfig:
     partition_mode:    str   = "local" # local or shared
     num_rounds:        int   = 15
-    num_clients:       int   = 2
+    num_clients:       int   = 1
     fraction_fit:      float = 1.0
     fraction_evaluate: float = 1.0
     proximal_mu:       float = 2.0
