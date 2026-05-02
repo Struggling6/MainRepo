@@ -26,7 +26,7 @@ REQUIREMENTS_BASE = [
     "numpy==2.4.4",
     "scikit-learn==1.8.0",
     "matplotlib==3.10.9",
-    "transformers==4.40.0",
+    "transformers==5.6.2",
     "captum==0.9.0",
     "pypots>=1.4",
 ]
