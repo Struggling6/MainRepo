@@ -70,7 +70,7 @@ class TrainEvalBase:
                 if self.num_classes == 1:
                     loss_labels = labels.float().view_as(logits)
                 else:
-                    loss_labels = labels
+                    loss_labels = labels.long()
 
                 total_loss += loss_fn(logits, loss_labels).item() * features.size(0)
                 total_samples += features.size(0)

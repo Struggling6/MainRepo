@@ -49,7 +49,7 @@ def train_model(
         print("[TRAIN] creating loss function...", flush=True)
         loss_cls = resolve_loss_fn(model_config.loss_fn)
         loss_fn = loss_cls(
-            pos_weight=torch.tensor([pos_weight], device=device)
+            pos_weight=torch.tensor([pos_weight], dtype=torch.float32, device=device)
         ) if loss_cls == nn.BCEWithLogitsLoss else loss_cls()
     else:
         # HuggingFace models — loss is handled internally, pass None

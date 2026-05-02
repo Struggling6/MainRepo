@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
-from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
 
 def resolve_loss_fn(loss_fn):
     """Resolve a loss function name or class to a torch.nn loss class."""
@@ -143,6 +142,8 @@ class PatchTSTConfig():
 
     def build(self, input_dim: int, context_length = None):
         from models.PatchTST import PatchTST
+        from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
+
 
         hf_config = HF_PatchTSTConfig(
             num_input_channels=input_dim,
@@ -256,8 +257,8 @@ class TrainingConfig:
 @dataclass
 class FederationConfig:
     partition_mode:    str   = "local" # local or shared
-    num_rounds:        int   = 2
-    num_clients:       int   = 3
+    num_rounds:        int   = 15
+    num_clients:       int   = 2
     fraction_fit:      float = 1.0
     fraction_evaluate: float = 1.0
     proximal_mu:       float = 2.0
@@ -273,6 +274,22 @@ class EvaluationConfig:
     threshold:    float        = 0.5   # decision threshold — override with best_thresh from training
     input_dim:    int          = 0     # set after data loading
 
+
+# ── Interpretability config ─────────────────────────────────────────── #
+@dataclass
+class InterpretabilityConfig:
+    # Number of steps in Integrated Gradients
+    ig_steps: int = 50
+
+    # Baseline type: "zero", "mean", or "sample"
+    ig_baseline: str = "zero"
+
+    # Whether to use probabilities instead of raw logits
+    ig_use_probability: bool = False
+
+    # Where to save IG outputs
+    ig_output_path: Path = Path("plotting/saved_plots/integrated_gradients.npz")
+
 # ── Top-level experiment config ───────────────────────────────────────── #
 
     
@@ -285,7 +302,7 @@ class ExperimentConfig:
     training:   TrainingConfig             = field(default_factory=TrainingConfig)
     federation: FederationConfig           = field(default_factory=FederationConfig)
     evaluation: EvaluationConfig           = field(default_factory=EvaluationConfig)
-
+    interpretability: InterpretabilityConfig = field(default_factory=InterpretabilityConfig)
 # ── Active experiment ─────────────────────────────────────────────────── #
 # Change CONFIG to switch experiments. All fields have defaults so you only
 # need to specify what differs from the defaults.
@@ -293,7 +310,7 @@ class ExperimentConfig:
 CONFIG = ExperimentConfig(
     model=CNNTransformerConfig(nhead=4, num_layers=2, d_model=128, dropout=0.3),
     training=TrainingConfig(local_epochs=10, learning_rate=1e-4),
-    federation=FederationConfig(num_rounds=10, num_clients=10, proximal_mu=0.1, partition_mode="shared"),
+    federation=FederationConfig(num_rounds=1, num_clients=5, proximal_mu=0.1, partition_mode="shared", fraction_fit=0.2, fraction_evaluate=0.2),
 )
 
 
