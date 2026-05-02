@@ -17,13 +17,14 @@ class Trainer(TrainEvalBase):
         proximal_mu:   float = 0.0,
         global_params: list[torch.Tensor] | None = None,
     ):
-        super().__init__(epochs, num_classes)
+        super().__init__(num_classes=num_classes, epochs=epochs)
         self.model = model.to(self.device)
         self.loss_fn = loss_fn
         self.batch_size = batch_size
         self.optimizer = torch.optim.AdamW(
             model.parameters(), lr=lr, weight_decay=weight_decay
         )
+        self.patience = patience
         self.proximal_mu = proximal_mu
 
         # FedProx saves the global model before the client starts local training.
