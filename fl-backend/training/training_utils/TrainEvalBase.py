@@ -38,13 +38,15 @@ class TrainEvalBase:
         model.train()
         total_loss, total_samples = 0.0, 0
 
-        for features, labels in loader:
+        for batch_idx, (features, labels) in enumerate(loader):            
             features = features.to(self.device)
-            labels   = labels.to(self.device).float()   # ← cast to float32
+            labels   = labels.to(self.device).float()
 
             optimizer.zero_grad()
             logits = model(features)
+
             loss   = loss_fn(logits, labels)
+            
             loss.backward()
             optimizer.step()
 
