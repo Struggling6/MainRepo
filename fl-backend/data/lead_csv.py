@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 
 from pathlib import Path
+from sklearn.preprocessing import StandardScaler
+
 from .time_series_utils import temporal_grouped_split
 from .BaseDataHandler import BaseDatasetHandler
 
@@ -73,8 +75,8 @@ class LeadCSVHandler(BaseDatasetHandler):
             self.features, self.labels = self._prepare_data(self.df)
             self._prepare_partitions()
 
+        # In local mode each client gets its own file later in get_dataloaders(...)
         elif self.partition_mode == "local":
-            # In local mode each client gets its own file later in get_dataloaders(...)
             self.client_indices = list(range(self.num_clients))
 
         else:
@@ -89,13 +91,16 @@ class LeadCSVHandler(BaseDatasetHandler):
 
         if self.data_dir and self.file_pattern:
             client_index = partition_id + 1
-            path = Path(self.data_dir) / self.file_pattern.format(client_index=client_index)
+            path = Path(self.data_dir) / self.file_pattern.format(
+                client_index=client_index
+            )
         else:
-            # Fallback to single-file behavior if no local pattern is configured
-            path = Path(self.file_path)
+            path = Path(self.file_path) # Fallback to single-file behavior if no local pattern is configured
 
         if not path.exists():
-            raise FileNotFoundError(f"Local client file not found for partition {partition_id}: {path}")
+            raise FileNotFoundError(
+                f"Local client file not found for partition {partition_id}: {path}"
+            )
 
         return path
 
@@ -199,6 +204,7 @@ class LeadCSVHandler(BaseDatasetHandler):
         expected_primary_use_cols = [
             f"primary_use_{cat}" for cat in self.PRIMARY_USE_CATEGORIES
         ]
+
         for col in expected_primary_use_cols:
             if col not in df.columns:
                 df[col] = 0.0
@@ -216,9 +222,14 @@ class LeadCSVHandler(BaseDatasetHandler):
 
         print(f"[LEAD] Feature count: {len(self.feature_cols)}")
 
-        missing_features = [col for col in self.feature_cols if col not in df.columns]
+        missing_features = [
+            col for col in self.feature_cols if col not in df.columns
+        ]
+
         if missing_features:
-            raise ValueError(f"Missing expected feature columns: {missing_features}")
+            raise ValueError(
+                f"Missing expected feature columns: {missing_features}"
+            )
 
         self.df = df
 
@@ -227,11 +238,45 @@ class LeadCSVHandler(BaseDatasetHandler):
 
         return X, y
 
+    def _scale_temporal_arrays(
+        self,
+        X_train: np.ndarray,
+        X_val: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Standardize features after the temporal train/validation split.
+
+        The scaler is fitted only on X_train to avoid validation leakage.
+        Input shape is expected to be:
+        (num_windows, window_size, num_features)
+        """
+
+        scaler = StandardScaler()
+
+        original_train_shape = X_train.shape
+        original_val_shape = X_val.shape
+
+        X_train_2d = X_train.reshape(-1, X_train.shape[-1])
+        X_val_2d = X_val.reshape(-1, X_val.shape[-1])
+
+        X_train_scaled = scaler.fit_transform(X_train_2d).reshape(
+            original_train_shape
+        )
+        X_val_scaled = scaler.transform(X_val_2d).reshape(original_val_shape)
+
+        print("[LEAD] Applied StandardScaler using training data only")
+
+        return (
+            X_train_scaled.astype(np.float32),
+            X_val_scaled.astype(np.float32),
+        )
+
     def _prepare_partitions(self):
         """
         Shared mode: partition buildings across clients.
         Each building_id belongs to exactly one client partition.
         """
+
         rng = np.random.default_rng(self.seed)
         buildings = self.df[self._node_col].unique()
         rng.shuffle(buildings)
@@ -283,10 +328,13 @@ class LeadCSVHandler(BaseDatasetHandler):
 
         print(f"[LEAD] Split done: X_train={X_train.shape}, X_val={X_val.shape}")
 
+        X_train, X_val = self._scale_temporal_arrays(X_train, X_val)
+
         train_dataset = torch.utils.data.TensorDataset(
             torch.tensor(X_train, dtype=torch.float32),
             torch.tensor(y_train, dtype=torch.long),
         )
+
         val_dataset = torch.utils.data.TensorDataset(
             torch.tensor(X_val, dtype=torch.float32),
             torch.tensor(y_val, dtype=torch.long),
@@ -296,11 +344,16 @@ class LeadCSVHandler(BaseDatasetHandler):
             train_dataset,
             batch_size=self.batch_size,
             shuffle=True,
+            num_workers=0,
+            pin_memory=False,
         )
+
         valloader = torch.utils.data.DataLoader(
             val_dataset,
             batch_size=self.batch_size,
             shuffle=False,
+            num_workers=0,
+            pin_memory=False,
         )
 
         return trainloader, valloader
@@ -309,7 +362,10 @@ class LeadCSVHandler(BaseDatasetHandler):
         if self.df is None:
             if self.partition_mode == "local":
                 sample_path = self._resolve_local_file_path(0)
-                print(f"[LEAD] Loading representative local file for metadata: {sample_path}")
+                print(
+                    f"[LEAD] Loading representative local file for metadata: "
+                    f"{sample_path}"
+                )
                 raw_df = pd.read_csv(sample_path)
 
                 if self.target not in raw_df.columns:

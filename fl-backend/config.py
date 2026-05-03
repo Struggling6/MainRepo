@@ -21,15 +21,6 @@ def resolve_loss_fn(loss_fn):
 class BinaryClassificationConfig:
     name: str = "binary_classification"
 
-@dataclass
-class AnomalyDetectionConfig:
-    name: str = "anomaly_detection"
-
-@dataclass
-class MultiClassClassificationConfig:
-    name: str = "multi_class_classification"
-
-
 # ── Model configs ─────────────────────────────────────────────────────── #
 
 @dataclass
@@ -151,6 +142,8 @@ class PatchTSTConfig():
 
     def build(self, input_dim: int, context_length = None):
         from models.PatchTST import PatchTST
+        from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
+
 
         from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
 
@@ -172,7 +165,55 @@ class PatchTSTConfig():
             num_targets=self.num_classes,
         )
         return PatchTST(hf_config)
+    
+@dataclass
+class SupervisedCNNConfig:
+    name:           str   = "supervised_cnn"
+    d_model:        int   = 128
+    dropout:        float = 0.3
+    pos_weight_cap: float = 10.0
+    num_classes:    int   = 1
+    loss_fn:        str   = "BCEWithLogitsLoss"
 
+    def build(self, input_dim: int):
+        from models.SupervisedCNN import SupervisedCNN
+
+        return SupervisedCNN(
+            in_channels=input_dim,
+            d_model=self.d_model,
+            num_classes=self.num_classes,
+            dropout=self.dropout,
+        )
+
+
+@dataclass
+class TimesNetConfig:
+    name:           str   = "timesnet"
+    batch_size:     int   = 64
+    d_model:        int   = 128
+    num_layers:     int   = 2
+    top_k:          int   = 3
+    d_ffn:          int   = 256
+    n_kernels:      int   = 6
+    dropout:        float = 0.3
+    pos_weight_cap: float = 10.0
+    num_classes:    int   = 1
+    loss_fn:        str   = "BCEWithLogitsLoss"
+
+    def build(self, input_dim: int, context_length: int = None):
+        from models.TimesNet import TimesNetModel
+
+        return TimesNetModel(
+            n_steps=context_length if context_length is not None else 168,
+            n_features=input_dim,
+            n_classes=self.num_classes,
+            n_layers=self.num_layers,
+            top_k=self.top_k,
+            d_model=self.d_model,
+            d_ffn=self.d_ffn,
+            n_kernels=self.n_kernels,
+            dropout=self.dropout,
+        )
 # ── Data configs ──────────────────────────────────────────────────────── #
 
 @dataclass
@@ -219,11 +260,11 @@ class TrainingConfig:
 @dataclass
 class FederationConfig:
     partition_mode:    str   = "local" # local or shared
-    num_rounds:        int   = 2
+    num_rounds:        int   = 15
     num_clients:       int   = 1
     fraction_fit:      float = 1.0
     fraction_evaluate: float = 1.0
-    proximal_mu:       float = 0.1
+    proximal_mu:       float = 2.0
 
 # ── Evaluation config ─────────────────────────────────────────────────── #
 
@@ -236,6 +277,22 @@ class EvaluationConfig:
     threshold:    float        = 0.5   # decision threshold — override with best_thresh from training
     input_dim:    int          = 0     # set after data loading
 
+
+# ── Interpretability config ─────────────────────────────────────────── #
+@dataclass
+class InterpretabilityConfig:
+    # Number of steps in Integrated Gradients
+    ig_steps: int = 50
+
+    # Baseline type: "zero", "mean", or "sample"
+    ig_baseline: str = "zero"
+
+    # Whether to use probabilities instead of raw logits
+    ig_use_probability: bool = False
+
+    # Where to save IG outputs
+    ig_output_path: Path = Path("plotting/saved_plots/integrated_gradients.npz")
+
 # ── Top-level experiment config ───────────────────────────────────────── #
 
     
@@ -243,12 +300,12 @@ class EvaluationConfig:
 @dataclass
 class ExperimentConfig:
     task:       BinaryClassificationConfig = field(default_factory=BinaryClassificationConfig)
-    model:      CNNTransformerConfig       = field(default_factory=CNNTransformerConfig)
+    model:      SupervisedCNNConfig       = field(default_factory=SupervisedCNNConfig)
     data:       LeadCSVConfig              = field(default_factory=LeadCSVConfig)
     training:   TrainingConfig             = field(default_factory=TrainingConfig)
     federation: FederationConfig           = field(default_factory=FederationConfig)
     evaluation: EvaluationConfig           = field(default_factory=EvaluationConfig)
-
+    interpretability: InterpretabilityConfig = field(default_factory=InterpretabilityConfig)
 # ── Active experiment ─────────────────────────────────────────────────── #
 # Change CONFIG to switch experiments. All fields have defaults so you only
 # need to specify what differs from the defaults.
@@ -263,6 +320,12 @@ CONFIG = ExperimentConfig(
 """
 Examples:
 
+CONFIG = ExperimentConfig(
+    model=TimesNetConfig(num_layers=3,d_model=128,top_k=3,d_ffn=256,n_kernels=6,dropout=0.3,num_classes=1,loss_fn="BCEWithLogitsLoss",),
+    training=TrainingConfig(local_epochs=1, learning_rate=1e-4),
+    federation=FederationConfig(num_rounds=2,num_clients=1, proximal_mu=0.1,partition_mode="local",),
+)
+    
 FedProx with LSTM on PowerGrid dataset:
 CONFIG = ExperimentConfig(
     model=ModelConfig(model=LSTMConfig(hidden_size=256, dropout=0.2)),

@@ -1,5 +1,6 @@
-from pathlib import Path
+import torch 
 from torch import nn
+from pathlib import Path
 from flwr.client import ClientApp, NumPyClient
 from training.training_utils.Evaluator import Evaluator
 from flwr.common.logger import log
@@ -10,6 +11,8 @@ from training.train import train_model
 from copy import deepcopy
 from config import CONFIG
 
+torch.set_num_threads(1)
+torch.set_num_interop_threads(1)
 
 def _resolve_real_model(model):
     """Return the actual nn.Module containing weights."""
@@ -98,7 +101,8 @@ class FlowerClient(NumPyClient):
         log(INFO, "[%s] FIT start | round=%s", self.facility_id, round_num)
         set_model_parameters(self.model, parameters)
 
-        proximal_mu = config.get("proximal-mu", self.config.federation.proximal_mu)
+        # Flower FedProx sends this value to tell the client how strong the penalty is.
+        proximal_mu = config.get("proximal_mu", self.config.federation.proximal_mu)
 
         results = train_model(
             model=self.model,
@@ -107,6 +111,7 @@ class FlowerClient(NumPyClient):
             training_config=self.config.training,
             model_config=self.config.model,
             device=self.device,
+            proximal_mu=proximal_mu,
         )
 
         results["input_dim"] = self.metadata["input_dim"]
