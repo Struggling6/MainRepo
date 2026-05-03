@@ -87,7 +87,7 @@ class OptunaOptimizer(TrainEvalBase):
         weight_decay      = trial.suggest_float("weight_decay",         1e-4, 1e-2, log=True)
         num_layers        = trial.suggest_int("num_layers",             1, 5)
         batch_size        = trial.suggest_categorical("batch_size",     [8, 16, 32, 64, 128, 256])
-        pos_weight_cap    = trial.suggest_categorical("pos_weight_cap", [ 20, 50, 70, 100])
+        pos_weight_cap    = trial.suggest_categorical("pos_weight_cap", [ 20, 50, 70, 90])
         dropout           = trial.suggest_float("dropout",              0.1, 0.5)
         self._logger(
             f"Trial {trial.number + 1}: sampled lr={lr:.3e}, wd={weight_decay:.3e}, "

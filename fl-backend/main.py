@@ -2,7 +2,7 @@ from config import CONFIG
 from training.train import train_model
 from models.utils import get_device
 from training.training_utils.Evaluator import Evaluator
-from plotting.plotting_config import plot_diagrams
+#from plotting.plotting_config import plot_diagrams
 
 import argparse
 parser = argparse.ArgumentParser()
@@ -60,12 +60,14 @@ def main():
         training_config=config.training,
         model_config=config.model,
         device=device,
+        proximal_mu=config.federation.proximal_mu,
     )
     print(f"Training results: {train_results}")
 
     # ── Evaluation ───────────────────────────────────────────────────── #
     evaluator = Evaluator(
         model_config=config.model,
+        metadata=metadata,
     )
     eval_results = evaluator.evaluate_round(model, valloader)
     print(f"Evaluation results: {eval_results}")

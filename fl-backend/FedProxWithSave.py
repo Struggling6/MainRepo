@@ -2,6 +2,7 @@ import os
 from logging import INFO, ERROR
 from pathlib import Path
 from typing import Optional, Union
+
 import torch
 import torch.nn as nn
 from flwr.common import EvaluateRes, FitRes, Parameters, parameters_to_ndarrays
@@ -23,8 +24,6 @@ class FedProxWithSave(FedProx):
 
         self.f1_history = []
         self.pr_auc_history = []
-
-
 
     def aggregate_fit(
         self,

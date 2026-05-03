@@ -46,7 +46,7 @@ services:
       - --isolation
       - process
       - --node-config
-      - "partition-id=0 num-partitions=2"
+      - "partition-id=0 num-partitions=1"
     depends_on:
       - superlink
 
@@ -63,44 +63,6 @@ services:
       - supernode-1:9094
     depends_on:
       - supernode-1
-    stop_signal: SIGINT
-    volumes:
-      - ./fl-backend/datasets:/app/datasets
-    devices:
-      - /dev/kfd:/dev/kfd
-      - /dev/dri:/dev/dri
-    group_add:
-      - render
-      - video
-
-  supernode-2:
-    image: flwr/supernode:1.27.0
-    command:
-      - --insecure
-      - --superlink
-      - superlink:9092
-      - --clientappio-api-address
-      - 0.0.0.0:9095
-      - --isolation
-      - process
-      - --node-config
-      - "partition-id=1 num-partitions=2"
-    depends_on:
-      - superlink
-
-  superexec-clientapp-2:
-    image: *superexec_image
-    build:
-      context: ./fl-backend
-      dockerfile: Dockerfile
-    command:
-      - --insecure
-      - --plugin-type
-      - clientapp
-      - --appio-api-address
-      - supernode-2:9095
-    depends_on:
-      - supernode-2
     stop_signal: SIGINT
     volumes:
       - ./fl-backend/datasets:/app/datasets
