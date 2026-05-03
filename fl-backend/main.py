@@ -16,7 +16,7 @@ def simulate():
     from client_app import app as client_app
     from server_app import app as server_app
 
-    num_clients = CONFIG.data.num_clients
+    num_clients = CONFIG.federation.num_clients
 
     print(f"Starting simulation with {num_clients} clients, {CONFIG.federation.num_rounds} rounds")
 
