@@ -296,12 +296,12 @@ class InterpretabilityConfig:
 
 @dataclass
 class ExperimentConfig:
-    task:       BinaryClassificationConfig = field(default_factory=BinaryClassificationConfig)
-    model:      SupervisedCNNConfig       = field(default_factory=SupervisedCNNConfig)
-    data:       LeadCSVConfig              = field(default_factory=LeadCSVConfig)
-    training:   TrainingConfig             = field(default_factory=TrainingConfig)
-    federation: FederationConfig           = field(default_factory=FederationConfig)
-    evaluation: EvaluationConfig           = field(default_factory=EvaluationConfig)
+    task:       BinaryClassificationConfig   = field(default_factory=BinaryClassificationConfig)
+    model:      SupervisedCNNConfig          = field(default_factory=SupervisedCNNConfig)
+    data:       LeadCSVConfig                = field(default_factory=LeadCSVConfig)
+    training:   TrainingConfig               = field(default_factory=TrainingConfig)
+    federation: FederationConfig             = field(default_factory=FederationConfig)
+    evaluation: EvaluationConfig             = field(default_factory=EvaluationConfig)
     interpretability: InterpretabilityConfig = field(default_factory=InterpretabilityConfig)
 # ── Active experiment ─────────────────────────────────────────────────── #
 # Change CONFIG to switch experiments. All fields have defaults so you only
@@ -310,7 +310,7 @@ class ExperimentConfig:
 CONFIG = ExperimentConfig(
     model=CNNTransformerConfig(nhead=4, num_layers=2, batch_size=128, pos_weight_cap=50, dropout=0.2, d_model=64),
     training=TrainingConfig(local_epochs=5, learning_rate=0.00016273524419282967, weight_decay=0.0001000950072852069),
-    federation=FederationConfig(num_rounds=1, num_clients=1, proximal_mu=0.1, partition_mode="shared"),
+    federation=FederationConfig(num_rounds=50, num_clients=10, proximal_mu=0.1, partition_mode="shared"),
 )
 
 
