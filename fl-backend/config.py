@@ -144,9 +144,6 @@ class PatchTSTConfig():
         from models.PatchTST import PatchTST
         from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
 
-
-        from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
-
         hf_config = HF_PatchTSTConfig(
             num_input_channels=input_dim,
             context_length=context_length or self.context_length,
@@ -311,9 +308,9 @@ class ExperimentConfig:
 # need to specify what differs from the defaults.
 
 CONFIG = ExperimentConfig(
-    model=CNNTransformerConfig(nhead=4, num_layers=1, batch_size=128, pos_weight_cap=100, dropout=0.1250780386573224, d_model=64),
-    training=TrainingConfig(local_epochs=20, learning_rate=0.00016273524419282967, weight_decay=0.0001000950072852069),
-    federation=FederationConfig(num_rounds=10, num_clients=2, proximal_mu=0.1, partition_mode="shared"),
+    model=CNNTransformerConfig(nhead=4, num_layers=2, batch_size=128, pos_weight_cap=50, dropout=0.2, d_model=64),
+    training=TrainingConfig(local_epochs=5, learning_rate=0.00016273524419282967, weight_decay=0.0001000950072852069),
+    federation=FederationConfig(num_rounds=1, num_clients=1, proximal_mu=0.1, partition_mode="shared"),
 )
 
 
