@@ -2,7 +2,7 @@ from config import CONFIG
 from training.train import train_model
 from models.utils import get_device
 from training.training_utils.Evaluator import Evaluator
-#from plotting.plotting_config import plot_diagrams
+from plotting.plotting_config import plot_diagrams
 
 import argparse
 parser = argparse.ArgumentParser()
@@ -72,7 +72,7 @@ def main():
     eval_results = evaluator.evaluate_round(model, valloader)
     print(f"Evaluation results: {eval_results}")
 
-    #plot_diagrams(eval_results["targets"], eval_results["preds"], train_results["train_losses"], train_results["train_accuracies"])
+    plot_diagrams(train_results["pr_history"], train_results["f1_history"])
 
 if __name__ == "__main__":
     if args.simulate:
