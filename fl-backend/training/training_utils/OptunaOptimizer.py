@@ -2,6 +2,8 @@ import optuna
 import os
 from copy import deepcopy
 import torch.nn as nn
+import warnings
+from optuna.exceptions import ExperimentalWarning
 
 
 os.environ["TORCH_BLAS_PREFER_HIPBLASLT"] = "0"
@@ -241,40 +243,42 @@ class OptunaOptimizer(TrainEvalBase):
         print("─" * 40 + "\n")
 
     def _save_visualizations(self, study):
-        from optuna.visualization.matplotlib import (
-            plot_optimization_history,
-            plot_intermediate_values,
-            plot_parallel_coordinate,
-            plot_contour,
-            plot_slice,
-            plot_param_importances,
-            plot_edf,
-            plot_rank,
-            plot_timeline,
-        )
-        import matplotlib.pyplot as plt
-        from pathlib import Path
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=ExperimentalWarning)
+            from optuna.visualization.matplotlib import (
+                plot_optimization_history,
+                plot_intermediate_values,
+                plot_parallel_coordinate,
+                plot_contour,
+                plot_slice,
+                plot_param_importances,
+                plot_edf,
+                plot_rank,
+                plot_timeline,
+            )
+            import matplotlib.pyplot as plt
+            from pathlib import Path
 
-        out_dir = f"plotting/saved_plots/optuna_study_{self.study_name}"
-        Path(out_dir).mkdir(parents=True, exist_ok=True)
+            out_dir = f"plotting/saved_plots/optuna_study_{self.study_name}"
+            Path(out_dir).mkdir(parents=True, exist_ok=True)
 
-        plots = {
-            "optimization_history": plot_optimization_history,
-            "intermediate_values":  plot_intermediate_values,
-            "parallel_coordinate":  plot_parallel_coordinate,
-            "contour":              plot_contour,
-            "slice":                plot_slice,
-            "param_importances":    plot_param_importances,
-            "edf":                  plot_edf,
-            "rank":                 plot_rank,
-            "timeline":             plot_timeline,
-        }
+            plots = {
+                "optimization_history": plot_optimization_history,
+                "intermediate_values":  plot_intermediate_values,
+                "parallel_coordinate":  plot_parallel_coordinate,
+                "contour":              plot_contour,
+                "slice":                plot_slice,
+                "param_importances":    plot_param_importances,
+                "edf":                  plot_edf,
+                "rank":                 plot_rank,
+                "timeline":             plot_timeline,
+            }
 
-        for name, plot_fn in plots.items():
-            try:
-                plot_fn(study)
-                plt.savefig(f"{out_dir}/{name}.png", dpi=150, bbox_inches="tight")
-                plt.close()
-                self._logger(f"Saved {name}.png")
-            except Exception as e:
-                self._logger(f"Skipped {name}: {e}")  # some plots need ≥2 trials etc.
+            for name, plot_fn in plots.items():
+                try:
+                    plot_fn(study)
+                    plt.savefig(f"{out_dir}/{name}.png", dpi=150, bbox_inches="tight")
+                    plt.close()
+                    self._logger(f"Saved {name}.png")
+                except Exception as e:
+                    self._logger(f"Skipped {name}: {e}")  # some plots need ≥2 trials etc.
