@@ -32,9 +32,13 @@ Cleaning rules:
 
 Usage:
     python scripts/clean_lead_features.py \
-        --train datasets/LEAD/train_features.csv \
-        --test  datasets/LEAD/test_features.csv \
-        --out-dir datasets/LEAD
+        --train fl-backend/datasets/LEAD/train_features.csv \
+        --test  fl-backend/datasets/LEAD/test_features.csv \
+        --out-dir fl-backend/datasets/LEAD
+
+Windows users:
+    python scripts/clean_lead_features.py --train fl-backend/datasets/LEAD/train_features.csv --test fl-backend/datasets/LEAD/test_features.csv --out-dir fl-backend/datasets/LEAD
+        
 """
 
 from __future__ import annotations
