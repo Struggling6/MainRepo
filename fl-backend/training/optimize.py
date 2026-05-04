@@ -5,6 +5,12 @@ parser.add_argument("--epochs", "-e", type=int, default=10, help="Epochs per tri
 parser.add_argument("--trials", "-t", type=int, default=50, help="Number of Optuna trials (default: 50)")
 parser.add_argument("--storage", "-s", type=str, help="Optuna storage URL")
 parser.add_argument("--study-name", "-n", type=str, help="Optuna study name")
+parser.add_argument(
+    "--dashboard",
+    "-d",
+    action="store_true",
+    help="Launch Optuna Dashboard after optimization finishes",
+)
 args = parser.parse_args()
 
 from models.utils import get_device
@@ -51,3 +57,14 @@ optimizer = OptunaOptimizer(
 study = optimizer.run()
 
 best_params = study.best_trial.params
+
+if args.dashboard:
+    try:
+        from optuna_dashboard import run_server
+    except ImportError:
+        print("\nDashboard requested, but optuna-dashboard is not installed.")
+        print("Install it with: pip install optuna-dashboard")
+    else:
+        print("\nLaunching Optuna Dashboard on http://127.0.0.1:8080")
+        print("Press Ctrl+C to stop the dashboard server.")
+        run_server(study._storage, host="127.0.0.1", port=8080)

@@ -147,7 +147,7 @@ Monitor jobs:
 
 ```bash
 squeue --me
-tail -f /ceph/project/sw6P6/fl-backend/logs/optuna_<jobid>_0.out
+tail -f /ceph/project/sw6P6/fl-backend/aiLab_scripts/logs/optuna_<jobid>_0.out
 ```
 
 AI-LAB limits: max 8 concurrent jobs, max 8 GPUs per user, max 12h per job.
@@ -333,8 +333,21 @@ python -m training.optimize --trials 50 --epochs 10
 | `--trials` | `-t` | `50` | Number of Optuna trials |
 | `--epochs` | `-e` | `10` | Max epochs per trial |
 | `--storage` | `-s` | None | SQLite URL for shared study (AI-LAB) |
-| `--study-name` | `-n` | `lead_anomaly_detection` | Optuna study name |
+| `--study-name` | `-n` | `fl-backend/optuna_study.db` | Optuna study name |
+| `--dashboard` | `-d` | off | Launch Optuna Dashboard after optimization |
 
 On AI-LAB, `run_optuna.sh` submits one SLURM array task per trial so all trials run in parallel across GPUs, writing results to a shared SQLite database.
+
+## Optuna Dashboard
+
+`optuna-dashboard` provides an interactive web UI for optimization history, parameter importance, contour/rank/slice plots, and trial tables.
+
+### Run dashboard locally without re-running study
+
+```bash
+python scripts/run_optuna_dashboard.py
+```
+
+Default URL: `http://127.0.0.1:8080`
 
 ---
