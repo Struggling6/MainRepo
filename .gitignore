@@ -147,6 +147,7 @@ htmlcov/
 *.swp
 uv.lock
 *.fab
+compose.yml
 fl-backend/requirements.txt
-fl-backend/compose.yml
 fl-backend/local_experiment.py
+fl-backend/optuna_study.db
