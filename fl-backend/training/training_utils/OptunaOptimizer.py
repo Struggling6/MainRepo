@@ -50,6 +50,9 @@ class OptunaOptimizer(TrainEvalBase):
         self.study_name = study_name
 
     def run(self):
+        min_resource = max(3, self.epochs // 4)
+        max_resource = self.epochs
+
         self._logger(
             f"Starting study name={self.study_name}, trials={self.n_trials}, epochs={self.epochs}, "
             f"train_shape={self.X_train.shape}, val_shape={self.X_val.shape}"
@@ -61,8 +64,8 @@ class OptunaOptimizer(TrainEvalBase):
             storage=self.storage,
             direction="maximize",
             pruner=optuna.pruners.HyperbandPruner(
-                min_resource=10,
-                max_resource=40,
+                min_resource=min_resource,
+                max_resource=max_resource,
                 reduction_factor=3,
             ),
             load_if_exists=True,
@@ -222,7 +225,7 @@ class OptunaOptimizer(TrainEvalBase):
             print(f"    {k}: {v}")
 
     def _pretty_trial_callback(self, study: optuna.Study, trial: optuna.trial.FrozenTrial):
-        is_best = study.best_trial.number == trial.number + 1
+        is_best = (study.best_trial.number + 1) == (trial.number + 1)
         marker   = "★ NEW BEST" if is_best else ""
         duration = trial.duration.total_seconds() if trial.duration else 0.0
 

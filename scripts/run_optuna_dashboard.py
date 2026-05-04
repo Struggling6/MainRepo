@@ -50,9 +50,7 @@ def main() -> int:
     print(f"  Port    : {args.port}")
 
     cmd = [
-        sys.executable,
-        "-m",
-        "optuna_dashboard",
+        "optuna-dashboard",
         "--host",
         args.host,
         "--port",
