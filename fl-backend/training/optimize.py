@@ -3,8 +3,8 @@ import argparse
 parser = argparse.ArgumentParser(description="Run Optuna hyperparameter optimization")
 parser.add_argument("--epochs", "-e", type=int, default=10, help="Epochs per trial (default: 10)")
 parser.add_argument("--trials", "-t", type=int, default=50, help="Number of Optuna trials (default: 50)")
-parser.add_argument("--storage", type=str, help="Optuna storage URL")
-parser.add_argument("--study-name", type=str, help="Optuna study name")
+parser.add_argument("--storage", "-s", type=str, help="Optuna storage URL")
+parser.add_argument("--study-name", "-n", type=str, help="Optuna study name")
 args = parser.parse_args()
 
 from models.utils import get_device
