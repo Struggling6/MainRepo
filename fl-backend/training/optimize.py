@@ -10,19 +10,19 @@ args = parser.parse_args()
 from models.utils import get_device
 from .training_utils.OptunaOptimizer import OptunaOptimizer
 from data.lead_csv import LeadCSVHandler
-from config import CONFIG
+from local_experiment import CONFIG
 
 print("OPTUNA ARGS")
-print("  storage   =", args.storage)
-print("  study     =", args.study_name)
-print("  epochs    =", args.epochs)
-print("  trials    =", args.trials)
+print("  storage    =", args.storage)
+print("  study      =", args.study_name)
+print("  epochs     =", args.epochs)
+print("  trials     =", args.trials)
 print("CONFIG")
-print("  model     =", CONFIG.model.name)
-print("  training  =", CONFIG.training)
+print("  model      =", CONFIG.model.name)
+print("  training   =", CONFIG.training)
 print("  federation =", CONFIG.federation)
-print("  dataset   =", CONFIG.data.name)
-print("  device    =", get_device())
+print("  dataset    =", CONFIG.data.name)
+print("  device     =", get_device())
 
 datahandler = LeadCSVHandler(CONFIG)
 

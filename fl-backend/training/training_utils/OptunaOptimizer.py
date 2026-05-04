@@ -10,7 +10,7 @@ import torch
 from training.training_utils.TrainEvalBase import TrainEvalBase
 from training.training_utils.utils import compute_pos_weight
 from models.utils import get_device
-from config import CONFIG, resolve_loss_fn
+from local_experiment import CONFIG, resolve_loss_fn
 
 class OptunaOptimizer(TrainEvalBase):
     """

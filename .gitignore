@@ -147,5 +147,6 @@ htmlcov/
 *.swp
 uv.lock
 *.fab
-requirements.txt
-compose.yml
+fl-backend/requirements.txt
+fl-backend/compose.yml
+fl-backend/experiment_local.py

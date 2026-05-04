@@ -1,4 +1,4 @@
-from config import CONFIG
+from local_experiment import CONFIG
 from training.train import train_model
 from models.utils import get_device
 from training.training_utils.Evaluator import Evaluator

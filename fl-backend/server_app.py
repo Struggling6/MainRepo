@@ -1,7 +1,7 @@
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
 from flwr.common.logger import log
 from logging import INFO
-from config import CONFIG
+from local_experiment import CONFIG
 from FedProxWithSave import FedProxWithSave
 from plotting.plotting_config import plot_diagrams
 

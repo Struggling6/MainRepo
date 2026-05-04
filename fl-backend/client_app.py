@@ -5,11 +5,10 @@ from flwr.client import ClientApp, NumPyClient
 from training.training_utils.Evaluator import Evaluator
 from flwr.common.logger import log
 from logging import INFO
-from config import CONFIG
+from local_experiment import CONFIG
 from models.utils import get_device, get_model_parameters, set_model_parameters
 from training.train import train_model
 from copy import deepcopy
-from config import CONFIG
 
 torch.set_num_threads(1)
 torch.set_num_interop_threads(1)

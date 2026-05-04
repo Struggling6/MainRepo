@@ -6,7 +6,7 @@ import torch
 from captum.attr import IntegratedGradients
 from torch.utils.data import DataLoader
 
-from config import CONFIG, ExperimentConfig
+from local_experiment import CONFIG, ExperimentConfig
 from data.registry import create_dataset_handler
 from interpretability.attribution_utils import (
     get_device,
