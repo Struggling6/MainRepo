@@ -3,6 +3,10 @@
 #from plotting.plot_methods.loss_accuracy_plot import loss_over_time_plot
 from pathlib import Path
 
+import matplotlib
+
+matplotlib.use("Agg")
+
 from plotting.plot_methods.pr_auc_method import pr_auc_plot
 from plotting.plot_methods.f1_plot_method import f1_plot
 

@@ -24,7 +24,12 @@ def create_windowed_data(
     """
     #X = past observations in a window, y = the target value just after the window
     X_windows, y_windows = [], []
-    data   = df[feature_cols].values   # input features for all rows, shape: (n_rows, n_features)
+    # Force float32 to prevent any stray float64 column from upcasting the
+    # whole windowed array (which doubles peak RAM usage).
+    data   = df[feature_cols].values.astype(np.float32, copy=False)   # input features for all rows, shape: (n_rows, n_features)
+
+
+
     labels = df[target].values         # target labels for each row, shape: (n_rows,)
 
     # range(start=0, stop=last valid start, step=stride)
@@ -34,7 +39,7 @@ def create_windowed_data(
         X_windows.append(data[i : i + window_size])
         y_windows.append(labels[i + window_size])
 
-    return np.array(X_windows), np.array(y_windows)
+    return np.array(X_windows, dtype=np.float32), np.array(y_windows)
 
 
 def _prepare_groups(df, node_col, time_col):

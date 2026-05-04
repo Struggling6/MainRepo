@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -121,6 +120,7 @@ class PatchTSTConfig():
     HuggingFace internals (attention implementation, label mappings, etc.) are
     properly initialized before the model is built.
     """
+
     name:                str   = "patchtst"
     batch_size:          int   = 64
     context_length:      int   = 168
@@ -143,7 +143,6 @@ class PatchTSTConfig():
     def build(self, input_dim: int, context_length = None):
         from models.PatchTST import PatchTST
         from transformers import PatchTSTConfig as HF_PatchTSTConfig # We have to extend the HuggingFace config
-
 
         hf_config = HF_PatchTSTConfig(
             num_input_channels=input_dim,
@@ -217,7 +216,7 @@ class TimesNetConfig:
 @dataclass
 class LeadCSVConfig: 
     name:         str   = "lead_csv"
-    file_path:    Path  = Path("datasets/LEAD/train_features.csv") #used for shared mode, ignored for local mode, should be the large dataset csv
+    file_path:    Path  = Path("datasets/LEAD/train_features_clean.csv") #used for shared mode, ignored for local mode, should be the large dataset csv (sentinel-cleaned by scripts/clean_lead_features.py)
     data_dir:     Path  = Path("datasets/LEAD")
     file_pattern: str   = "data{client_index}.csv"
     target:       str   = "anomaly"
@@ -269,7 +268,7 @@ class FederationConfig:
 @dataclass
 class EvaluationConfig:
     model_path:   Path | None  = None  # set in FedProxWithSave
-    test_path:    Path         = Path("/app/datasets/LEAD/test_features.csv")
+    test_path:    Path         = Path("/app/datasets/LEAD/test_features_clean.csv")
     target:       str          = "anomaly"
     batch_size:   int          = 64
     threshold:    float        = 0.5   # decision threshold — override with best_thresh from training
@@ -297,21 +296,21 @@ class InterpretabilityConfig:
 
 @dataclass
 class ExperimentConfig:
-    task:       BinaryClassificationConfig = field(default_factory=BinaryClassificationConfig)
-    model:      SupervisedCNNConfig       = field(default_factory=SupervisedCNNConfig)
-    data:       LeadCSVConfig              = field(default_factory=LeadCSVConfig)
-    training:   TrainingConfig             = field(default_factory=TrainingConfig)
-    federation: FederationConfig           = field(default_factory=FederationConfig)
-    evaluation: EvaluationConfig           = field(default_factory=EvaluationConfig)
+    task:       BinaryClassificationConfig   = field(default_factory=BinaryClassificationConfig)
+    model:      SupervisedCNNConfig          = field(default_factory=SupervisedCNNConfig)
+    data:       LeadCSVConfig                = field(default_factory=LeadCSVConfig)
+    training:   TrainingConfig               = field(default_factory=TrainingConfig)
+    federation: FederationConfig             = field(default_factory=FederationConfig)
+    evaluation: EvaluationConfig             = field(default_factory=EvaluationConfig)
     interpretability: InterpretabilityConfig = field(default_factory=InterpretabilityConfig)
 # ── Active experiment ─────────────────────────────────────────────────── #
 # Change CONFIG to switch experiments. All fields have defaults so you only
 # need to specify what differs from the defaults.
 
 CONFIG = ExperimentConfig(
-    model=CNNTransformerConfig(nhead=4, num_layers=2, d_model=128, dropout=0.3),
-    training=TrainingConfig(local_epochs=10, learning_rate=1e-4),
-    federation=FederationConfig(num_rounds=1, num_clients=5, proximal_mu=0.1, partition_mode="shared", fraction_fit=0.2, fraction_evaluate=0.2),
+    model=CNNTransformerConfig(nhead=4, num_layers=2, batch_size=128, pos_weight_cap=50, dropout=0.2, d_model=64),
+    training=TrainingConfig(local_epochs=5, learning_rate=0.00016273524419282967, weight_decay=0.0001000950072852069),
+    federation=FederationConfig(num_rounds=50, num_clients=10, proximal_mu=0.1, partition_mode="shared"),
 )
 
 

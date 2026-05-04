@@ -116,7 +116,9 @@ class LeadCSVHandler(BaseDatasetHandler):
             "dew_temperature",
             "precip_depth_1_hr",
             "sea_level_pressure",
-            "wind_direction",
+            # wind_direction (raw degrees) is replaced by cyclic encoding below.
+            "wind_dir_x",
+            "wind_dir_y",
             "wind_speed",
             "air_temperature_mean_lag7",
             "air_temperature_max_lag7",
@@ -140,6 +142,17 @@ class LeadCSVHandler(BaseDatasetHandler):
             "meter_diff_1",
             "meter_diff_24",
             "meter_zscore_24",
+            # Missingness indicators emitted by scripts/clean_lead_features.py.
+            # Each flag is 1.0 when the corresponding raw feature was a sentinel
+            # in the source CSV and was replaced by an imputed value.
+            "cloud_coverage_was_missing",
+            "year_built_was_missing",
+            "floor_count_was_missing",
+            "wind_dir_missing",
+            "wind_speed_was_missing",
+            "precip_depth_was_missing",
+            "air_temp_std_lag7_was_missing",
+            "air_temp_std_lag73_was_missing",
         ]
 
         primary_use_cols = [
@@ -199,6 +212,11 @@ class LeadCSVHandler(BaseDatasetHandler):
         bool_cols = df.select_dtypes(include="bool").columns
         df[bool_cols] = df[bool_cols].astype("float32")
 
+        # Re-cast all float columns to float32 after feature engineering
+        # (lag/rolling/diff/zscore ops above silently upcast to float64).
+        float_cols = df.select_dtypes(include=["float64", "float32"]).columns
+        df[float_cols] = df[float_cols].astype("float32")
+
         df = df.dropna()
 
         print(f"[LEAD] Processed shape: {df.shape}")
@@ -244,19 +262,24 @@ class LeadCSVHandler(BaseDatasetHandler):
         original_val_shape = X_val.shape
 
         X_train_2d = X_train.reshape(-1, X_train.shape[-1])
-        X_val_2d = X_val.reshape(-1, X_val.shape[-1])
-
-        X_train_scaled = scaler.fit_transform(X_train_2d).reshape(
-            original_train_shape
+        X_train_scaled = (
+            scaler.fit_transform(X_train_2d)
+            .astype(np.float32, copy=False)
+            .reshape(original_train_shape)
         )
-        X_val_scaled = scaler.transform(X_val_2d).reshape(original_val_shape)
+        del X_train_2d
+
+        X_val_2d = X_val.reshape(-1, X_val.shape[-1])
+        X_val_scaled = (
+            scaler.transform(X_val_2d)
+            .astype(np.float32, copy=False)
+            .reshape(original_val_shape)
+        )
+        del X_val_2d
 
         print("[LEAD] Applied StandardScaler using training data only")
 
-        return (
-            X_train_scaled.astype(np.float32),
-            X_val_scaled.astype(np.float32),
-        )
+        return X_train_scaled, X_val_scaled
 
     def _prepare_partitions(self):
         """
@@ -319,12 +342,12 @@ class LeadCSVHandler(BaseDatasetHandler):
 
         train_dataset = torch.utils.data.TensorDataset(
             torch.tensor(X_train, dtype=torch.float32),
-            torch.tensor(y_train, dtype=torch.long),
+            torch.tensor(y_train, dtype=torch.float32),
         )
 
         val_dataset = torch.utils.data.TensorDataset(
             torch.tensor(X_val, dtype=torch.float32),
-            torch.tensor(y_val, dtype=torch.long),
+            torch.tensor(y_val, dtype=torch.float32),
         )
 
         trainloader = torch.utils.data.DataLoader(
