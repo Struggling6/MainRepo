@@ -194,8 +194,6 @@ class OptunaOptimizer(TrainEvalBase):
             model_config.attention_dropout = trial.suggest_float("attention_dropout", 0.1, 0.4)
             model_config.positional_dropout = trial.suggest_float("positional_dropout", 0.1, 0.4)
             model_config.head_dropout = trial.suggest_float("head_dropout", 0.1, 0.4)
-            model_config.pre_norm = trial.suggest_categorical("pre_norm", [True, False])
-            model_config.norm_type = trial.suggest_categorical("norm_type", ["batchnorm", "layernorm"])
             self._logger(
                 f"Trial {trial.number + 1}: building PatchTSTConfig context_length={model_config.context_length}, "
                 f"patch_candidates={patch_candidates}, selected_patch_length={model_config.patch_length}, "

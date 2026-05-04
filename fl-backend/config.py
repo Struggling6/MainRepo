@@ -135,7 +135,7 @@ class PatchTSTConfig():
     positional_dropout:  float = 0.1
     head_dropout:        float = 0.1
     pre_norm:            bool  = True
-    norm_type:           Literal["batchnorm", "layernorm"] = "batchnorm"
+    norm_type:           Literal["batchnorm", "layernorm"] = "layernorm"
     pos_weight_cap:      float = 10.0
     loss_fn:             str   = "BCEWithLogitsLoss"
     num_classes:         int   = 1
