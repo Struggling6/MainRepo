@@ -116,7 +116,9 @@ class LeadCSVHandler(BaseDatasetHandler):
             "dew_temperature",
             "precip_depth_1_hr",
             "sea_level_pressure",
-            "wind_direction",
+            "wind_dir_x",
+            "wind_dir_y",
+            "wind_dir_missing",
             "wind_speed",
             "air_temperature_mean_lag7",
             "air_temperature_max_lag7",
@@ -261,14 +263,168 @@ class LeadCSVHandler(BaseDatasetHandler):
     def _prepare_partitions(self):
         """
         Shared mode: partition buildings across clients.
-        Each building_id belongs to exactly one client partition.
+
+        Keeps each building_id fully on one client, while trying to balance:
+        - number of rows
+        - number of anomaly rows
+        - number of buildings
+
+        Also guarantees that every client gets at least one building, as long as
+        num_clients <= number of buildings.
         """
 
-        rng = np.random.default_rng(self.seed)
-        buildings = self.df[self._node_col].unique()
-        rng.shuffle(buildings)
-        self.client_indices = np.array_split(buildings, self.num_clients)
+        if self.df is None:
+            raise RuntimeError("Cannot prepare partitions before dataframe is loaded.")
 
+        if self._node_col not in self.df.columns:
+            raise ValueError(f"Missing node column: {self._node_col}")
+
+        if self.target not in self.df.columns:
+            raise ValueError(f"Missing target column: {self.target}")
+
+        rng = np.random.default_rng(self.seed)
+
+        building_stats = (
+            self.df
+            .groupby(self._node_col)
+            .agg(
+                num_rows=(self.target, "size"),
+                num_anomalies=(self.target, "sum"),
+            )
+            .reset_index()
+        )
+
+        building_stats["num_rows"] = building_stats["num_rows"].astype(int)
+        building_stats["num_anomalies"] = building_stats["num_anomalies"].astype(int)
+        building_stats["_tie_break"] = rng.random(len(building_stats))
+
+        building_stats = building_stats.sort_values(
+            by=["num_anomalies", "num_rows", "_tie_break"],
+            ascending=[False, False, True],
+        ).reset_index(drop=True)
+
+        total_rows = int(building_stats["num_rows"].sum())
+        total_anomalies = int(building_stats["num_anomalies"].sum())
+        total_buildings = int(len(building_stats))
+
+        if self.num_clients > total_buildings:
+            raise ValueError(
+                f"num_clients={self.num_clients} is greater than number of "
+                f"available buildings={total_buildings}. This would create empty clients."
+            )
+
+        ideal_rows = total_rows / self.num_clients
+        ideal_anomalies = total_anomalies / self.num_clients if total_anomalies > 0 else 0.0
+        ideal_buildings = total_buildings / self.num_clients
+
+        clients = [
+            {
+                "buildings": [],
+                "num_rows": 0,
+                "num_anomalies": 0,
+                "num_buildings": 0,
+            }
+            for _ in range(self.num_clients)
+        ]
+
+        def score_client_after_assignment(client, rows_to_add, anomalies_to_add):
+            new_rows = client["num_rows"] + rows_to_add
+            new_anomalies = client["num_anomalies"] + anomalies_to_add
+            new_buildings = client["num_buildings"] + 1
+
+            row_score = ((new_rows - ideal_rows) / max(ideal_rows, 1.0)) ** 2
+
+            if total_anomalies > 0:
+                anomaly_score = (
+                    (new_anomalies - ideal_anomalies)
+                    / max(ideal_anomalies, 1.0)
+                ) ** 2
+            else:
+                anomaly_score = 0.0
+
+            building_score = (
+                (new_buildings - ideal_buildings)
+                / max(ideal_buildings, 1.0)
+            ) ** 2
+
+            return (
+                1.0 * row_score
+                + 3.0 * anomaly_score
+                + 0.2 * building_score
+            )
+
+        # First pass: guarantee every client gets at least one building.
+        remaining_buildings = building_stats.copy()
+
+        for client_idx in range(self.num_clients):
+            row = remaining_buildings.iloc[0]
+            remaining_buildings = remaining_buildings.iloc[1:].reset_index(drop=True)
+
+            building_id = row[self._node_col]
+            rows = int(row["num_rows"])
+            anomalies = int(row["num_anomalies"])
+
+            clients[client_idx]["buildings"].append(building_id)
+            clients[client_idx]["num_rows"] += rows
+            clients[client_idx]["num_anomalies"] += anomalies
+            clients[client_idx]["num_buildings"] += 1
+
+        # Second pass: greedily assign remaining buildings.
+        for _, row in remaining_buildings.iterrows():
+            building_id = row[self._node_col]
+            rows = int(row["num_rows"])
+            anomalies = int(row["num_anomalies"])
+
+            best_client_idx = min(
+                range(self.num_clients),
+                key=lambda idx: score_client_after_assignment(
+                    clients[idx],
+                    rows,
+                    anomalies,
+                ),
+            )
+
+            clients[best_client_idx]["buildings"].append(building_id)
+            clients[best_client_idx]["num_rows"] += rows
+            clients[best_client_idx]["num_anomalies"] += anomalies
+            clients[best_client_idx]["num_buildings"] += 1
+
+        self.client_indices = [
+            np.array(client["buildings"])
+            for client in clients
+        ]
+
+        print("[LEAD] Shared partition summary:")
+        print(
+            f"[LEAD] total_buildings={total_buildings}, "
+            f"total_rows={total_rows}, total_anomalies={total_anomalies}"
+        )
+
+        for idx, client in enumerate(clients):
+            rows = client["num_rows"]
+            anomalies = client["num_anomalies"]
+            anomaly_rate = anomalies / rows if rows > 0 else 0.0
+
+            print(
+                f"[LEAD] client={idx} "
+                f"buildings={client['num_buildings']} "
+                f"rows={rows} "
+                f"anomalies={anomalies} "
+                f"anomaly_rate={anomaly_rate:.4f}"
+            )
+
+        zero_anomaly_clients = [
+            idx for idx, client in enumerate(clients)
+            if client["num_anomalies"] == 0
+        ]
+
+        if zero_anomaly_clients:
+            print(
+                "[LEAD] WARNING: Some clients received zero anomaly rows: "
+                f"{zero_anomaly_clients}. "
+                "This may hurt federated anomaly detection."
+            )
+    
     def get_dataloaders(self, partition_id: int):
         print(
             f"[LEAD] get_dataloaders partition_mode={self.partition_mode} "
