@@ -35,9 +35,11 @@ class IntegratedGradientsRunner:
         trainloader, testloader = handler.get_dataloaders(
             partition_id=partition_id
         )
+    
+        path = Path(f"checkpoints/{CONFIG.model.name}_{CONFIG.data.name}.pt")
 
         model, checkpoint = load_checkpoint_model(
-            checkpoint_path=self.config.evaluation.model_path,
+            checkpoint_path=path,
             config=self.config,
             metadata=metadata,
             device=self.device,
