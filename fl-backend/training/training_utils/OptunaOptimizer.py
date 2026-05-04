@@ -76,6 +76,7 @@ class OptunaOptimizer(TrainEvalBase):
             
         )
         self._print_results(study)
+        self._save_visualizations(study)
 
         self._logger("Study finished")
         return study
@@ -87,8 +88,8 @@ class OptunaOptimizer(TrainEvalBase):
         weight_decay      = trial.suggest_float("weight_decay",         1e-4, 1e-2, log=True)
         num_layers        = trial.suggest_int("num_layers",             1, 5)
         batch_size        = trial.suggest_categorical("batch_size",     [8, 16, 32, 64, 128, 256])
-        pos_weight_cap    = trial.suggest_categorical("pos_weight_cap", [ 20, 50, 70, 90])
-        dropout           = trial.suggest_float("dropout",              0.1, 0.5)
+        pos_weight_cap    = trial.suggest_float("pos_weight_cap",       20.0, 60.0, log=True)
+        dropout           = trial.suggest_float("dropout",              0.1, 0.4)
         self._logger(
             f"Trial {trial.number + 1}: sampled lr={lr:.3e}, wd={weight_decay:.3e}, "
             f"layers={num_layers}, batch_size={batch_size}, dropout={dropout:.3f}"
@@ -190,9 +191,9 @@ class OptunaOptimizer(TrainEvalBase):
             model_config.patch_stride = trial.suggest_int("patch_stride", 1, model_config.patch_length)
             model_config.ffn_dim    = trial.suggest_categorical("ffn_dim", [32, 64, 128, 256, 512])
             model_config.channel_attention = trial.suggest_categorical("channel_attention", [True, False])
-            model_config.attention_dropout = trial.suggest_float("attention_dropout", 0.1, 0.5)
-            model_config.positional_dropout = trial.suggest_float("positional_dropout", 0.1, 0.5)
-            model_config.head_dropout = trial.suggest_float("head_dropout", 0.1, 0.5)
+            model_config.attention_dropout = trial.suggest_float("attention_dropout", 0.1, 0.4)
+            model_config.positional_dropout = trial.suggest_float("positional_dropout", 0.1, 0.4)
+            model_config.head_dropout = trial.suggest_float("head_dropout", 0.1, 0.4)
             model_config.pre_norm = trial.suggest_categorical("pre_norm", [True, False])
             model_config.norm_type = trial.suggest_categorical("norm_type", ["batchnorm", "layernorm"])
             self._logger(
@@ -240,3 +241,42 @@ class OptunaOptimizer(TrainEvalBase):
             else:
                 print(f"     {k:<16} = {v}")
         print("─" * 40 + "\n")
+
+    def _save_visualizations(self, study):
+        from optuna.visualization.matplotlib import (
+            plot_optimization_history,
+            plot_intermediate_values,
+            plot_parallel_coordinate,
+            plot_contour,
+            plot_slice,
+            plot_param_importances,
+            plot_edf,
+            plot_rank,
+            plot_timeline,
+        )
+        import matplotlib.pyplot as plt
+        from pathlib import Path
+
+        out_dir = f"plotting/saved_plots/optuna_study_{self.study_name}"
+        Path(out_dir).mkdir(parents=True, exist_ok=True)
+
+        plots = {
+            "optimization_history": plot_optimization_history,
+            "intermediate_values":  plot_intermediate_values,
+            "parallel_coordinate":  plot_parallel_coordinate,
+            "contour":              plot_contour,
+            "slice":                plot_slice,
+            "param_importances":    plot_param_importances,
+            "edf":                  plot_edf,
+            "rank":                 plot_rank,
+            "timeline":             plot_timeline,
+        }
+
+        for name, plot_fn in plots.items():
+            try:
+                plot_fn(study)
+                plt.savefig(f"{out_dir}/{name}.png", dpi=150, bbox_inches="tight")
+                plt.close()
+                self._logger(f"Saved {name}.png")
+            except Exception as e:
+                self._logger(f"Skipped {name}: {e}")  # some plots need ≥2 trials etc.
