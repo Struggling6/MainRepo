@@ -11,9 +11,9 @@ def _repo_root() -> Path:
 
 
 def _default_storage() -> str:
-    base_dir = _repo_root() / "fl-backend"
-    return f"sqlite:////{str(base_dir).lstrip('/')}/optuna_study.db"
-
+    db_path = _repo_root() / "fl-backend" / "optuna_study.db"
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    return f"sqlite:///{db_path.as_posix()}"
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run local Optuna Dashboard")

@@ -223,6 +223,9 @@ class LeadCSVConfig:
     task_name:    str   = "binary_classification"
     test_split:   float = 0.2
     seed:         int   = 42
+    use_undersampling: bool = True
+    undersampling_ratio: float = 1.0
+    undersample_val: bool = False
 
     def build_handler(self, config=None):
         from data.lead_csv import LeadCSVHandler

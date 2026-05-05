@@ -31,6 +31,7 @@ REQUIREMENTS_BASE = [
     "optuna",
     "optuna-dashboard",
     "pypots==1.3",
+    "imblearn",
     
 ]
 

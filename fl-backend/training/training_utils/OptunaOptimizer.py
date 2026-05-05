@@ -11,11 +11,16 @@ from local_experiment import CONFIG, resolve_loss_fn
 
 os.environ["TORCH_BLAS_PREFER_HIPBLASLT"] = "0"
 
+
 class OptunaOptimizer(TrainEvalBase):
     """
     Runs an Optuna hyperparameter search using the shared train/val
     epoch logic from TrainEvalBase. Builds a fresh model for each trial.
-    Pruning is handled by HyperbandPruner — no manual patience needed.
+
+    Objective:
+        score = 0.7 * PR-AUC + 0.3 * F1
+
+    Pruning is handled by HyperbandPruner.
     """
 
     optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -25,8 +30,10 @@ class OptunaOptimizer(TrainEvalBase):
 
     def __init__(
         self,
-        X_train, y_train,
-        X_val, y_val,
+        X_train,
+        y_train,
+        X_val,
+        y_val,
         config=CONFIG,
         n_trials=50,
         epochs=20,
@@ -37,8 +44,8 @@ class OptunaOptimizer(TrainEvalBase):
         self.config = config
         self.X_train = X_train
         self.y_train = y_train
-        self.X_val   = X_val
-        self.y_val   = y_val
+        self.X_val = X_val
+        self.y_val = y_val
         self.in_channels = int(X_train.shape[-1])
         self.config.evaluation.input_dim = self.in_channels
 
@@ -55,10 +62,10 @@ class OptunaOptimizer(TrainEvalBase):
 
         self._logger(
             f"Starting study name={self.study_name}, trials={self.n_trials}, epochs={self.epochs}, "
-            f"train_shape={self.X_train.shape}, val_shape={self.X_val.shape}"
+            f"train_shape={self.X_train.shape}, val_shape={self.X_val.shape}, "
             f"device={get_device()}"
-            
         )
+
         study = optuna.create_study(
             study_name=self.study_name,
             storage=self.storage,
@@ -70,16 +77,20 @@ class OptunaOptimizer(TrainEvalBase):
             ),
             load_if_exists=True,
         )
+
         study.optimize(
             self._objective,
             n_trials=self.n_trials,
             callbacks=[self._pretty_trial_callback],
             show_progress_bar=True,
-            
         )
+
         self._print_results(study)
         self._logger("Study finished")
         return study
+
+    def _objective_score(self, pr_auc: float, f1: float) -> float:
+        return 0.3 * float(pr_auc) + 0.7 * float(f1)
 
     def _objective(self, trial):
         print(f"\n▶ Trial {trial.number + 1}/{self.n_trials} starting...")
@@ -88,69 +99,110 @@ class OptunaOptimizer(TrainEvalBase):
         weight_decay      = trial.suggest_float("weight_decay",         1e-4, 1e-2, log=True)
         num_layers        = trial.suggest_int("num_layers",             1, 5)
         batch_size        = trial.suggest_categorical("batch_size",     [8, 16, 32, 64, 128, 256])
-        pos_weight_cap    = trial.suggest_float("pos_weight_cap",       20.0, 60.0, log=True)
-        dropout           = trial.suggest_float("dropout",              0.1, 0.4)
-        self._logger(
-            f"Trial {trial.number + 1}: sampled lr={lr:.3e}, wd={weight_decay:.3e}, "
-            f"layers={num_layers}, batch_size={batch_size}, dropout={dropout:.3f}"
-            f"pos_weight_cap={pos_weight_cap}"
-        )
-        model             = self._build_model(trial, dropout, num_layers, batch_size)
-        loss_fn           = self._build_loss(pos_weight_cap)
-        train_dl          = self._build_dataloader(self.X_train, self.y_train, batch_size, shuffle=True)
-        val_dl            = self._build_dataloader(self.X_val,   self.y_val,   batch_size, shuffle=False)
-        self._logger(
-            f"Trial {trial.number + 1}: dataloaders built train_batches={len(train_dl)}, val_batches={len(val_dl)}"
-        )
-        optimizer         = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+        pos_weight_cap    = trial.suggest_categorical("pos_weight_cap", [ 20, 50, 70, 90])
+        dropout           = trial.suggest_float("dropout",              0.1, 0.5)
+    
 
-        best_pr_auc, best_threshold = 0.0, 0.5
+        self._logger(
+            f"Trial {trial.number + 1}: sampled lr={lr:.3e}, "
+            f"wd={weight_decay:.3e}, layers={num_layers}, "
+            f"batch_size={batch_size}, dropout={dropout:.3f}, "
+            f"pos_weight_cap={pos_weight_cap:.4f}"
+        )
 
-        for epoch in range(self.epochs):  # 0-indexed for Hyperband
+        model = self._build_model(trial, dropout, num_layers, batch_size)
+        loss_fn = self._build_loss(pos_weight_cap)
+
+        train_dl = self._build_dataloader(
+            self.X_train,
+            self.y_train,
+            batch_size,
+            shuffle=True,
+        )
+        val_dl = self._build_dataloader(
+            self.X_val,
+            self.y_val,
+            batch_size,
+            shuffle=False,
+        )
+
+        self._logger(
+            f"Trial {trial.number + 1}: dataloaders built "
+            f"train_batches={len(train_dl)}, val_batches={len(val_dl)}"
+        )
+
+        optimizer = torch.optim.AdamW(
+            model.parameters(),
+            lr=lr,
+            weight_decay=weight_decay,
+        )
+
+        best_score = 0.0
+        best_pr_auc = 0.0
+        best_f1 = 0.0
+        best_threshold = 0.5
+        best_precision = 0.0
+        best_recall = 0.0
+
+        for epoch in range(self.epochs):
             train_loss = self._train_epoch(model, train_dl, optimizer, loss_fn)
-            val_loss, val_f1, best_thresh, pr_auc = self._val_epoch(model, val_dl, loss_fn)
+            val_loss, val_f1, best_thresh, pr_auc, val_precision, val_recall = self._val_epoch(
+                model,
+                val_dl,
+                loss_fn,
+            )
 
-            # Track best-so-far PR-AUC and the threshold that achieved it.
-            # We update this BEFORE reporting to the pruner so the value
-            # passed to Hyperband is a non-decreasing curve.
-            if pr_auc > best_pr_auc:
-                best_pr_auc    = pr_auc
+            current_score = float(val_f1)#self._objective_score(pr_auc, val_f1)
+
+            if current_score > best_score:
+                best_score = current_score
+                best_pr_auc = pr_auc
+                best_f1 = val_f1
                 best_threshold = best_thresh
+                best_precision = val_precision
+                best_recall = val_recall
 
             self._logger(
                 f"Trial {trial.number + 1} epoch {epoch + 1}/{self.epochs}: "
-                f"train_loss={train_loss:.6f}, val_loss={val_loss:.6f}, val_f1={val_f1:.4f}, "
-                f"pr_auc={pr_auc:.4f}, best_pr_auc={best_pr_auc:.4f}, best_thresh={best_thresh:.2f}"
+                f"train_loss={train_loss:.6f}, val_loss={val_loss:.6f}, "
+                f"val_f1={val_f1:.4f}, precision={val_precision:.4f}, recall={val_recall:.4f}, pr_auc={pr_auc:.4f}, "
+                f"score={current_score:.4f}, best_score={best_score:.4f}, "
+                f"best_thresh={best_thresh:.2f}"
             )
 
-            # Hyperband (and Optuna pruners in general) compares the value
-            # reported at step `epoch` across trials. If we feed the raw
-            # per-epoch PR-AUC, a single noisy dip can mask a trial that is
-            # actually trending upward and lead to premature pruning.
-            #
-            # Reporting the running maximum (`best_pr_auc`) yields a
-            # monotonically non-decreasing curve, which is the contract
-            # Hyperband implicitly assumes ("more resource = at least as
-            # good"). This stabilises pruning decisions without changing
-            # which trial wins overall (the final return value is unchanged).
-            trial.report(best_pr_auc, epoch)
+            trial.report(best_score, epoch)
+
             if trial.should_prune():
                 self._logger(
                     f"Trial {trial.number + 1} pruned at epoch {epoch + 1} "
-                    f"with best_pr_auc={best_pr_auc:.4f} (last_epoch_pr_auc={pr_auc:.4f})"
+                    f"with best_score={best_score:.4f} "
+                    f"(last_epoch_score={current_score:.4f}, "
+                    f"last_epoch_pr_auc={pr_auc:.4f}, "
+                    f"last_epoch_f1={val_f1:.4f})"
                 )
                 raise optuna.TrialPruned()
 
-        trial.set_user_attr("best_threshold", float(best_threshold))
+        trial.set_user_attr("pr_auc", float(best_pr_auc))
+        trial.set_user_attr("f1", float(best_f1))
+        trial.set_user_attr("threshold", float(best_threshold))
+        trial.set_user_attr("objective", float(best_score))
+        trial.set_user_attr("precision", float(best_precision))
+        trial.set_user_attr("recall", float(best_recall))
+   
+
         self._logger(
-            f"Trial {trial.number + 1} complete: best_pr_auc={best_pr_auc:.4f}, "
+            f"Trial {trial.number + 1} complete: "
+            f"score={best_score:.4f}, "
+            f"best_pr_auc={best_pr_auc:.4f}, "
+            f"best_f1={best_f1:.4f}, "
             f"best_threshold={best_threshold:.2f}"
         )
-        return float(best_pr_auc)
+
+        return float(best_score)
 
     def _build_model(self, trial, dropout, num_layers, batch_size) -> nn.Module:
         from config import CNNTransformerConfig, TransformerConfig, LSTMConfig, PatchTSTConfig
-        
+
         model_config = deepcopy(self.config.model)
 
         model_config.batch_size = batch_size
@@ -159,51 +211,94 @@ class OptunaOptimizer(TrainEvalBase):
         def valid_nheads():
             return [n for n in [2, 4, 8, 16] if model_config.d_model % n == 0]
 
-        # For transformer-based models, ensure nhead divides d_model
         if hasattr(model_config, "nhead") and valid_nheads():
             model_config.nhead = trial.suggest_categorical("nhead", valid_nheads())
-            self._logger(f"Trial {trial.number + 1}: valid_nheads={valid_nheads()}, selected_nhead={model_config.nhead}")
+            self._logger(
+                f"Trial {trial.number + 1}: valid_nheads={valid_nheads()}, "
+                f"selected_nhead={model_config.nhead}"
+            )
 
         def valid_patch_lengths(context_length):
             return [p for p in [4, 8, 16, 32] if context_length % p == 0]
 
         if isinstance(model_config, (CNNTransformerConfig, TransformerConfig)):
-            model_config.d_model     = trial.suggest_categorical("d_model", [32, 64, 128])
-            model_config.dropout     = dropout
+            model_config.d_model = trial.suggest_categorical("d_model", [32, 64, 128])
+            model_config.dropout = dropout
 
             self._logger(
                 f"Trial {trial.number + 1}: building {type(model_config).__name__} "
-                f"d_model={model_config.d_model}, num_layers={model_config.num_layers}, dropout={model_config.dropout:.3f}"
+                f"d_model={model_config.d_model}, "
+                f"num_layers={model_config.num_layers}, "
+                f"dropout={model_config.dropout:.3f}"
             )
 
         elif isinstance(model_config, LSTMConfig):
-            model_config.hidden_size = trial.suggest_categorical("hidden_size", [16, 32, 64, 128, 256])
-            model_config.dropout     = dropout
+            model_config.hidden_size = trial.suggest_categorical(
+                "hidden_size",
+                [16, 32, 64, 128, 256],
+            )
+            model_config.dropout = dropout
+
             self._logger(
-                f"Trial {trial.number + 1}: building LSTMConfig hidden_size={model_config.hidden_size}, "
-                f"num_layers={model_config.num_layers}, dropout={model_config.dropout:.3f}"
+                f"Trial {trial.number + 1}: building LSTMConfig "
+                f"hidden_size={model_config.hidden_size}, "
+                f"num_layers={model_config.num_layers}, "
+                f"dropout={model_config.dropout:.3f}"
             )
 
         elif isinstance(model_config, PatchTSTConfig):
             patch_candidates = valid_patch_lengths(model_config.context_length)
-            model_config.d_model     = trial.suggest_categorical("d_model", [32, 64, 128])
-            model_config.patch_length = trial.suggest_categorical("patch_length", patch_candidates)
-            model_config.patch_stride = trial.suggest_int("patch_stride", 1, model_config.patch_length)
-            model_config.ffn_dim    = trial.suggest_categorical("ffn_dim", [32, 64, 128, 256, 512])
-            model_config.channel_attention = trial.suggest_categorical("channel_attention", [True, False])
-            model_config.attention_dropout = trial.suggest_float("attention_dropout", 0.1, 0.4)
-            model_config.positional_dropout = trial.suggest_float("positional_dropout", 0.1, 0.4)
-            model_config.head_dropout = trial.suggest_float("head_dropout", 0.1, 0.4)
-            self._logger(
-                f"Trial {trial.number + 1}: building PatchTSTConfig context_length={model_config.context_length}, "
-                f"patch_candidates={patch_candidates}, selected_patch_length={model_config.patch_length}, "
-                f"patch_stride={model_config.patch_stride}, d_model={model_config.d_model}, ffn_dim={model_config.ffn_dim}"
+
+            model_config.d_model = trial.suggest_categorical("d_model", [32, 64, 128])
+            model_config.patch_length = trial.suggest_categorical(
+                "patch_length",
+                patch_candidates,
             )
+            model_config.patch_stride = trial.suggest_int(
+                "patch_stride",
+                1,
+                model_config.patch_length,
+            )
+            model_config.ffn_dim = trial.suggest_categorical(
+                "ffn_dim",
+                [32, 64, 128, 256, 512],
+            )
+            model_config.channel_attention = trial.suggest_categorical(
+                "channel_attention",
+                [True, False],
+            )
+            model_config.attention_dropout = trial.suggest_float(
+                "attention_dropout",
+                0.1,
+                0.4,
+            )
+            model_config.positional_dropout = trial.suggest_float(
+                "positional_dropout",
+                0.1,
+                0.4,
+            )
+            model_config.head_dropout = trial.suggest_float(
+                "head_dropout",
+                0.1,
+                0.4,
+            )
+
+            self._logger(
+                f"Trial {trial.number + 1}: building PatchTSTConfig "
+                f"context_length={model_config.context_length}, "
+                f"patch_candidates={patch_candidates}, "
+                f"selected_patch_length={model_config.patch_length}, "
+                f"patch_stride={model_config.patch_stride}, "
+                f"d_model={model_config.d_model}, "
+                f"ffn_dim={model_config.ffn_dim}"
+            )
+
         else:
             raise TypeError(
                 f"No search space defined for {type(model_config).__name__}. "
                 f"Add a branch to _build_model() in OptunaOptimizer."
             )
+
         self._logger(f"Trial {trial.number + 1}: model moved to device={get_device()}")
 
         return model_config.build(input_dim=self.in_channels).to(get_device())
@@ -211,31 +306,53 @@ class OptunaOptimizer(TrainEvalBase):
     def _build_loss(self, pos_weight_cap):
         pw = min(self.raw_pw, pos_weight_cap)
         loss_cls = resolve_loss_fn(self.loss_fn)
+
         self._logger(
-            f"Loss setup: loss_fn={self.loss_fn}, raw_pos_weight={self.raw_pw:.4f}, "
-            f"cap={pos_weight_cap}, effective_pos_weight={pw:.4f}"
+            f"Loss setup: loss_fn={self.loss_fn}, "
+            f"raw_pos_weight={self.raw_pw:.4f}, "
+            f"cap={pos_weight_cap:.4f}, "
+            f"effective_pos_weight={pw:.4f}"
         )
+
         return loss_cls(pos_weight=torch.tensor([pw], device=get_device()))
 
     def _print_results(self, study):
         print("\n=== Best Trial ===")
-        print(f"  PR-AUC:     {study.best_trial.value:.4f}")
+        print(f"  Score:      {study.best_trial.value:.4f}")
+        print(f"  PR-AUC:     {study.best_trial.user_attrs.get('pr_auc')}")
+        print(f"  Precision:  {study.best_trial.user_attrs.get('precision')}")
+        print(f"  Recall:     {study.best_trial.user_attrs.get('recall')}")
+        print(f"  F1:         {study.best_trial.user_attrs.get('f1')}")
+        print(f"  Threshold:  {study.best_trial.user_attrs.get('threshold')}")
         print("  Params:")
+
         for k, v in study.best_trial.params.items():
             print(f"    {k}: {v}")
 
-    def _pretty_trial_callback(self, study: optuna.Study, trial: optuna.trial.FrozenTrial):
+    def _pretty_trial_callback(
+        self,
+        study: optuna.Study,
+        trial: optuna.trial.FrozenTrial,
+    ):
         is_best = (study.best_trial.number + 1) == (trial.number + 1)
-        marker   = "★ NEW BEST" if is_best else ""
+        marker = "★ NEW BEST" if is_best else ""
         duration = trial.duration.total_seconds() if trial.duration else 0.0
 
         print(f"\n── Trial {trial.number + 1:>3}  {marker}")
         print(f"   value    : {trial.value:.6f}")
         print(f"   duration : {duration:6.1f}s")
-        print(f"   params   :")
+        print("   metrics  :")
+        print(f"     pr_auc          = {trial.user_attrs.get('pr_auc')}")
+        print(f"     precision       = {trial.user_attrs.get('precision')}")
+        print(f"     recall          = {trial.user_attrs.get('recall')}")
+        print(f"     f1              = {trial.user_attrs.get('f1')}")
+        print(f"     threshold       = {trial.user_attrs.get('threshold')}")
+        print("   params   :")
+
         for k, v in trial.params.items():
             if isinstance(v, float):
                 print(f"     {k:<16} = {v:.6g}")
             else:
                 print(f"     {k:<16} = {v}")
+
         print("─" * 40 + "\n")
