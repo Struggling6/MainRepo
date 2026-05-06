@@ -29,7 +29,9 @@ REQUIREMENTS_BASE = [
     "transformers==5.6.2",
     "captum==0.9.0",
     "optuna",
+    "optuna-dashboard",
     "pypots==1.3",
+    
 ]
 
 TORCH_PINS = {

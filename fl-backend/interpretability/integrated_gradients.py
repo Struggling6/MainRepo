@@ -6,7 +6,7 @@ import torch
 from captum.attr import IntegratedGradients
 from torch.utils.data import DataLoader
 
-from config import CONFIG, ExperimentConfig
+from local_experiment import CONFIG, ExperimentConfig
 from data.registry import create_dataset_handler
 from interpretability.attribution_utils import (
     get_device,
@@ -35,9 +35,11 @@ class IntegratedGradientsRunner:
         trainloader, testloader = handler.get_dataloaders(
             partition_id=partition_id
         )
+    
+        path = Path(f"checkpoints/{CONFIG.model.name}_{CONFIG.data.name}.pt")
 
         model, checkpoint = load_checkpoint_model(
-            checkpoint_path=self.config.evaluation.model_path,
+            checkpoint_path=path,
             config=self.config,
             metadata=metadata,
             device=self.device,

@@ -8,7 +8,9 @@ from copy import deepcopy
 from training.training_utils.TrainEvalBase import TrainEvalBase
 from training.training_utils.utils import compute_pos_weight
 from models.utils import get_device
-from config import CONFIG, resolve_loss_fn
+from local_experiment import CONFIG, resolve_loss_fn
+
+os.environ["TORCH_BLAS_PREFER_HIPBLASLT"] = "0"
 
 class OptunaOptimizer(TrainEvalBase):
     """
@@ -75,7 +77,6 @@ class OptunaOptimizer(TrainEvalBase):
             gc_after_trial=True,
         )
         self._print_results(study)
-
         self._logger("Study finished")
         return study
 
@@ -235,7 +236,7 @@ class OptunaOptimizer(TrainEvalBase):
             print(f"    {k}: {v}")
 
     def _pretty_trial_callback(self, study: optuna.Study, trial: optuna.trial.FrozenTrial):
-        is_best = study.best_trial.number == trial.number + 1
+        is_best = (study.best_trial.number + 1) == (trial.number + 1)
         marker   = "★ NEW BEST" if is_best else ""
         duration = trial.duration.total_seconds() if trial.duration else 0.0
 
