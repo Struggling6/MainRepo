@@ -107,7 +107,6 @@ predictions/
 plots/
 fl-backend/plotting/saved_plots/
 
-
 # =========================
 
 # IDE
@@ -135,7 +134,6 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
-
 
 # =========================
 

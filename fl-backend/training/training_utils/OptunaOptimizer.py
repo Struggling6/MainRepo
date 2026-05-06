@@ -172,7 +172,7 @@ class OptunaOptimizer(TrainEvalBase):
         # For transformer-based models, ensure nhead divides d_model
         if hasattr(model_config, "nhead") and valid_nheads():
             model_config.nhead = trial.suggest_categorical("nhead", valid_nheads())
-            self._logger(f"Trial {trial.number}: valid_nheads={valid_nheads()}, selected_nhead={model_config.nhead}")
+            self._logger(f"Trial {trial.number + 1}: valid_nheads={valid_nheads()}, selected_nhead={model_config.nhead}")
 
         def valid_patch_lengths(context_length):
             return [p for p in [4, 8, 16, 32] if context_length % p == 0]
@@ -182,7 +182,7 @@ class OptunaOptimizer(TrainEvalBase):
             model_config.dropout     = dropout
 
             self._logger(
-                f"Trial {trial.number}: building {type(model_config).__name__} "
+                f"Trial {trial.number + 1}: building {type(model_config).__name__} "
                 f"d_model={model_config.d_model}, num_layers={model_config.num_layers}, dropout={model_config.dropout:.3f}"
             )
 
@@ -190,7 +190,7 @@ class OptunaOptimizer(TrainEvalBase):
             model_config.hidden_size = trial.suggest_categorical("hidden_size", [64, 128, 256, 512])
             model_config.dropout     = dropout
             self._logger(
-                f"Trial {trial.number}: building LSTMConfig hidden_size={model_config.hidden_size}, "
+                f"Trial {trial.number + 1}: building LSTMConfig hidden_size={model_config.hidden_size}, "
                 f"num_layers={model_config.num_layers}, dropout={model_config.dropout:.3f}"
             )
 
@@ -205,7 +205,7 @@ class OptunaOptimizer(TrainEvalBase):
             model_config.positional_dropout = trial.suggest_float("positional_dropout", 0.1, 0.4)
             model_config.head_dropout       = trial.suggest_float("head_dropout", 0.1, 0.4)
             self._logger(
-                f"Trial {trial.number}: building PatchTSTConfig context_length={model_config.context_length}, "
+                f"Trial {trial.number + 1}: building PatchTSTConfig context_length={model_config.context_length}, "
                 f"patch_candidates={patch_candidates}, selected_patch_length={model_config.patch_length}, "
                 f"patch_stride={model_config.patch_stride}, d_model={model_config.d_model}, ffn_dim={model_config.ffn_dim}"
             )
@@ -235,11 +235,11 @@ class OptunaOptimizer(TrainEvalBase):
             print(f"    {k}: {v}")
 
     def _pretty_trial_callback(self, study: optuna.Study, trial: optuna.trial.FrozenTrial):
-        is_best = study.best_trial.number == trial.number
+        is_best = study.best_trial.number == trial.number + 1
         marker   = "★ NEW BEST" if is_best else ""
         duration = trial.duration.total_seconds() if trial.duration else 0.0
 
-        print(f"\n── Trial {trial.number:>3}  {marker}")
+        print(f"\n── Trial {trial.number + 1:>3}  {marker}")
         print(f"   value    : {trial.value:.6f}")
         print(f"   duration : {duration:6.1f}s")
         print(f"   params   :")

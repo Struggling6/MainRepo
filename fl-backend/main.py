@@ -16,7 +16,7 @@ def simulate():
     from client_app import app as client_app
     from server_app import app as server_app
 
-    num_clients = CONFIG.data.num_clients
+    num_clients = CONFIG.federation.num_clients
 
     print(f"Starting simulation with {num_clients} clients, {CONFIG.federation.num_rounds} rounds")
 
@@ -60,17 +60,19 @@ def main():
         training_config=config.training,
         model_config=config.model,
         device=device,
+        proximal_mu=config.federation.proximal_mu,
     )
     print(f"Training results: {train_results}")
 
     # ── Evaluation ───────────────────────────────────────────────────── #
     evaluator = Evaluator(
         model_config=config.model,
+        metadata=metadata,
     )
     eval_results = evaluator.evaluate_round(model, valloader)
     print(f"Evaluation results: {eval_results}")
 
-    #plot_diagrams(eval_results["targets"], eval_results["preds"], train_results["train_losses"], train_results["train_accuracies"])
+    plot_diagrams(train_results["pr_history"], train_results["f1_history"])
 
 if __name__ == "__main__":
     if args.simulate:
