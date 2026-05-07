@@ -1,3 +1,4 @@
+import threading
 import optuna
 import os
 import torch
@@ -21,8 +22,11 @@ class OptunaOptimizer(TrainEvalBase):
 
     optuna.logging.set_verbosity(optuna.logging.WARNING)
 
+
     def _logger(self, msg: str):
-        print(f"[Optuna] {msg}", flush=True)
+        _print_lock = threading.Lock()
+        with _print_lock:
+            print(f"[Optuna] {msg}", flush=True)
 
     def __init__(
         self,
@@ -33,6 +37,7 @@ class OptunaOptimizer(TrainEvalBase):
         epochs=20,
         storage=None,
         study_name=None,
+        n_jobs=1,
     ):
         super().__init__(num_classes=1, epochs=epochs)
         self.config = config
@@ -50,6 +55,7 @@ class OptunaOptimizer(TrainEvalBase):
         self.storage = storage
         self.study_name = study_name
         self.device = get_device()
+        self.n_jobs = n_jobs
 
     def run(self):
 
@@ -73,8 +79,10 @@ class OptunaOptimizer(TrainEvalBase):
         study.optimize(
             self._objective,
             n_trials=self.n_trials,
+            n_jobs=self.n_jobs,
             callbacks=[self._pretty_trial_callback],
             gc_after_trial=True,
+            show_progress_bar=True,
         )
         self._print_results(study)
         self._logger("Study finished")
@@ -86,8 +94,7 @@ class OptunaOptimizer(TrainEvalBase):
         train_dl  = None
         val_dl    = None
 
-        try:
-            print(f"\n▶ Trial {trial.number + 1}/{self.n_trials} starting...")
+        try: 
 
             lr                = trial.suggest_float("lr",                   3e-4, 3e-2, log=True)
             weight_decay      = trial.suggest_float("weight_decay",         1e-4, 1e-2, log=True)

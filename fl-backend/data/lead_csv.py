@@ -21,8 +21,6 @@ class LeadCSVHandler(BaseDatasetHandler):
     produce the same input dimensionality.
     """
 
-    _gap_hours = 73
-
     PRIMARY_USE_CATEGORIES = [
         "Education",
         "Entertainment/public assembly",
@@ -60,6 +58,8 @@ class LeadCSVHandler(BaseDatasetHandler):
         self.features = None
         self.labels = None
         self.feature_cols = self._build_feature_columns()
+        self._gap_hours = 73
+        self._stride = 24
 
         if self.partition_mode == "shared":
             print(f"[LEAD] Loading shared file: {self.file_path}")

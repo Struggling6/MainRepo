@@ -6,16 +6,27 @@ from pathlib import Path
 from config import *
 
 CONFIG = ExperimentConfig(
-    model=LSTMConfig(hidden_size=64, dropout=0.2),
+    model=PatchTSTConfig(
+        nhead=16,
+        d_model=128,
+        head_dropout=0.2,
+        attention_dropout=0.2,
+        positional_dropout=0.2,
+        patch_length=16,
+        patch_stride=12,
+        ffn_dim=256,
+        context_length=168,
+        norm_type="layernorm",
+        num_layers=3,  
+    ),
     data=LeadCSVConfig(
         file_path=Path("datasets/LEAD/train_features_clean.csv"),
-        test_file_path=Path("datasets/LEAD/LEAD_test.csv"),
     ),
     training=TrainingConfig(
         local_epochs=30,
-        learning_rate=0.0008978749981783818,
-        weight_decay=0.0033661842169768396,
-        patience=20,
+        learning_rate=0.0009,
+        weight_decay=0.0034,
+        patience=10,
     ),
     federation=FederationConfig(
         num_rounds=1,

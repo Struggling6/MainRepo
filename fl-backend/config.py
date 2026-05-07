@@ -139,6 +139,7 @@ class PatchTSTConfig():
     pos_weight_cap:      float = 10.0
     loss_fn:             str   = "BCEWithLogitsLoss"
     num_classes:         int   = 1
+    task:                str   = "single_label_classification"
 
     def build(self, input_dim: int, context_length = None):
         from models.PatchTST import PatchTST
@@ -160,6 +161,7 @@ class PatchTSTConfig():
             pre_norm=self.pre_norm,
             norm_type=self.norm_type,
             num_targets=self.num_classes,
+            problem_type=self.task
         )
         return PatchTST(hf_config)
     
@@ -239,9 +241,9 @@ class PowerGridCSVConfig:
     noise_level:  float = 0.7
     seed:         int   = 42
 
-    def build_handler(self, config=None):
+    def build_handler(self, config):
         from data.powergrid_csv import PowerGridCSVHandler
-        return PowerGridCSVHandler(config or CONFIG)
+        return PowerGridCSVHandler(config)
 
 # ── Training config ───────────────────────────────────────────────────── #
 

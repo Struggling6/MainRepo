@@ -38,7 +38,7 @@ def main():
     device = get_device()
 
     # ── Dataset ──────────────────────────────────────────────────────── #
-    dataset_handler             = config.data.build_handler()
+    dataset_handler             = config.data.build_handler(config)
     metadata                    = dataset_handler.get_metadata()
     config.evaluation.input_dim = metadata["input_dim"]
     
