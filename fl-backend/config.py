@@ -123,7 +123,7 @@ class PatchTSTConfig():
 
     name:                str   = "patchtst"
     batch_size:          int   = 64
-    context_length:      int   = 168
+    context_length:      int   = 168 # Has to mach the window_size used in data config
     patch_length:        int   = 16
     patch_stride:        int   = 8
     d_model:             int   = 128
@@ -139,6 +139,7 @@ class PatchTSTConfig():
     pos_weight_cap:      float = 10.0
     loss_fn:             str   = "BCEWithLogitsLoss"
     num_classes:         int   = 1
+    task:                str   = "single_label_classification"
 
     def build(self, input_dim: int, context_length = None):
         from models.PatchTST import PatchTST
@@ -160,6 +161,7 @@ class PatchTSTConfig():
             pre_norm=self.pre_norm,
             norm_type=self.norm_type,
             num_targets=self.num_classes,
+            problem_type=self.task
         )
         return PatchTST(hf_config)
     
@@ -223,10 +225,13 @@ class LeadCSVConfig:
     task_name:    str   = "binary_classification"
     test_split:   float = 0.2
     seed:         int   = 42
+    window_size:  int   = 168
+    gap_hours:    int   = 73
+    stride:       int   = 168
 
-    def build_handler(self, config=None):
+    def build_handler(self, config):
         from data.lead_csv import LeadCSVHandler
-        return LeadCSVHandler(config or CONFIG)
+        return LeadCSVHandler(config)
 
 @dataclass
 class PowerGridCSVConfig:
@@ -239,9 +244,9 @@ class PowerGridCSVConfig:
     noise_level:  float = 0.7
     seed:         int   = 42
 
-    def build_handler(self, config=None):
+    def build_handler(self, config):
         from data.powergrid_csv import PowerGridCSVHandler
-        return PowerGridCSVHandler(config or CONFIG)
+        return PowerGridCSVHandler(config)
 
 # ── Training config ───────────────────────────────────────────────────── #
 
@@ -303,6 +308,10 @@ class ExperimentConfig:
     federation: FederationConfig             = field(default_factory=FederationConfig)
     evaluation: EvaluationConfig             = field(default_factory=EvaluationConfig)
     interpretability: InterpretabilityConfig = field(default_factory=InterpretabilityConfig)
+
+    def __post_init__(self):
+        if hasattr(self.model, "context_length"):
+            self.model.context_length = self.data.window_size
 
 
 CONFIG = ExperimentConfig()

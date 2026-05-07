@@ -24,6 +24,9 @@ class Trainer(TrainEvalBase):
         self.optimizer = torch.optim.AdamW(
             model.parameters(), lr=lr, weight_decay=weight_decay
         )
+        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            self.optimizer, T_max=max(1, epochs), eta_min=lr * 0.01
+        )
         self.patience = patience
         self.proximal_mu = proximal_mu
 
@@ -47,6 +50,7 @@ class Trainer(TrainEvalBase):
         for epoch in range(1, self.epochs + 1):
             train_loss                            = self._train_epoch(self.model, train_loader, self.optimizer, self.loss_fn)
             val_loss, val_f1, best_thresh, pr_auc = self._val_epoch(self.model, val_loader, self.loss_fn)
+            self.scheduler.step()
 
             metrics = {
                 "epoch":       epoch,
@@ -99,6 +103,7 @@ class Trainer(TrainEvalBase):
                 loss = loss + (self.proximal_mu / 2.0) * prox_term
 
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
 
             total_loss += loss.item() * features.size(0)

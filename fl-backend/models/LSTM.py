@@ -32,9 +32,10 @@ class LSTMModel(BaseModel):
             # dropout is only applied between LSTM layers, not after the last one
             # so it has no effect with num_layers=1 — set to 0 to avoid a warning
         )
+        self.dropout = nn.Dropout(dropout)
 
         self.classifier = nn.Sequential(
-            nn.Dropout(dropout),
+            self.dropout,
             nn.Linear(hidden_size, num_classes),
         )
 
@@ -47,5 +48,7 @@ class LSTMModel(BaseModel):
 
         # Take only the last timestep's output — it has seen the full sequence
         last_timestep = lstm_out[:, -1, :]  # (batch, hidden_size)
+
+        last_timestep = self.dropout(last_timestep)
 
         return self.classifier(last_timestep).squeeze(-1)  # (batch,)

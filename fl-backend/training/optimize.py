@@ -1,8 +1,10 @@
-import argparse
-import os
-import signal
-import sys
+import argparse, os, signal, sys
+
 from pathlib import Path
+from models.utils import get_device
+from .training_utils.OptunaOptimizer import OptunaOptimizer
+from data.lead_csv import LeadCSVHandler
+from local_experiment import CONFIG
 
 # Compute default storage path
 _db_dir = Path(__file__).resolve().parent.parent.parent / "fl-backend"
@@ -20,12 +22,8 @@ parser.add_argument(
     action="store_true",
     help="Launch Optuna Dashboard after optimization finishes",
 )
+parser.add_argument("--jobs", "-j", type=int, default=1, help="Number of parallel jobs (default: 1)")
 args = parser.parse_args()
-
-from models.utils import get_device
-from .training_utils.OptunaOptimizer import OptunaOptimizer
-from data.lead_csv import LeadCSVHandler
-from local_experiment import CONFIG
 
 print("OPTUNA ARGS")
 print("  storage    =", args.storage)
@@ -61,6 +59,7 @@ optimizer = OptunaOptimizer(
     epochs=args.epochs,
     storage=args.storage,
     study_name=args.study_name,
+    n_jobs=args.jobs,
 )
 
 study = optimizer.run()
@@ -69,21 +68,16 @@ best_params = study.best_trial.params
 
 if args.dashboard:
     try:
-        from optuna_dashboard import run_server
-    except ImportError:
-        print("\nDashboard requested, but optuna-dashboard is not installed.")
-        print("Install it with: pip install optuna-dashboard")
-    else:
-        def signal_handler(sig, frame):
-            print("\n\nShutting down dashboard server...")
-            sys.exit(0)
-
-        signal.signal(signal.SIGINT, signal_handler)
-        
+        import subprocess
+        dashboard_proc = subprocess.Popen(
+            ["optuna-dashboard", args.storage, "--host", "127.0.0.1", "--port", "8080"],
+        )
         print("\nLaunching Optuna Dashboard on http://127.0.0.1:8080")
-        print("Press Ctrl+C to stop the dashboard server.")
-        try:
-            run_server(args.storage, host="127.0.0.1", port=8080)
-        except KeyboardInterrupt:
-            print("\n\nShutting down dashboard server...")
-            sys.exit(0)
+        print("Press Ctrl+C to stop.")
+        dashboard_proc.wait()
+    except ImportError:
+        print("\noptuna-dashboard is not installed. Run: pip install optuna-dashboard")
+    except KeyboardInterrupt:
+        dashboard_proc.terminate()
+        dashboard_proc.wait()
+        print("\nDashboard stopped.")
