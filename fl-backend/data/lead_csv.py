@@ -58,8 +58,9 @@ class LeadCSVHandler(BaseDatasetHandler):
         self.features = None
         self.labels = None
         self.feature_cols = self._build_feature_columns()
-        self._gap_hours = 73
-        self._stride = 24
+        self._gap_hours = config.data.gap_hours
+        self._stride = config.data.stride
+        self._window_size = config.data.window_size
 
         if self.partition_mode == "shared":
             print(f"[LEAD] Loading shared file: {self.file_path}")
@@ -105,12 +106,11 @@ class LeadCSVHandler(BaseDatasetHandler):
         return path
 
     def _build_feature_columns(self):
+        # Static per-building identity features (site_id, square_feet, year_built,
+        # floor_count, primary_use_*) are excluded — they let the model memorize
+        # building identity and overfit when train/val share buildings.
         base_features = [
             "meter_reading",
-            "site_id",
-            "square_feet",
-            "year_built",
-            "floor_count",
             "air_temperature",
             "cloud_coverage",
             "dew_temperature",
@@ -146,8 +146,6 @@ class LeadCSVHandler(BaseDatasetHandler):
             # Each flag is 1.0 when the corresponding raw feature was a sentinel
             # in the source CSV and was replaced by an imputed value.
             "cloud_coverage_was_missing",
-            "year_built_was_missing",
-            "floor_count_was_missing",
             "wind_dir_missing",
             "wind_speed_was_missing",
             "precip_depth_was_missing",
@@ -155,11 +153,7 @@ class LeadCSVHandler(BaseDatasetHandler):
             "air_temp_std_lag73_was_missing",
         ]
 
-        primary_use_cols = [
-            f"primary_use_{cat}" for cat in self.PRIMARY_USE_CATEGORIES
-        ]
-
-        return base_features + primary_use_cols
+        return base_features
 
     def _preprocess(self, df: pd.DataFrame) -> pd.DataFrame:
         print("[LEAD] Starting _prepare_data")

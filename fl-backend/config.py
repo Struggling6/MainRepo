@@ -225,6 +225,9 @@ class LeadCSVConfig:
     task_name:    str   = "binary_classification"
     test_split:   float = 0.2
     seed:         int   = 42
+    window_size:  int   = 168
+    gap_hours:    int   = 73
+    stride:       int   = 168
 
     def build_handler(self, config=None):
         from data.lead_csv import LeadCSVHandler
