@@ -40,7 +40,7 @@ class TrainEvalBase:
 
         for features, labels in loader:
             features = features.to(self.device)
-            labels   = labels.to(self.device).float()   # ← cast to float32
+            labels   = labels.to(self.device)
 
             optimizer.zero_grad()
             logits = model(features)

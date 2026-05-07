@@ -8,7 +8,8 @@ from local_experiment import CONFIG
 
 # Compute default storage path
 _db_dir = Path(__file__).resolve().parent.parent.parent / "fl-backend"
-_storage_default = f"sqlite:////{str(_db_dir).lstrip('/')}/optuna_study.db"
+_db_path = _db_dir / "optuna_study.db"
+_storage_default = f"sqlite:///{_db_path.as_posix()}"
 
 parser = argparse.ArgumentParser(description="Run Optuna hyperparameter optimization")
 parser.add_argument("--epochs", "-e", type=int, default=10, help="Epochs per trial (default: 10)")

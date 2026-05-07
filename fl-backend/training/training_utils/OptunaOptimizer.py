@@ -1,7 +1,9 @@
 import threading
 import optuna
 import os
-import torch
+os.environ["TORCH_BLAS_PREFER_HIPBLASLT"] = "0" #Has to happen before torch import to have effect
+
+import torch, optuna
 import torch.nn as nn
 import gc
 
@@ -11,7 +13,6 @@ from training.training_utils.utils import compute_pos_weight
 from models.utils import get_device
 from local_experiment import CONFIG, resolve_loss_fn
 
-os.environ["TORCH_BLAS_PREFER_HIPBLASLT"] = "0"
 
 class OptunaOptimizer(TrainEvalBase):
     """
