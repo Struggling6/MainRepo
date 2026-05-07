@@ -55,6 +55,13 @@ class LeadCSVHandler(BaseDatasetHandler):
 
         self.data_dir = getattr(config.data, "data_dir", None)
         self.file_pattern = getattr(config.data, "file_pattern", None)
+        self.precomputed_dir = getattr(config.data, "precomputed_dir", None)
+        self.precomputed_pattern = getattr(config.data, "precomputed_pattern", None)
+        self.use_precomputed_windows = getattr(
+            config.data,
+            "use_precomputed_windows",
+            False,
+        )
 
         self._node_col = "building_id"
         self._time_col = "timestamp"
@@ -63,6 +70,10 @@ class LeadCSVHandler(BaseDatasetHandler):
         self.features = None
         self.labels = None
         self.feature_cols = self._build_feature_columns()
+        self.aggregation_weight = 0
+        self.num_train_windows_before_undersampling = 0
+        self.num_train_anomalies_before_undersampling = 0
+        self.num_train_windows_after_undersampling = 0
 
         if self.partition_mode in ["shared", "optuna"]:
             print(f"[LEAD] Loading {self.partition_mode} file: {self.file_path}")
@@ -110,6 +121,29 @@ class LeadCSVHandler(BaseDatasetHandler):
         if not path.exists():
             raise FileNotFoundError(
                 f"Local client file not found for partition {partition_id}: {path}"
+            )
+
+        return path
+
+    def _resolve_precomputed_file_path(self, partition_id: int) -> Path:
+        if partition_id < 0:
+            raise ValueError(f"Invalid partition_id: {partition_id}")
+
+        if not self.precomputed_dir or not self.precomputed_pattern:
+            raise ValueError(
+                "Precomputed LEAD windows require data.precomputed_dir and "
+                "data.precomputed_pattern to be configured."
+            )
+
+        client_index = partition_id + 1
+        path = Path(self.precomputed_dir) / self.precomputed_pattern.format(
+            client_index=client_index
+        )
+
+        if not path.exists():
+            raise FileNotFoundError(
+                f"Precomputed windows not found for partition {partition_id}: {path}. "
+                "Run scripts/precompute_lead_windows.py before starting Flower."
             )
 
         return path
@@ -260,6 +294,115 @@ class LeadCSVHandler(BaseDatasetHandler):
         return (
             X_train_scaled.astype(np.float32),
             X_val_scaled.astype(np.float32),
+        )
+
+    def _build_dataloaders_from_arrays(
+        self,
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        X_val: np.ndarray,
+        y_val: np.ndarray,
+    ):
+        train_dataset = torch.utils.data.TensorDataset(
+            torch.tensor(X_train, dtype=torch.float32),
+            torch.tensor(y_train, dtype=torch.long),
+        )
+
+        val_dataset = torch.utils.data.TensorDataset(
+            torch.tensor(X_val, dtype=torch.float32),
+            torch.tensor(y_val, dtype=torch.long),
+        )
+
+        trainloader = torch.utils.data.DataLoader(
+            train_dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=0,
+            pin_memory=False,
+        )
+
+        valloader = torch.utils.data.DataLoader(
+            val_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=0,
+            pin_memory=False,
+        )
+
+        return trainloader, valloader
+
+    def _load_precomputed_dataloaders(self, partition_id: int):
+        path = self._resolve_precomputed_file_path(partition_id)
+        print(f"[LEAD] Loading precomputed windows: {path}")
+
+        with np.load(path) as artifact:
+            required = ["X_train", "y_train", "X_val", "y_val"]
+            missing = [key for key in required if key not in artifact]
+
+            if missing:
+                raise ValueError(
+                    f"Precomputed artifact {path} is missing arrays: {missing}"
+                )
+
+            X_train = artifact["X_train"].astype(np.float32, copy=False)
+            y_train = artifact["y_train"].astype(np.int64, copy=False)
+            X_val = artifact["X_val"].astype(np.float32, copy=False)
+            y_val = artifact["y_val"].astype(np.int64, copy=False)
+
+            self.num_train_windows_before_undersampling = int(
+                artifact["num_train_windows_before_undersampling"][0]
+            ) if "num_train_windows_before_undersampling" in artifact else len(y_train)
+            self.num_train_anomalies_before_undersampling = int(
+                artifact["num_train_anomalies_before_undersampling"][0]
+            ) if "num_train_anomalies_before_undersampling" in artifact else int(y_train.sum())
+            self.num_train_windows_after_undersampling = int(
+                artifact["num_train_windows_after_undersampling"][0]
+            ) if "num_train_windows_after_undersampling" in artifact else len(y_train)
+            self.aggregation_weight = int(
+                artifact["aggregation_weight"][0]
+            ) if "aggregation_weight" in artifact else self.num_train_windows_before_undersampling
+            oversampling_method = (
+                str(artifact["oversampling_method"][0])
+                if "oversampling_method" in artifact
+                else "unknown"
+            )
+            num_train_windows_after_oversampling = int(
+                artifact["num_train_windows_after_oversampling"][0]
+            ) if "num_train_windows_after_oversampling" in artifact else len(y_train)
+            num_train_anomalies_after_oversampling = int(
+                artifact["num_train_anomalies_after_oversampling"][0]
+            ) if "num_train_anomalies_after_oversampling" in artifact else int(y_train.sum())
+            oversample_val = bool(
+                artifact["oversample_val"][0]
+            ) if "oversample_val" in artifact else False
+            num_val_windows_after_oversampling = int(
+                artifact["num_val_windows_after_oversampling"][0]
+            ) if "num_val_windows_after_oversampling" in artifact else len(y_val)
+            num_val_anomalies_after_oversampling = int(
+                artifact["num_val_anomalies_after_oversampling"][0]
+            ) if "num_val_anomalies_after_oversampling" in artifact else int(y_val.sum())
+
+        self.df = None
+        self.features = X_train
+        self.labels = y_train
+
+        print(
+            f"[LEAD] Precomputed shapes: "
+            f"X_train={X_train.shape}, X_val={X_val.shape}, "
+            f"aggregation_weight={self.aggregation_weight}, "
+            f"oversampling={oversampling_method}, "
+            f"train_after_oversampling={num_train_windows_after_oversampling}, "
+            f"train_anomalies_after_oversampling={num_train_anomalies_after_oversampling}, "
+            f"oversample_val={oversample_val}, "
+            f"val_after_oversampling={num_val_windows_after_oversampling}, "
+            f"val_anomalies_after_oversampling={num_val_anomalies_after_oversampling}"
+        )
+
+        return self._build_dataloaders_from_arrays(
+            X_train,
+            y_train,
+            X_val,
+            y_val,
         )
 
     def _prepare_partitions(self):
@@ -421,6 +564,9 @@ class LeadCSVHandler(BaseDatasetHandler):
             f"partition_id={partition_id}"
         )
 
+        if self.partition_mode == "local" and self.use_precomputed_windows:
+            return self._load_precomputed_dataloaders(partition_id)
+
         if self.partition_mode == "local":
             file_path = self._resolve_local_file_path(partition_id)
             print(f"[LEAD] Loading local client file: {file_path}")
@@ -470,6 +616,10 @@ class LeadCSVHandler(BaseDatasetHandler):
 
         print(f"[LEAD] Split done: X_train={X_train.shape}, X_val={X_val.shape}")
 
+        self.num_train_windows_before_undersampling = len(y_train)
+        self.num_train_anomalies_before_undersampling = int(y_train.sum())
+        self.aggregation_weight = self.num_train_windows_before_undersampling
+
         X_train, X_val = self._scale_temporal_arrays(X_train, X_val)
         if self.use_undersampling:
             X_train, y_train = self._undersample_normals(
@@ -488,52 +638,21 @@ class LeadCSVHandler(BaseDatasetHandler):
                 )
             else:
                 print("[LEAD] Keeping validation set unchanged")
+
+        self.num_train_windows_after_undersampling = len(y_train)
                 
-        train_dataset = torch.utils.data.TensorDataset(
-            torch.tensor(X_train, dtype=torch.float32),
-            torch.tensor(y_train, dtype=torch.long),
-        )
-
-        val_dataset = torch.utils.data.TensorDataset(
-            torch.tensor(X_val, dtype=torch.float32),
-            torch.tensor(y_val, dtype=torch.long),
-        )
-
-        trainloader = torch.utils.data.DataLoader(
-            train_dataset,
-            batch_size=self.batch_size,
-            shuffle=True,
-            num_workers=0,
-            pin_memory=False,
-        )
-
-        valloader = torch.utils.data.DataLoader(
-            val_dataset,
-            batch_size=self.batch_size,
-            shuffle=False,
-            num_workers=0,
-            pin_memory=False,
-        )
-
-        return trainloader, valloader
+        return self._build_dataloaders_from_arrays(X_train, y_train, X_val, y_val)
 
     def get_metadata(self):
         if self.df is None:
             if self.partition_mode == "local":
-                sample_path = self._resolve_local_file_path(0)
-                print(
-                    f"[LEAD] Loading representative local file for metadata: "
-                    f"{sample_path}"
-                )
-                raw_df = pd.read_csv(sample_path)
-
-                if self.target not in raw_df.columns:
-                    raise ValueError(
-                        f"CSV file must contain target column '{self.target}', "
-                        f"but columns were: {list(raw_df.columns)}"
-                    )
-
-                self._prepare_data(raw_df)
+                return {
+                    "input_dim": len(self.feature_cols),
+                    "num_classes": self.config.model.num_classes,
+                    "num_samples": 0,
+                    "task_type": self.config.task.name,
+                    "data_format": "tabular",
+                }
             else:
                 raise RuntimeError("Metadata requested before dataset was prepared")
 

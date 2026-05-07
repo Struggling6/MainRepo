@@ -219,13 +219,20 @@ class LeadCSVConfig:
     file_path:    Path  = Path("datasets/LEAD/train_features_clean.csv") #used for shared mode, ignored for local mode, should be the large dataset csv (sentinel-cleaned by scripts/clean_lead_features.py)
     data_dir:     Path  = Path("datasets/LEAD")
     file_pattern: str   = "data{client_index}.csv"
+    precomputed_dir: Path = Path("datasets/LEAD/windowed")
+    precomputed_pattern: str = "client{client_index}.npz"
+    use_precomputed_windows: bool = False
     target:       str   = "anomaly"
     task_name:    str   = "binary_classification"
     test_split:   float = 0.2
     seed:         int   = 42
     use_undersampling: bool = True
-    undersampling_ratio: float = 1.0
-    undersample_val: bool = False
+    undersampling_ratio: float = 5.0
+    oversampling_method: Literal["none", "random_over", "smote"] = "none"
+    oversampling_ratio: float = 1.0
+    smote_k_neighbors: int = 5
+    undersample_val: bool = True
+    oversample_val: bool = True
 
     def build_handler(self, config=None):
         from data.lead_csv import LeadCSVHandler
@@ -265,6 +272,9 @@ class FederationConfig:
     fraction_fit:      float = 1.0
     fraction_evaluate: float = 1.0
     proximal_mu:       float = 2.0
+    serialize_gpu:     bool  = False
+    serialize_gpu_evaluate: bool = True
+    gpu_lock_path:     Path  = Path("datasets/.gpu.lock")
 
 # ── Evaluation config ─────────────────────────────────────────────────── #
 

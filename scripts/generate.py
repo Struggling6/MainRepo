@@ -200,6 +200,7 @@ services:
     stop_signal: SIGINT
     volumes:
       - ./fl-backend/checkpoints:/app/checkpoints
+      - ./fl-backend/plotting/saved_plots:/app/plotting/saved_plots
 
 """
 

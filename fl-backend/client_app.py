@@ -1,5 +1,6 @@
 import torch 
 from torch import nn
+from contextlib import contextmanager
 from pathlib import Path
 from flwr.client import ClientApp, NumPyClient
 from training.training_utils.Evaluator import Evaluator
@@ -12,6 +13,31 @@ from copy import deepcopy
 
 torch.set_num_threads(1)
 torch.set_num_interop_threads(1)
+
+
+@contextmanager
+def _gpu_file_lock(enabled: bool, lock_path: Path, label: str):
+    if not enabled:
+        yield
+        return
+
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(lock_path, "a+", encoding="utf-8") as lock_file:
+        try:
+            import fcntl
+
+            print(f"[GPU LOCK] waiting for {label}: {lock_path}", flush=True)
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            print(f"[GPU LOCK] acquired for {label}", flush=True)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                print(f"[GPU LOCK] released for {label}", flush=True)
+        except ModuleNotFoundError:
+            print("[GPU LOCK] fcntl unavailable; continuing without file lock", flush=True)
+            yield
 
 def _resolve_real_model(model):
     """Return the actual nn.Module containing weights."""
@@ -75,9 +101,8 @@ class FlowerClient(NumPyClient):
             log(INFO, "[%s] ERROR building model: %s", self.facility_id, e)
             raise
 
-        self.trainloader, self.testloader = self.dataset_handler.get_dataloaders(
-            partition_id=self.partition_id
-        )
+        self.trainloader = None
+        self.testloader = None
 
         log(INFO, "[%s] initialised | partition=%s | data=%s | mode=%s | device=%s",
             self.facility_id,
@@ -89,6 +114,30 @@ class FlowerClient(NumPyClient):
 
         self.evaluator = Evaluator(model_config=self.config.model, metadata=self.metadata)
 
+    def _use_gpu_lock(self, for_evaluate: bool = False) -> bool:
+        if self.device.type != "cuda":
+            return False
+
+        fed_config = self.config.federation
+        if for_evaluate and not getattr(fed_config, "serialize_gpu_evaluate", True):
+            return False
+
+        return getattr(fed_config, "serialize_gpu", False)
+
+    def _gpu_lock_path(self) -> Path:
+        return Path(getattr(self.config.federation, "gpu_lock_path", "datasets/.gpu.lock"))
+
+    def _ensure_dataloaders(self):
+        if self.trainloader is not None and self.testloader is not None:
+            return
+
+        log(INFO, "[%s] loading dataloaders for partition=%s", self.facility_id, self.partition_id)
+        self.trainloader, self.testloader = self.dataset_handler.get_dataloaders(
+            partition_id=self.partition_id
+        )
+        self.metadata = self.dataset_handler.get_metadata()
+        self.evaluator.metadata = self.metadata
+
     def get_parameters(self, config):
         print("=== CLIENT get_parameters ENTERED ===", flush=True)
         params = get_model_parameters(self.model)
@@ -99,33 +148,54 @@ class FlowerClient(NumPyClient):
         round_num = config.get("round", "?")
         log(INFO, "[%s] FIT start | round=%s", self.facility_id, round_num)
         set_model_parameters(self.model, parameters)
+        self._ensure_dataloaders()
 
         # Flower FedProx sends this value to tell the client how strong the penalty is.
         proximal_mu = config.get("proximal_mu", self.config.federation.proximal_mu)
 
-        results = train_model(
-            model=self.model,
-            trainloader=self.trainloader,
-            valloader=self.testloader,
-            training_config=self.config.training,
-            model_config=self.config.model,
-            device=self.device,
-            proximal_mu=proximal_mu,
-        )
+        lock_label = f"{self.facility_id} fit round={round_num}"
+        with _gpu_file_lock(self._use_gpu_lock(), self._gpu_lock_path(), lock_label):
+            results = train_model(
+                model=self.model,
+                trainloader=self.trainloader,
+                valloader=self.testloader,
+                training_config=self.config.training,
+                model_config=self.config.model,
+                device=self.device,
+                proximal_mu=proximal_mu,
+            )
 
         results["input_dim"] = self.metadata["input_dim"]
+        results["num_examples_trained"] = results["num_examples"]
+
+        aggregation_weight = int(
+            getattr(
+                self.dataset_handler,
+                "aggregation_weight",
+                results["num_examples"],
+            )
+        )
+        results["aggregation_weight"] = aggregation_weight
+
         log(INFO, "[FIT] done facility_id=%s results=%s", self.facility_id, results)
 
-        return get_model_parameters(self.model), results["num_examples"], results
+        return get_model_parameters(self.model), aggregation_weight, results
 
     def evaluate(self, parameters, config):
         round_num = config.get("round", "?")
         log(INFO, "[%s] EVAL start | round=%s", self.facility_id, round_num)
 
         set_model_parameters(self.model, parameters)
-        self.model = self.model.to(self.device)
+        self._ensure_dataloaders()
 
-        results = self.evaluator.evaluate_round(self.model, self.testloader)
+        lock_label = f"{self.facility_id} evaluate round={round_num}"
+        with _gpu_file_lock(
+            self._use_gpu_lock(for_evaluate=True),
+            self._gpu_lock_path(),
+            lock_label,
+        ):
+            self.model = self.model.to(self.device)
+            results = self.evaluator.evaluate_round(self.model, self.testloader)
 
         log(INFO, "[%s] EVAL done  | round=%s | loss=%.4f | f1=%.4f | pr_auc=%.4f | thresh=%.2f",
             self.facility_id,
