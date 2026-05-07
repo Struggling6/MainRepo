@@ -7,6 +7,7 @@ RUN apt-get update \
     && groupadd -f render \
     && groupadd -f video \
     && usermod -aG render,video app \
+    && rm -rf /usr/local/bin/python \
     && ln -sf /python/venv/bin/python3 /usr/local/bin/python3 \
     && ln -sf /python/venv/bin/python3 /usr/local/bin/python
 
