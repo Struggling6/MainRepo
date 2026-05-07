@@ -1,6 +1,7 @@
-import optuna
 import os
-import torch
+os.environ["TORCH_BLAS_PREFER_HIPBLASLT"] = "0"
+
+import torch, optuna
 import torch.nn as nn
 
 from copy import deepcopy
@@ -9,7 +10,6 @@ from training.training_utils.utils import compute_pos_weight
 from models.utils import get_device
 from local_experiment import CONFIG, resolve_loss_fn
 
-os.environ["TORCH_BLAS_PREFER_HIPBLASLT"] = "0"
 
 class OptunaOptimizer(TrainEvalBase):
     """

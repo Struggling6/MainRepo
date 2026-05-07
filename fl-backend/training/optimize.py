@@ -6,7 +6,8 @@ from pathlib import Path
 
 # Compute default storage path
 _db_dir = Path(__file__).resolve().parent.parent.parent / "fl-backend"
-_storage_default = f"sqlite:////{str(_db_dir).lstrip('/')}/optuna_study.db"
+_db_path = _db_dir / "optuna_study.db"
+_storage_default = f"sqlite:///{_db_path.as_posix()}"
 
 parser = argparse.ArgumentParser(description="Run Optuna hyperparameter optimization")
 parser.add_argument("--epochs", "-e", type=int, default=10, help="Epochs per trial (default: 10)")
@@ -82,7 +83,7 @@ if args.dashboard:
         print("\nLaunching Optuna Dashboard on http://127.0.0.1:8080")
         print("Press Ctrl+C to stop the dashboard server.")
         try:
-            run_server(study._storage, host="127.0.0.1", port=8080)
+            run_server(args.storage, host="127.0.0.1", port=8080)
         except KeyboardInterrupt:
             print("\n\nShutting down dashboard server...")
             sys.exit(0)

@@ -332,8 +332,8 @@ python -m training.optimize --trials 50 --epochs 10
 |---|---|---|---|
 | `--trials` | `-t` | `50` | Number of Optuna trials |
 | `--epochs` | `-e` | `10` | Max epochs per trial |
-| `--storage` | `-s` | None | SQLite URL for shared study (AI-LAB) |
-| `--study-name` | `-n` | `fl-backend/optuna_study.db` | Optuna study name |
+| `--storage` | `-s` | `sqlite:///...fl-backend/optuna_study.db` | SQLite URL for shared study (AI-LAB) |
+| `--study-name` | `-n` | None | Optuna study name |
 | `--dashboard` | `-d` | off | Launch Optuna Dashboard after optimization |
 
 On AI-LAB, `run_optuna.sh` submits one SLURM array task per trial so all trials run in parallel across GPUs, writing results to a shared SQLite database.
