@@ -22,6 +22,7 @@ dependencies = [
     "transformers",
     "captum",
     "pypots",
+    "optuna-dashboard",
 ]
 
 [tool.flwr.app]

@@ -1,16 +1,15 @@
-import optuna
 import os
-from copy import deepcopy
-import torch.nn as nn
-
-
 os.environ["TORCH_BLAS_PREFER_HIPBLASLT"] = "0"
 
-import torch
+import torch, optuna
+import torch.nn as nn
+
+from copy import deepcopy
 from training.training_utils.TrainEvalBase import TrainEvalBase
 from training.training_utils.utils import compute_pos_weight
 from models.utils import get_device
-from config import CONFIG, resolve_loss_fn
+from local_experiment import CONFIG, resolve_loss_fn
+
 
 class OptunaOptimizer(TrainEvalBase):
     """
@@ -51,6 +50,9 @@ class OptunaOptimizer(TrainEvalBase):
         self.study_name = study_name
 
     def run(self):
+        min_resource = max(3, self.epochs // 4)
+        max_resource = self.epochs
+
         self._logger(
             f"Starting study name={self.study_name}, trials={self.n_trials}, epochs={self.epochs}, "
             f"train_shape={self.X_train.shape}, val_shape={self.X_val.shape}"
@@ -62,8 +64,8 @@ class OptunaOptimizer(TrainEvalBase):
             storage=self.storage,
             direction="maximize",
             pruner=optuna.pruners.HyperbandPruner(
-                min_resource=10,
-                max_resource=40,
+                min_resource=min_resource,
+                max_resource=max_resource,
                 reduction_factor=3,
             ),
             load_if_exists=True,
@@ -76,7 +78,6 @@ class OptunaOptimizer(TrainEvalBase):
             
         )
         self._print_results(study)
-
         self._logger("Study finished")
         return study
 
@@ -87,8 +88,8 @@ class OptunaOptimizer(TrainEvalBase):
         weight_decay      = trial.suggest_float("weight_decay",         1e-4, 1e-2, log=True)
         num_layers        = trial.suggest_int("num_layers",             1, 5)
         batch_size        = trial.suggest_categorical("batch_size",     [8, 16, 32, 64, 128, 256])
-        pos_weight_cap    = trial.suggest_categorical("pos_weight_cap", [ 20, 50, 70, 90])
-        dropout           = trial.suggest_float("dropout",              0.1, 0.5)
+        pos_weight_cap    = trial.suggest_float("pos_weight_cap",       20.0, 60.0, log=True)
+        dropout           = trial.suggest_float("dropout",              0.1, 0.4)
         self._logger(
             f"Trial {trial.number + 1}: sampled lr={lr:.3e}, wd={weight_decay:.3e}, "
             f"layers={num_layers}, batch_size={batch_size}, dropout={dropout:.3f}"
@@ -190,11 +191,9 @@ class OptunaOptimizer(TrainEvalBase):
             model_config.patch_stride = trial.suggest_int("patch_stride", 1, model_config.patch_length)
             model_config.ffn_dim    = trial.suggest_categorical("ffn_dim", [32, 64, 128, 256, 512])
             model_config.channel_attention = trial.suggest_categorical("channel_attention", [True, False])
-            model_config.attention_dropout = trial.suggest_float("attention_dropout", 0.1, 0.5)
-            model_config.positional_dropout = trial.suggest_float("positional_dropout", 0.1, 0.5)
-            model_config.head_dropout = trial.suggest_float("head_dropout", 0.1, 0.5)
-            model_config.pre_norm = trial.suggest_categorical("pre_norm", [True, False])
-            model_config.norm_type = trial.suggest_categorical("norm_type", ["batchnorm", "layernorm"])
+            model_config.attention_dropout = trial.suggest_float("attention_dropout", 0.1, 0.4)
+            model_config.positional_dropout = trial.suggest_float("positional_dropout", 0.1, 0.4)
+            model_config.head_dropout = trial.suggest_float("head_dropout", 0.1, 0.4)
             self._logger(
                 f"Trial {trial.number + 1}: building PatchTSTConfig context_length={model_config.context_length}, "
                 f"patch_candidates={patch_candidates}, selected_patch_length={model_config.patch_length}, "
@@ -226,7 +225,7 @@ class OptunaOptimizer(TrainEvalBase):
             print(f"    {k}: {v}")
 
     def _pretty_trial_callback(self, study: optuna.Study, trial: optuna.trial.FrozenTrial):
-        is_best = study.best_trial.number == trial.number + 1
+        is_best = (study.best_trial.number + 1) == (trial.number + 1)
         marker   = "★ NEW BEST" if is_best else ""
         duration = trial.duration.total_seconds() if trial.duration else 0.0
 

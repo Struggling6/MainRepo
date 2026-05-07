@@ -1,4 +1,4 @@
-from config import CONFIG
+from local_experiment import CONFIG
 
 import torch
 import numpy as np

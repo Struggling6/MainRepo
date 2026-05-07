@@ -1,16 +1,16 @@
 import os
-from logging import INFO, ERROR
-from pathlib import Path
-from typing import Optional, Union
-
 import torch
 import torch.nn as nn
+
+from pathlib import Path
+from typing import Optional, Union
 from flwr.common import EvaluateRes, FitRes, Parameters, parameters_to_ndarrays
 from flwr.common.logger import log
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.strategy import FedProx
 
-from config import CONFIG
+from logging import INFO, ERROR
+from local_experiment import CONFIG
 
 
 class FedProxWithSave(FedProx):

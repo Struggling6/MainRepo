@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 
-from config import CONFIG
+from local_experiment import CONFIG
 from interpretability.integrated_gradients import run_integrated_gradients
 from interpretability.visualization import (
     plot_feature_importance,

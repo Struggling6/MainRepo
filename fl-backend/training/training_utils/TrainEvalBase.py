@@ -40,7 +40,7 @@ class TrainEvalBase:
 
         for features, labels in loader:
             features = features.to(self.device)
-            labels   = labels.to(self.device).float()   # ← cast to float32
+            labels   = labels.to(self.device)
 
             optimizer.zero_grad()
             logits = model(features)
@@ -104,7 +104,8 @@ class TrainEvalBase:
             best_f1, best_thresh = 0.0, 0.5
         else:
             denom = precision + recall
-            f1_scores = np.where(denom > 0, 2 * precision * recall / denom, 0.0)
+            f1_scores = np.zeros_like(denom, dtype=float)
+            np.divide(2 * precision * recall, denom, out=f1_scores, where=denom > 0)
             best_idx = int(np.argmax(f1_scores))
             best_f1 = float(f1_scores[best_idx])
             best_thresh = float(thresholds[best_idx])
