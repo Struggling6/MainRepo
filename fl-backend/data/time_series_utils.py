@@ -175,7 +175,7 @@ def estimate_split_mem_usage(df, feature_cols):
     arrays in RAM before running the full pipeline.
     """
     total_rows     = len(df)
-    approx_windows = total_rows / 24   # stride=24
+    approx_windows = total_rows / 168   # stride=24
     window_size    = 168
     n_features     = len(feature_cols)
 

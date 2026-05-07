@@ -227,12 +227,12 @@ class LeadCSVConfig:
     test_split:   float = 0.2
     seed:         int   = 42
     use_undersampling: bool = True
-    undersampling_ratio: float = 5.0
+    undersampling_ratio: float = 1.0
     oversampling_method: Literal["none", "random_over", "smote"] = "none"
     oversampling_ratio: float = 1.0
     smote_k_neighbors: int = 5
-    undersample_val: bool = True
-    oversample_val: bool = True
+    undersample_val: bool = False
+    oversample_val: bool = False
 
     def build_handler(self, config=None):
         from data.lead_csv import LeadCSVHandler
@@ -272,7 +272,7 @@ class FederationConfig:
     fraction_fit:      float = 1.0
     fraction_evaluate: float = 1.0
     proximal_mu:       float = 2.0
-    serialize_gpu:     bool  = False
+    serialize_gpu:     bool  = True
     serialize_gpu_evaluate: bool = True
     gpu_lock_path:     Path  = Path("datasets/.gpu.lock")
 

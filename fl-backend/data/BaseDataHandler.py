@@ -36,8 +36,8 @@ class BaseDatasetHandler(ABC):
     _node_col    = "building_id"
     _time_col    = "timestamp"
     _window_size = 168   # 1 week of hourly data
-    _stride      = 24    # one window per day
-    _gap_hours   = 0     # override if lag features require a gap
+    _stride      = 168    # one window per day
+    _gap_hours   = 73     # override if lag features require a gap
 
     def __init__(self, config):
         self.config       = config
