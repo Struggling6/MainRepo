@@ -1,7 +1,7 @@
 import threading
 import optuna
 import os
-os.environ["TORCH_BLAS_PREFER_HIPBLASLT"] = "0"
+os.environ["TORCH_BLAS_PREFER_HIPBLASLT"] = "0" #Has to happen before torch import to have effect
 
 import torch, optuna
 import torch.nn as nn
@@ -97,11 +97,11 @@ class OptunaOptimizer(TrainEvalBase):
 
         try: 
 
-            lr                = trial.suggest_float("lr",                   3e-4, 3e-2, log=True)
+            lr                = trial.suggest_float("lr",                   3e-4, 3e-3, log=True)
             weight_decay      = trial.suggest_float("weight_decay",         1e-4, 1e-2, log=True)
             num_layers        = trial.suggest_int("num_layers",             1, 3)
-            batch_size        = trial.suggest_categorical("batch_size",     [32, 64, 128, 256, 512 ])
-            pos_weight_cap    = trial.suggest_float("pos_weight_cap",       20.0, 50.0, log=True)
+            batch_size        = trial.suggest_categorical("batch_size",     [64, 128, 256, 512, 1024])
+            pos_weight_cap    = trial.suggest_float("pos_weight_cap",       1.0, 10.0, log=True)
             dropout           = trial.suggest_float("dropout",              0.15, 0.35)
             self._logger(
                 f"Trial {trial.number + 1}: sampled lr={lr:.3e}, wd={weight_decay:.3e}, "
@@ -187,7 +187,7 @@ class OptunaOptimizer(TrainEvalBase):
             return [p for p in [4, 8, 16, 32] if context_length % p == 0]
 
         if isinstance(model_config, (CNNTransformerConfig, TransformerConfig)):
-            model_config.d_model     = trial.suggest_categorical("d_model", [32, 64, 128])
+            model_config.d_model     = trial.suggest_categorical("d_model", [64, 128, 256, 512, 1024])
             model_config.dropout     = dropout
 
             self._logger(
@@ -244,7 +244,10 @@ class OptunaOptimizer(TrainEvalBase):
             print(f"    {k}: {v}")
 
     def _pretty_trial_callback(self, study: optuna.Study, trial: optuna.trial.FrozenTrial):
-        is_best = (study.best_trial.number + 1) == (trial.number + 1)
+        try:
+            is_best = study.best_trial.number == trial.number
+        except ValueError:
+            is_best = False
         marker   = "★ NEW BEST" if is_best else ""
         duration = trial.duration.total_seconds() if trial.duration else 0.0
 

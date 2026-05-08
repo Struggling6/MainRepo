@@ -123,7 +123,7 @@ class PatchTSTConfig():
 
     name:                str   = "patchtst"
     batch_size:          int   = 64
-    context_length:      int   = 168
+    context_length:      int   = 168 # Has to mach the window_size used in data config
     patch_length:        int   = 16
     patch_stride:        int   = 8
     d_model:             int   = 128
@@ -225,10 +225,13 @@ class LeadCSVConfig:
     task_name:    str   = "binary_classification"
     test_split:   float = 0.2
     seed:         int   = 42
+    window_size:  int   = 168
+    gap_hours:    int   = 73
+    stride:       int   = 168
 
-    def build_handler(self, config=None):
+    def build_handler(self, config):
         from data.lead_csv import LeadCSVHandler
-        return LeadCSVHandler(config or CONFIG)
+        return LeadCSVHandler(config)
 
 @dataclass
 class PowerGridCSVConfig:
@@ -305,6 +308,10 @@ class ExperimentConfig:
     federation: FederationConfig             = field(default_factory=FederationConfig)
     evaluation: EvaluationConfig             = field(default_factory=EvaluationConfig)
     interpretability: InterpretabilityConfig = field(default_factory=InterpretabilityConfig)
+
+    def __post_init__(self):
+        if hasattr(self.model, "context_length"):
+            self.model.context_length = self.data.window_size
 
 
 CONFIG = ExperimentConfig()
