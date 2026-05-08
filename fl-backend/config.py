@@ -323,9 +323,10 @@ class GeneralOptunaConfig:
 
 @dataclass
 class ScoringConfig:
+    """Optuna optimizes pr_auc_weight * pr_auc + f1_weight * f1.
+    Set (1, 0) for pure PR-AUC, (0, 1) for pure F1, or any mix."""
     pr_auc_weight: float = 0.5
-    f1_weight: float = 0.5
-    report_metric: str = "score"  # "score", "pr_auc", or "f1"
+    f1_weight:     float = 0.5
 
 
 @dataclass

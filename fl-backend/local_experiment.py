@@ -6,32 +6,27 @@ from pathlib import Path
 from config import *
 
 CONFIG = ExperimentConfig(
-    
-
-    model = TimesNetConfig(
-        batch_size   = 64,
-        d_model   = 128,
-        num_layers   = 2,
-        top_k   = 3,
-        d_ffn   = 256,
-        n_kernels   = 6,
-        dropout = 0.3,
-        pos_weight_cap = 10.0,
-        num_classes   = 1,
+    model=PatchTSTConfig(
+        nhead=16,
+        d_model=128,
+        head_dropout=0.2,
+        attention_dropout=0.2,
+        positional_dropout=0.2,
+        patch_length=16,
+        patch_stride=12,
+        ffn_dim=256,
+        context_length=168,
+        norm_type="batchnorm",
+        num_layers=3,  
     ),
     data=LeadCSVConfig(
         file_path=Path("datasets/LEAD/train_features_clean.csv"),
-        window_size   = 168,
-        gap_hours   = 73,
-        stride  = 168,
-        use_undersampling = True,
-        use_oversampling = True,
-        undersampling_ratio = 5.0,
-        oversampling_method = "smote", #["none", "random_over", "smote"]
-        oversampling_ratio = 1.0,
-        smote_k_neighbors = 5,
-        undersample_val = True,
-        oversample_val = True,
+        window_size=168,
+        stride=168,
+        gap_hours=168,
+        use_precomputed_windows=False,
+        use_undersampling=False,
+
     ),
     training=TrainingConfig(
         local_epochs=30,
@@ -43,7 +38,7 @@ CONFIG = ExperimentConfig(
         num_rounds=1,
         num_clients=1,
         proximal_mu=0,
-        partition_mode="optuna",
+        partition_mode="shared",
     ),
 )
 

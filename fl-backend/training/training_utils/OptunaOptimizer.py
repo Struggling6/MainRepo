@@ -135,6 +135,8 @@ class OptunaOptimizer(TrainEvalBase):
         return study
 
     def _objective_score(self, pr_auc: float, f1: float) -> float:
+        """Weighted scalar Optuna optimizes. Set pr_auc_weight=1, f1_weight=0
+        for pure PR-AUC; flip for pure F1; mix for a blended objective."""
         s = self.optuna_config.scoring
         return s.pr_auc_weight * float(pr_auc) + s.f1_weight * float(f1)
 
@@ -202,7 +204,9 @@ class OptunaOptimizer(TrainEvalBase):
 
                 score = self._objective_score(pr_auc, val_f1)
 
-                if pr_auc > best_pr_auc:
+                # Track best epoch by the weighted score so PR-AUC, F1, or any
+                # mix can drive the search just by changing the weights.
+                if score > best_score:
                     best_pr_auc = pr_auc
                     best_f1 = val_f1
                     best_score = score
@@ -212,8 +216,9 @@ class OptunaOptimizer(TrainEvalBase):
                     f"Trial {trial.number + 1} epoch {epoch + 1}/{self.epochs}: "
                     f"train_loss={train_loss:.6f}, val_loss={val_loss:.6f}, "
                     f"val_f1={val_f1:.4f}, pr_auc={pr_auc:.4f}, "
-                    f"score={score:.4f}, best_pr_auc={best_pr_auc:.4f}, "
-                    f"best_f1={best_f1:.4f}, best_thresh={best_threshold:.2f}"
+                    f"score={score:.4f}, best_score={best_score:.4f}, "
+                    f"best_pr_auc={best_pr_auc:.4f}, best_f1={best_f1:.4f}, "
+                    f"best_thresh={best_threshold:.2f}"
                 )
 
                 trial.report(best_pr_auc, epoch)
@@ -226,8 +231,8 @@ class OptunaOptimizer(TrainEvalBase):
                 if trial.should_prune():
                     self._logger(
                         f"Trial {trial.number + 1} pruned at epoch {epoch + 1} "
-                        f"with best_pr_auc={best_pr_auc:.4f} "
-                        f"(last_epoch_pr_auc={pr_auc:.4f})"
+                        f"with best_score={best_score:.4f} "
+                        f"(last_epoch_score={score:.4f})"
                     )
                     raise optuna.TrialPruned()
 
@@ -241,7 +246,7 @@ class OptunaOptimizer(TrainEvalBase):
                 f"best_threshold={best_threshold:.2f}"
             )
 
-            return float(best_pr_auc)
+            return float(best_score)
 
         finally:
             del model, optimizer, train_dl, val_dl
