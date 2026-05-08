@@ -388,12 +388,16 @@ class TimesNetOptunaConfig(OptunaSearchConfig):
     """Search space used by TimesNetConfig."""
 
     # TimesNet can be fairly memory-heavy, so keep batch sizes moderate.
-    batch_size: list[int] = field(default_factory=lambda: [32, 64, 128, 256])
+    batch_size: list = field(default_factory=lambda: [32, 64, 128, 256])
 
-    d_model: list[int] = field(default_factory=lambda: [64, 128, 256])
-    top_k: list[int] = field(default_factory=lambda: [2, 3, 5])
-    d_ffn: list[int] = field(default_factory=lambda: [128, 256, 512])
-    n_kernels: list[int] = field(default_factory=lambda: [3, 6, 9])
+    d_model: list    = field(default_factory=lambda: [64, 128, 256])
+    top_k: list      = field(default_factory=lambda: [2, 3, 5])
+    d_ffn: list      = field(default_factory=lambda: [128, 256, 512])
+    n_kernels: list  = field(default_factory=lambda: [3, 6, 9])
+    dropout: FloatRange = field(default_factory=lambda: FloatRange(0.1, 0.4))
+    pos_weight_cap: FloatRange = field(default_factory=lambda: FloatRange(1.0, 10.0, log=True))
+    num_layers: IntRange = field(default_factory=lambda: IntRange(1, 5))
+                                                                  
 
 
 # ── Interpretability config ─────────────────────────────────────────── #
