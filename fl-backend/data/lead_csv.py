@@ -51,6 +51,12 @@ class LeadCSVHandler(BaseDatasetHandler):
         self.undersampling_ratio = getattr(config.data, "undersampling_ratio", 1.0)
         self.undersample_val = getattr(config.data, "undersample_val", False)
 
+        self.use_oversampling = getattr(config.data, "use_oversampling", False)
+        self.oversampling_method = getattr(config.data, "oversampling_method", "none")
+        self.oversampling_ratio = getattr(config.data, "oversampling_ratio", 1.0)
+        self.smote_k_neighbors = getattr(config.data, "smote_k_neighbors", 5)
+        self.oversample_val = getattr(config.data, "oversample_val", False)
+
         self.data_dir = getattr(config.data, "data_dir", None)
         self.file_pattern = getattr(config.data, "file_pattern", None)
         self.precomputed_dir = getattr(config.data, "precomputed_dir", None)
@@ -642,7 +648,31 @@ class LeadCSVHandler(BaseDatasetHandler):
                     seed=self.seed + 10_000 + partition_id,
                 )
             else:
-                print("[LEAD] Keeping validation set unchanged")
+                print("[LEAD] Keeping validation set unchanged after undersampling step")
+
+        if self.use_oversampling:
+            X_train, y_train = self._oversample_anomalies(
+                X_train,
+                y_train,
+                method=self.oversampling_method,
+                target_ratio=self.oversampling_ratio,
+                smote_k_neighbors=self.smote_k_neighbors,
+                seed=self.seed + 20_000 + partition_id,
+                split_name="train",
+            )
+
+            if self.oversample_val:
+                X_val, y_val = self._oversample_anomalies(
+                    X_val,
+                    y_val,
+                    method=self.oversampling_method,
+                    target_ratio=self.oversampling_ratio,
+                    smote_k_neighbors=self.smote_k_neighbors,
+                    seed=self.seed + 30_000 + partition_id,
+                    split_name="val",
+                )
+            else:
+                print("[LEAD] Keeping validation set unchanged after oversampling step")
 
         self.num_train_windows_after_undersampling = len(y_train)
                 
@@ -674,6 +704,7 @@ class LeadCSVHandler(BaseDatasetHandler):
         return len(self.client_indices)
     
     def _undersample_normals(
+            
         self,
         X: np.ndarray,
         y: np.ndarray,
@@ -722,3 +753,93 @@ class LeadCSVHandler(BaseDatasetHandler):
         )
 
         return X_under, y_under
+    
+    def _oversample_anomalies(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        *,
+        method: str,
+        target_ratio: float,
+        smote_k_neighbors: int,
+        seed: int,
+        split_name: str,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        y = y.astype(np.int64, copy=False)
+
+        if method in [None, "none"]:
+            return X, y
+
+        positives = int(y.sum())
+        negatives = int(len(y) - positives)
+
+        if positives == 0 or negatives == 0:
+            print(
+                f"[LEAD] WARNING: Oversampling skipped for {split_name}; "
+                "requires both classes."
+            )
+            return X, y
+
+        current_ratio = positives / negatives
+
+        if target_ratio <= current_ratio:
+            print(
+                f"[LEAD] Oversampling skipped for {split_name}: "
+                f"current positive:negative ratio={current_ratio:.4f} "
+                f"is already >= target={target_ratio:.4f}"
+            )
+            return X, y
+
+        original_shape = X.shape
+        X_flat = X.reshape(original_shape[0], -1)
+
+        if method == "random_over":
+            from imblearn.over_sampling import RandomOverSampler
+
+            sampler = RandomOverSampler(
+                sampling_strategy=target_ratio,
+                random_state=seed,
+            )
+
+        elif method == "smote":
+            if positives < 2:
+                print(
+                    f"[LEAD] WARNING: SMOTE skipped for {split_name}; "
+                    "requires at least two positive samples."
+                )
+                return X, y
+
+            from imblearn.over_sampling import SMOTE
+
+            effective_k = min(smote_k_neighbors, positives - 1)
+
+            sampler = SMOTE(
+                sampling_strategy=target_ratio,
+                random_state=seed,
+                k_neighbors=effective_k,
+            )
+
+        else:
+            raise ValueError(
+                f"Unknown oversampling_method='{method}'. "
+                "Expected 'none', 'random_over', or 'smote'."
+            )
+
+        X_resampled, y_resampled = sampler.fit_resample(X_flat, y)
+
+        X_resampled = X_resampled.reshape((-1, *original_shape[1:])).astype(
+            np.float32,
+            copy=False,
+        )
+        y_resampled = y_resampled.astype(np.int64, copy=False)
+
+        print(
+            f"[LEAD] Applied {split_name} oversampling: "
+            f"method={method}, "
+            f"target_pos_neg={target_ratio}:1, "
+            f"before={len(y)}, pos_before={positives}, "
+            f"after={len(y_resampled)}, pos_after={int(y_resampled.sum())}, "
+            f"anomaly_rate={float(y_resampled.mean()):.4f}"
+        )
+
+        return X_resampled, y_resampled

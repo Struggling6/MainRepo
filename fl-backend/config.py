@@ -231,9 +231,10 @@ class LeadCSVConfig:
     window_size:  int   = 168
     gap_hours:    int   = 73
     stride:       int   = 168
-    use_undersampling: bool = True
+    use_undersampling: bool = False
+    use_oversampling: bool = False
     undersampling_ratio: float = 1.0
-    oversampling_method: Literal["none", "random_over", "smote"] = "none"
+    oversampling_method: str = "none" #["none", "random_over", "smote"]
     oversampling_ratio: float = 1.0
     smote_k_neighbors: int = 5
     undersample_val: bool = False
