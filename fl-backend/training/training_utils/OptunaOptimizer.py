@@ -217,7 +217,12 @@ class OptunaOptimizer(TrainEvalBase):
                 )
 
                 trial.report(best_pr_auc, epoch)
-
+                trial.set_user_attr("score", float(best_score))
+                trial.set_user_attr("pr_auc", float(best_pr_auc))
+                trial.set_user_attr("f1", float(best_f1))
+                trial.set_user_attr("threshold", float(best_threshold))
+                trial.set_user_attr("best_threshold", float(best_threshold))
+                
                 if trial.should_prune():
                     self._logger(
                         f"Trial {trial.number + 1} pruned at epoch {epoch + 1} "
@@ -226,11 +231,7 @@ class OptunaOptimizer(TrainEvalBase):
                     )
                     raise optuna.TrialPruned()
 
-            trial.set_user_attr("score", float(best_score))
-            trial.set_user_attr("pr_auc", float(best_pr_auc))
-            trial.set_user_attr("f1", float(best_f1))
-            trial.set_user_attr("threshold", float(best_threshold))
-            trial.set_user_attr("best_threshold", float(best_threshold))
+
 
             self._logger(
                 f"Trial {trial.number + 1} complete: "
