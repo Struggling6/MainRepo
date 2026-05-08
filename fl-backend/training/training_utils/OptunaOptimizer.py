@@ -13,12 +13,17 @@ from training.training_utils.utils import compute_pos_weight
 from models.utils import get_device
 from local_experiment import CONFIG, resolve_loss_fn
 
+os.environ["TORCH_BLAS_PREFER_HIPBLASLT"] = "0"
 
 class OptunaOptimizer(TrainEvalBase):
     """
     Runs an Optuna hyperparameter search using the shared train/val
     epoch logic from TrainEvalBase. Builds a fresh model for each trial.
-    Pruning is handled by HyperbandPruner — no manual patience needed.
+
+    Objective:
+        score = 0.7 * PR-AUC + 0.3 * F1
+
+    Pruning is handled by HyperbandPruner.
     """
 
     optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -31,8 +36,10 @@ class OptunaOptimizer(TrainEvalBase):
 
     def __init__(
         self,
-        X_train, y_train,
-        X_val, y_val,
+        X_train,
+        y_train,
+        X_val,
+        y_val,
         config=CONFIG,
         n_trials=50,
         epochs=20,
@@ -44,8 +51,8 @@ class OptunaOptimizer(TrainEvalBase):
         self.config = config
         self.X_train = X_train
         self.y_train = y_train
-        self.X_val   = X_val
-        self.y_val   = y_val
+        self.X_val = X_val
+        self.y_val = y_val
         self.in_channels = int(X_train.shape[-1])
         self.config.evaluation.input_dim = self.in_channels
 
@@ -66,6 +73,7 @@ class OptunaOptimizer(TrainEvalBase):
             f"device={self.device}"
             
         )
+
         study = optuna.create_study(
             study_name=self.study_name,
             storage=self.storage,
@@ -77,6 +85,7 @@ class OptunaOptimizer(TrainEvalBase):
             ),
             load_if_exists=True,
         )
+
         study.optimize(
             self._objective,
             n_trials=self.n_trials,
@@ -85,9 +94,13 @@ class OptunaOptimizer(TrainEvalBase):
             gc_after_trial=True,
             show_progress_bar=True,
         )
+
         self._print_results(study)
         self._logger("Study finished")
         return study
+
+    def _objective_score(self, pr_auc: float, f1: float) -> float:
+        return 0.3 * float(pr_auc) + 0.7 * float(f1)
 
     def _objective(self, trial):
         model     = None
@@ -169,7 +182,7 @@ class OptunaOptimizer(TrainEvalBase):
 
     def _build_model(self, trial, dropout, num_layers, batch_size) -> nn.Module:
         from config import CNNTransformerConfig, TransformerConfig, LSTMConfig, PatchTSTConfig
-        
+
         model_config = deepcopy(self.config.model)
 
         model_config.batch_size = batch_size
@@ -178,10 +191,12 @@ class OptunaOptimizer(TrainEvalBase):
         def valid_nheads():
             return [n for n in [2, 4, 8, 16] if model_config.d_model % n == 0]
 
-        # For transformer-based models, ensure nhead divides d_model
         if hasattr(model_config, "nhead") and valid_nheads():
             model_config.nhead = trial.suggest_categorical("nhead", valid_nheads())
-            self._logger(f"Trial {trial.number + 1}: valid_nheads={valid_nheads()}, selected_nhead={model_config.nhead}")
+            self._logger(
+                f"Trial {trial.number + 1}: valid_nheads={valid_nheads()}, "
+                f"selected_nhead={model_config.nhead}"
+            )
 
         def valid_patch_lengths(context_length):
             return [p for p in [4, 8, 16, 32] if context_length % p == 0]
@@ -192,15 +207,19 @@ class OptunaOptimizer(TrainEvalBase):
 
             self._logger(
                 f"Trial {trial.number + 1}: building {type(model_config).__name__} "
-                f"d_model={model_config.d_model}, num_layers={model_config.num_layers}, dropout={model_config.dropout:.3f}"
+                f"d_model={model_config.d_model}, "
+                f"num_layers={model_config.num_layers}, "
+                f"dropout={model_config.dropout:.3f}"
             )
 
         elif isinstance(model_config, LSTMConfig):
             model_config.hidden_size = trial.suggest_categorical("hidden_size", [64, 128, 256, 512])
             model_config.dropout     = dropout
             self._logger(
-                f"Trial {trial.number + 1}: building LSTMConfig hidden_size={model_config.hidden_size}, "
-                f"num_layers={model_config.num_layers}, dropout={model_config.dropout:.3f}"
+                f"Trial {trial.number + 1}: building LSTMConfig "
+                f"hidden_size={model_config.hidden_size}, "
+                f"num_layers={model_config.num_layers}, "
+                f"dropout={model_config.dropout:.3f}"
             )
 
         elif isinstance(model_config, PatchTSTConfig):
@@ -214,10 +233,15 @@ class OptunaOptimizer(TrainEvalBase):
             model_config.positional_dropout = trial.suggest_float("positional_dropout", 0.1, 0.4)
             model_config.head_dropout       = trial.suggest_float("head_dropout", 0.1, 0.4)
             self._logger(
-                f"Trial {trial.number + 1}: building PatchTSTConfig context_length={model_config.context_length}, "
-                f"patch_candidates={patch_candidates}, selected_patch_length={model_config.patch_length}, "
-                f"patch_stride={model_config.patch_stride}, d_model={model_config.d_model}, ffn_dim={model_config.ffn_dim}"
+                f"Trial {trial.number + 1}: building PatchTSTConfig "
+                f"context_length={model_config.context_length}, "
+                f"patch_candidates={patch_candidates}, "
+                f"selected_patch_length={model_config.patch_length}, "
+                f"patch_stride={model_config.patch_stride}, "
+                f"d_model={model_config.d_model}, "
+                f"ffn_dim={model_config.ffn_dim}"
             )
+
         else:
             raise TypeError(
                 f"No search space defined for {type(model_config).__name__}. "
@@ -230,16 +254,25 @@ class OptunaOptimizer(TrainEvalBase):
     def _build_loss(self, pos_weight_cap):
         pw = min(self.raw_pw, pos_weight_cap)
         loss_cls = resolve_loss_fn(self.loss_fn)
+
         self._logger(
-            f"Loss setup: loss_fn={self.loss_fn}, raw_pos_weight={self.raw_pw:.4f}, "
-            f"cap={pos_weight_cap}, effective_pos_weight={pw:.4f}"
+            f"Loss setup: loss_fn={self.loss_fn}, "
+            f"raw_pos_weight={self.raw_pw:.4f}, "
+            f"cap={pos_weight_cap:.4f}, "
+            f"effective_pos_weight={pw:.4f}"
         )
         return loss_cls(pos_weight=torch.tensor([pw], device=self.device))
 
     def _print_results(self, study):
         print("\n=== Best Trial ===")
-        print(f"  PR-AUC:     {study.best_trial.value:.4f}")
+        print(f"  Score:      {study.best_trial.value:.4f}")
+        print(f"  PR-AUC:     {study.best_trial.user_attrs.get('pr_auc')}")
+        print(f"  Precision:  {study.best_trial.user_attrs.get('precision')}")
+        print(f"  Recall:     {study.best_trial.user_attrs.get('recall')}")
+        print(f"  F1:         {study.best_trial.user_attrs.get('f1')}")
+        print(f"  Threshold:  {study.best_trial.user_attrs.get('threshold')}")
         print("  Params:")
+
         for k, v in study.best_trial.params.items():
             print(f"    {k}: {v}")
 
@@ -254,10 +287,18 @@ class OptunaOptimizer(TrainEvalBase):
         print(f"\n── Trial {trial.number + 1:>3}  {marker}")
         print(f"   value    : {trial.value:.6f}")
         print(f"   duration : {duration:6.1f}s")
-        print(f"   params   :")
+        print("   metrics  :")
+        print(f"     pr_auc          = {trial.user_attrs.get('pr_auc')}")
+        print(f"     precision       = {trial.user_attrs.get('precision')}")
+        print(f"     recall          = {trial.user_attrs.get('recall')}")
+        print(f"     f1              = {trial.user_attrs.get('f1')}")
+        print(f"     threshold       = {trial.user_attrs.get('threshold')}")
+        print("   params   :")
+
         for k, v in trial.params.items():
             if isinstance(v, float):
                 print(f"     {k:<16} = {v:.6g}")
             else:
                 print(f"     {k:<16} = {v}")
+
         print("─" * 40 + "\n")

@@ -80,46 +80,44 @@ class TrainEvalBase:
         all_probs = torch.cat(all_probs).numpy()
         all_labels = torch.cat(all_labels).numpy()
 
-        # ------------------------------------------------------------------
-        # Decision-threshold search via the precision-recall curve.
-        #
-        # `precision_recall_curve` returns precision/recall at every unique
-        # score that occurs in `all_probs`, which is the finest threshold
-        # set that can ever change the confusion matrix (no information is
-        # lost vs. a fine grid, and no unreachable thresholds are tested).
-        #
-        # F1 is computed per-threshold from those precision/recall arrays,
-        # then we pick the argmax. This sweeps the full [0.0, 1.0) range,
-        # fixing the previous bug where np.arange(0.01, 0.5, 0.01) could
-        # never select an optimum at or above 0.5.
-        # ------------------------------------------------------------------
+        # -----------------------------
+        # PR-AUC (threshold-independent)
+        # -----------------------------
+        pr_auc = average_precision_score(all_labels, all_probs)
+
+        # -----------------------------
+        # Find best threshold via PR curve
+        # -----------------------------
         precision, recall, thresholds = precision_recall_curve(all_labels, all_probs)
 
-        # precision_recall_curve appends a final (precision=1, recall=0)
-        # sentinel point that has no associated threshold, so trim it.
+        # Remove last sentinel point
         precision = precision[:-1]
         recall = recall[:-1]
 
         if thresholds.size == 0:
-            # Degenerate batch (all labels identical or empty). Fall back.
-            best_f1, best_thresh = 0.0, 0.5
+            best_f1 = 0.0
+            best_thresh = 0.5
+ 
         else:
             denom = precision + recall
             f1_scores = np.zeros_like(denom, dtype=float)
-            np.divide(2 * precision * recall, denom, out=f1_scores, where=denom > 0)
+
+            np.divide(
+                2 * precision * recall,
+                denom,
+                out=f1_scores,
+                where=denom > 0,
+            )
+
             best_idx = int(np.argmax(f1_scores))
+
             best_f1 = float(f1_scores[best_idx])
             best_thresh = float(thresholds[best_idx])
 
-        # ------------------------------------------------------------------
-        # PR-AUC (average precision).
-        #
-        # Note on interpretation: PR-AUC is class-imbalance sensitive. The
-        # baseline expected score for a random classifier equals the
-        # positive class prevalence (e.g., for LEAD `anomaly` ~= 0.0213,
-        # so a random model scores PR-AUC ~= 0.0213, not 0.5). Always
-        # compare PR-AUC to the prevalence baseline, not to 0.5.
-        # ------------------------------------------------------------------
-        pr_auc = average_precision_score(all_labels, all_probs)
 
-        return total_loss / total_samples, best_f1, best_thresh, pr_auc
+        return (
+            total_loss / total_samples,
+            best_f1,
+            best_thresh,
+            pr_auc,
+        )

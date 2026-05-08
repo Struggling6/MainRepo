@@ -7,8 +7,9 @@ from data.lead_csv import LeadCSVHandler
 from local_experiment import CONFIG
 
 # Compute default storage path
-_db_dir = Path(__file__).resolve().parent.parent.parent / "fl-backend"
-_db_path = _db_dir / "optuna_study.db"
+_db_path = Path(__file__).resolve().parents[1] / "optuna_study.db"
+_db_path.parent.mkdir(parents=True, exist_ok=True)
+
 _storage_default = f"sqlite:///{_db_path.as_posix()}"
 
 parser = argparse.ArgumentParser(description="Run Optuna hyperparameter optimization")
