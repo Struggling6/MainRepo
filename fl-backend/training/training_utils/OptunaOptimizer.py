@@ -116,16 +116,12 @@ class OptunaOptimizer(TrainEvalBase):
                 f"Trial {trial.number + 1}: dataloaders built train_batches={len(train_dl)}, val_batches={len(val_dl)}"
             )
             optimizer         = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
-            scheduler         = torch.optim.lr_scheduler.CosineAnnealingLR(
-                optimizer, T_max=max(1, self.epochs), eta_min=lr * 0.01
-            )
 
             best_pr_auc, best_threshold = 0.0, 0.5
 
             for epoch in range(self.epochs):  # 0-indexed for Hyperband
                 train_loss = self._train_epoch(model, train_dl, optimizer, loss_fn)
                 val_loss, val_f1, best_thresh, pr_auc = self._val_epoch(model, val_dl, loss_fn)
-                scheduler.step()
 
                 # Track best-so-far PR-AUC and the threshold that achieved it.
                 # We update this BEFORE reporting to the pruner so the value
