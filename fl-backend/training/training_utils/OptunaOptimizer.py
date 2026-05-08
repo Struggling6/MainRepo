@@ -221,7 +221,7 @@ class OptunaOptimizer(TrainEvalBase):
                     f"best_thresh={best_threshold:.2f}"
                 )
 
-                trial.report(best_pr_auc, epoch)
+                trial.report(best_score, epoch)
                 trial.set_user_attr("score", float(best_score))
                 trial.set_user_attr("pr_auc", float(best_pr_auc))
                 trial.set_user_attr("f1", float(best_f1))
