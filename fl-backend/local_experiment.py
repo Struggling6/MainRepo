@@ -7,17 +7,27 @@ from config import *
 
 CONFIG = ExperimentConfig(
     
-    model = TimesNetConfig(
-        batch_size   = 64,
+    model = CNNTransformerConfig(
+       batch_size   = 64,
         d_model   = 128,
+        nhead   = 4,
         num_layers   = 2,
-        top_k   = 3,
-        d_ffn   = 256,
-        n_kernels   = 6,
         dropout = 0.3,
         pos_weight_cap = 10.0,
-        num_classes   = 1,
+
     ),
+
+    #model = TimesNetConfig(
+       # batch_size   = 64,
+      #  d_model   = 128,
+       # num_layers   = 2,
+      #  top_k   = 3,
+      #  d_ffn   = 256,
+      #  n_kernels   = 6,
+       # dropout = 0.3,
+       # pos_weight_cap = 10.0,
+       # num_classes   = 1,
+    #),
     data=LeadCSVConfig(
         file_path=Path("datasets/LEAD/train_features_clean.csv"),
         window_size   = 168,

@@ -20,7 +20,7 @@ class GeneralOptunaConfig:
     n_trials: int = 80
     epochs: int = 10
     n_jobs: int = 2
-    study_name: str | None = "Timesnet_optimization"
+    study_name: str | None = "tjester"
 
 
 @dataclass
