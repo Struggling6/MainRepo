@@ -231,7 +231,7 @@ class OptunaOptimizer(TrainEvalBase):
             )
         return valid
 
-def _build_model(self, trial, num_layers, batch_size) -> nn.Module:
+    def _build_model(self, trial, num_layers, batch_size) -> nn.Module:
         from config import CNNTransformerConfig, TransformerConfig, LSTMConfig, PatchTSTConfig
 
         model_config = deepcopy(self.config.model)
