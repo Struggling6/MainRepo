@@ -83,7 +83,13 @@ class OptunaOptimizer(TrainEvalBase):
 
     @staticmethod
     def _select_search_space(model_config, optuna_config):
-        from config import CNNTransformerConfig, TransformerConfig, LSTMConfig, PatchTSTConfig
+        from config import (
+            CNNTransformerConfig,
+            TransformerConfig,
+            LSTMConfig,
+            PatchTSTConfig,
+            TimesNetConfig,
+        )
 
         if isinstance(model_config, LSTMConfig):
             return optuna_config.lstm
@@ -93,6 +99,9 @@ class OptunaOptimizer(TrainEvalBase):
             return optuna_config.cnn_transformer
         if isinstance(model_config, PatchTSTConfig):
             return optuna_config.patchtst
+        if isinstance(model_config, TimesNetConfig):
+            return optuna_config.timesnet
+
         raise TypeError(
             f"No Optuna search space configured for {type(model_config).__name__}"
         )
@@ -231,8 +240,8 @@ class OptunaOptimizer(TrainEvalBase):
             )
         return valid
 
-def _build_model(self, trial, num_layers, batch_size) -> nn.Module:
-        from config import CNNTransformerConfig, TransformerConfig, LSTMConfig, PatchTSTConfig
+    def _build_model(self, trial, num_layers, batch_size) -> nn.Module:
+        from config import CNNTransformerConfig, TransformerConfig, LSTMConfig, PatchTSTConfig, TimesNetConfig
 
         model_config = deepcopy(self.config.model)
         s = self.search
@@ -269,6 +278,13 @@ def _build_model(self, trial, num_layers, batch_size) -> nn.Module:
             model_config.attention_dropout  = _suggest(trial, "attention_dropout", s.attention_dropout)
             model_config.positional_dropout = _suggest(trial, "positional_dropout", s.positional_dropout)
             model_config.head_dropout       = _suggest(trial, "head_dropout", s.head_dropout)
+            
+        elif isinstance(model_config, TimesNetConfig):
+            model_config.d_model = _suggest(trial, "d_model", s.d_model)
+            model_config.top_k = _suggest(trial, "top_k", s.top_k)
+            model_config.d_ffn = _suggest(trial, "d_ffn", s.d_ffn)
+            model_config.n_kernels = _suggest(trial, "n_kernels", s.n_kernels)
+            model_config.dropout = _suggest(trial, "dropout", s.dropout)
 
         else:
             raise TypeError(
