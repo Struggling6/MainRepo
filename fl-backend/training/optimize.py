@@ -17,7 +17,7 @@ parser = argparse.ArgumentParser(description="Run Optuna hyperparameter optimiza
 parser.add_argument("--epochs", "-e", type=int, default=OPTUNA_CONFIG.general.epochs, help="Epochs per trial")
 parser.add_argument("--trials", "-t", type=int, default=OPTUNA_CONFIG.general.n_trials, help="Number of Optuna trials")
 parser.add_argument("--storage", "-s", type=str, default=os.environ.get("STORAGE", _storage_default), help="Optuna storage URL (default: fl-backend/optuna_study.db)")
-parser.add_argument("--study-name", "-n", type=str, help="Optuna study name")
+parser.add_argument("--study-name", "-n", type=str, default=OPTUNA_CONFIG.general.study_name, help="Optuna study name")
 parser.add_argument(
     "--dashboard",
     "-d",
