@@ -21,6 +21,13 @@ CONFIG = ExperimentConfig(
     ),
     data=LeadCSVConfig(
         file_path=Path("datasets/LEAD/train_features_clean.csv"),
+        window_size=168,
+        stride=168,
+        gap_hours=168,
+        use_precomputed_windows=False,
+        use_undersampling=False,
+        
+
     ),
     training=TrainingConfig(
         local_epochs=30,
