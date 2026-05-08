@@ -373,6 +373,10 @@ class PatchTSTOptunaConfig(OptunaSearchConfig):
     # patch_length is filtered against context_length at trial time so it
     # always evenly divides the window.
     patch_length_candidates: list       = field(default_factory=lambda: [8, 16, 32])
+    # patch_stride is filtered to candidates <= patch_length at trial time.
+    # stride == patch_length gives non-overlapping patches; stride < patch_length
+    # gives overlap. Avoid stride=1 (extreme overlap → patch-count blowup).
+    patch_stride_candidates: list       = field(default_factory=lambda: [4, 8, 16])
     ffn_dim:                 list       = field(default_factory=lambda: [32, 64, 128, 256])
     channel_attention:       list       = field(default_factory=lambda: [True, False])
     # PatchTST has no shared `dropout` — only per-component dropouts below.

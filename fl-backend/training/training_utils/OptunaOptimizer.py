@@ -231,6 +231,17 @@ class OptunaOptimizer(TrainEvalBase):
             )
         return valid
 
+    @staticmethod
+    def _valid_patch_strides(patch_length, candidates):
+        """patch_stride must be <= patch_length (stride > patch_length leaves gaps)."""
+        valid = [s for s in candidates if s <= patch_length]
+        if not valid:
+            raise ValueError(
+                f"No patch_stride in {candidates} is <= patch_length={patch_length}. "
+                f"Add a value <= {patch_length} to patch_stride_candidates."
+            )
+        return valid
+
     def _build_model(self, trial, num_layers, batch_size) -> nn.Module:
         from config import CNNTransformerConfig, TransformerConfig, LSTMConfig, PatchTSTConfig
 
@@ -260,7 +271,10 @@ class OptunaOptimizer(TrainEvalBase):
                 "patch_length",
                 self._valid_patch_lengths(model_config.context_length, s.patch_length_candidates),
             )
-            model_config.patch_stride       = trial.suggest_int("patch_stride", 1, model_config.patch_length)
+            model_config.patch_stride = trial.suggest_categorical(
+                "patch_stride",
+                self._valid_patch_strides(model_config.patch_length, s.patch_stride_candidates),
+            )
             model_config.ffn_dim            = _suggest(trial, "ffn_dim", s.ffn_dim)
             model_config.channel_attention  = _suggest(trial, "channel_attention", s.channel_attention)
             model_config.attention_dropout  = _suggest(trial, "attention_dropout", s.attention_dropout)
