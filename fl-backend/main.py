@@ -2,7 +2,7 @@ from local_experiment import CONFIG
 from training.train import train_model
 from models.utils import get_device
 from training.training_utils.Evaluator import Evaluator
-from plotting.plotting_config import plot_diagrams
+#from plotting.plotting_config import plot_diagrams
 
 import argparse
 parser = argparse.ArgumentParser()
@@ -38,7 +38,7 @@ def main():
     device = get_device()
 
     # ── Dataset ──────────────────────────────────────────────────────── #
-    dataset_handler             = config.data.build_handler()
+    dataset_handler             = config.data.build_handler(config)
     metadata                    = dataset_handler.get_metadata()
     config.evaluation.input_dim = metadata["input_dim"]
     
@@ -72,7 +72,7 @@ def main():
     eval_results = evaluator.evaluate_round(model, valloader)
     print(f"Evaluation results: {eval_results}")
 
-    plot_diagrams(train_results["pr_history"], train_results["f1_history"])
+    # plot_diagrams(train_results["pr_history"], train_results["f1_history"])
 
 if __name__ == "__main__":
     if args.simulate:

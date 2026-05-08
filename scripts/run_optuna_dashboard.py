@@ -2,7 +2,6 @@
 import argparse
 import os
 import subprocess
-import sys
 from pathlib import Path
 
 
@@ -57,7 +56,15 @@ def main() -> int:
         str(args.port),
         args.storage,
     ]
-    return subprocess.call(cmd)
+    proc = subprocess.Popen(cmd)
+    try:
+        proc.wait()
+    except KeyboardInterrupt:
+        proc.terminate()
+        proc.wait()
+        print("\nDashboard stopped.")
+        return 0
+    return proc.returncode
 
 
 if __name__ == "__main__":

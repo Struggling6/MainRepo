@@ -22,8 +22,6 @@ class LeadCSVHandler(BaseDatasetHandler):
     produce the same input dimensionality.
     """
 
-    _gap_hours = 73
-
     PRIMARY_USE_CATEGORIES = [
         "Education",
         "Entertainment/public assembly",
@@ -74,6 +72,9 @@ class LeadCSVHandler(BaseDatasetHandler):
         self.num_train_windows_before_undersampling = 0
         self.num_train_anomalies_before_undersampling = 0
         self.num_train_windows_after_undersampling = 0
+        self._gap_hours = config.data.gap_hours
+        self._stride = config.data.stride
+        self._window_size = config.data.window_size
 
         if self.partition_mode in ["shared", "optuna"]:
             print(f"[LEAD] Loading {self.partition_mode} file: {self.file_path}")
@@ -149,12 +150,11 @@ class LeadCSVHandler(BaseDatasetHandler):
         return path
 
     def _build_feature_columns(self):
+        # Static per-building identity features (site_id, square_feet, year_built,
+        # floor_count, primary_use_*) are excluded — they let the model memorize
+        # building identity and overfit when train/val share buildings.
         base_features = [
             "meter_reading",
-            "site_id",
-            "square_feet",
-            "year_built",
-            "floor_count",
             "air_temperature",
             "cloud_coverage",
             "dew_temperature",
@@ -186,13 +186,18 @@ class LeadCSVHandler(BaseDatasetHandler):
             "meter_diff_1",
             "meter_diff_24",
             "meter_zscore_24",
+            # Missingness indicators emitted by scripts/clean_lead_features.py.
+            # Each flag is 1.0 when the corresponding raw feature was a sentinel
+            # in the source CSV and was replaced by an imputed value.
+            "cloud_coverage_was_missing",
+            "wind_dir_missing",
+            "wind_speed_was_missing",
+            "precip_depth_was_missing",
+            "air_temp_std_lag7_was_missing",
+            "air_temp_std_lag73_was_missing",
         ]
 
-        primary_use_cols = [
-            f"primary_use_{cat}" for cat in self.PRIMARY_USE_CATEGORIES
-        ]
-
-        return base_features + primary_use_cols
+        return base_features
 
     def _preprocess(self, df: pd.DataFrame) -> pd.DataFrame:
         print("[LEAD] Starting _prepare_data")
