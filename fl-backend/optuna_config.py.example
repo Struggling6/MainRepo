@@ -1,6 +1,10 @@
 from config import *
 
 OPTUNA_CONFIG = OptunaConfig(
+
+
+    # ── General Configs ─────────────────────────────────────────────────────── #
+    
     general=GeneralOptunaConfig(
         n_trials=75,
         epochs=12,
@@ -19,6 +23,8 @@ OPTUNA_CONFIG = OptunaConfig(
         reduction_factor=3
     ),
 
+    # ── LSTM Config ─────────────────────────────────────────────────────── #
+
     lstm=LSTMOptunaConfig(
         lr=FloatRange(3e-4, 3e-3, log=True),
         weight_decay=FloatRange(1e-5, 1e-2, log=True),
@@ -33,6 +39,7 @@ OPTUNA_CONFIG = OptunaConfig(
 
         pos_weight_cap=FloatRange(1.0, 6.0, log=True)
     ),
+    # ── Transformer Config ─────────────────────────────────────────────────────── #
 
     transformer=TransformerOptunaConfig(
         lr=FloatRange(3e-4, 2e-3, log=True),
@@ -50,6 +57,8 @@ OPTUNA_CONFIG = OptunaConfig(
         pos_weight_cap=FloatRange(1.0, 6.0, log=True)
     ),
 
+    # ── CNN-Transformer Config ─────────────────────────────────────────────── #
+
     cnn_transformer=CNNTransformerOptunaConfig(
         lr=FloatRange(3e-4, 2e-3, log=True),
         weight_decay=FloatRange(1e-5, 1e-2, log=True),
@@ -65,6 +74,8 @@ OPTUNA_CONFIG = OptunaConfig(
 
         pos_weight_cap=FloatRange(1.0, 6.0, log=True)
     ),
+
+    # ── PatchTST Config ─────────────────────────────────────────────────────── #
 
     patchtst=PatchTSTOptunaConfig(
         lr=FloatRange(3e-4, 2e-3, log=True),
