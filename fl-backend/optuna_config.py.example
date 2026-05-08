@@ -99,5 +99,13 @@ OPTUNA_CONFIG = OptunaConfig(
         head_dropout=FloatRange(0.05, 0.25),
 
         pos_weight_cap=FloatRange(1.0, 6.0, log=True)
+    ),
+
+    # ── TimesNet Config ─────────────────────────────────────────────────────── #
+    timesnet= TimesNetOptunaConfig(
+        batch_size = field(default_factory=lambda: [32, 64, 128, 256]),
+        d_model = field(default_factory=lambda: [64, 128, 256]),
+        top_k = field(default_factory=lambda: [2, 3, 5]),
+        d_ffn = field(default_factory=lambda: [128, 256, 512]),
+        n_kernels = field(default_factory=lambda: [3, 6, 9]),
     )
-)
