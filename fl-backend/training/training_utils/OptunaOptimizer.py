@@ -12,8 +12,8 @@ from training.training_utils.TrainEvalBase import TrainEvalBase
 from training.training_utils.utils import compute_pos_weight
 from models.utils import get_device
 from local_experiment import CONFIG
-from optuna_config import OPTUNA_CONFIG
-from config import resolve_loss_fn, FloatRange, IntRange
+from config import resolve_loss_fn 
+from optuna_config import OPTUNA_CONFIG, FloatRange, IntRange
 
 
 def _suggest(trial, name, spec):
