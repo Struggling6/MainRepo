@@ -248,6 +248,13 @@ class OptunaOptimizer(TrainEvalBase):
 
             return float(best_score)
 
+        except torch.cuda.OutOfMemoryError as e:
+            self._logger(
+                f"Trial {trial.number + 1} hit CUDA OOM "
+                f"({e.__class__.__name__}); marking pruned and continuing study."
+            )
+            raise optuna.TrialPruned() from e
+
         finally:
             del model, optimizer, train_dl, val_dl
             gc.collect()
