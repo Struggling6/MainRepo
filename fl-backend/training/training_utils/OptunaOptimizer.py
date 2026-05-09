@@ -296,7 +296,8 @@ class OptunaOptimizer(TrainEvalBase):
         s = self.search
 
         model_config.batch_size = batch_size
-        model_config.num_layers = num_layers
+        if not isinstance(model_config, SupervisedCNNConfig):
+            model_config.num_layers = num_layers
 
         if isinstance(model_config, (CNNTransformerConfig, TransformerConfig)):
             model_config.d_model = _suggest(trial, "d_model", s.d_model)
