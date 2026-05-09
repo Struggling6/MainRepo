@@ -1,11 +1,10 @@
 import torch
 import torch.nn as nn
 
-from .base import BaseModel
-from .supervised_utils.Classifier import Classifier
+from .Classifier import Classifier
 
 
-class Transformer(BaseModel):
+class Transformer(nn.Module):
     """
     Pure Transformer Encoder model (no CNN feature extraction).
     

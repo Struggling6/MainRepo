@@ -36,7 +36,7 @@ class CNNTransformerConfig:
     loss_fn:        str   = "BCEWithLogitsLoss"
 
     def build(self, input_dim: int):
-        from models.supervised_cnn_transformer import SupervisedCNNTransformer
+        from models.CNNTransformer import SupervisedCNNTransformer
 
         return SupervisedCNNTransformer(
             in_channels=input_dim,
@@ -62,7 +62,7 @@ class TransformerConfig:
 
 
     def build(self, input_dim: int, context_length: int = 0):
-        from models.transformer import Transformer
+        from models.CNNTransformer.Transformer import Transformer
 
         return Transformer(
             in_channels=input_dim,
@@ -86,7 +86,7 @@ class LSTMConfig:
     loss_fn:         str       = "BCEWithLogitsLoss"
 
     def build(self, input_dim: int):
-        from models.LSTM import LSTMModel
+        from models.MLSTM_FCN.LSTM import LSTMModel
 
         return LSTMModel(
             in_channels=input_dim,
@@ -175,7 +175,7 @@ class SupervisedCNNConfig:
     loss_fn:        str   = "BCEWithLogitsLoss"
 
     def build(self, input_dim: int):
-        from models.SupervisedCNN import SupervisedCNN
+        from models.CNNTransformer.CNN import SupervisedCNN
 
         return SupervisedCNN(
             in_channels=input_dim,

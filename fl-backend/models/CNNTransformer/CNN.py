@@ -1,12 +1,11 @@
 import torch
 import torch.nn as nn
 
-from .supervised_utils.featureExtractor import FeatureExtractor
-from .supervised_utils.Classifier import Classifier
-from .base import BaseModel
+from FeatureExtractor import FeatureExtractor
+from .Classifier import Classifier
 
 
-class SupervisedCNN(BaseModel):
+class SupervisedCNN(nn.Module):
     def __init__(self, in_channels, d_model, num_classes=1, dropout=0.3):
         super().__init__()
 
