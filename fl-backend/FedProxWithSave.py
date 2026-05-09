@@ -24,6 +24,7 @@ class FedProxWithSave(FedProx):
 
         self.f1_history = []
         self.pr_auc_history = []
+        self.roc_auc_history = []
 
     def aggregate_fit(
         self,
@@ -139,6 +140,9 @@ class FedProxWithSave(FedProx):
         if "pr_auc" in metrics:
             self.pr_auc_history.append((server_round, metrics["pr_auc"]))
 
+        if "roc_auc" in metrics:
+            self.roc_auc_history.append((server_round, metrics["roc_auc"]))
+
         if server_round == CONFIG.federation.num_rounds:
             try:
                 from plotting.plotting_config import plot_diagrams
@@ -148,6 +152,7 @@ class FedProxWithSave(FedProx):
                 plot_diagrams(
                     pr_history=self.pr_auc_history,
                     f1_history=self.f1_history,
+                    roc_history=self.roc_auc_history,
                 )
 
                 print("[PLOTS] Plots saved successfully.", flush=True)
