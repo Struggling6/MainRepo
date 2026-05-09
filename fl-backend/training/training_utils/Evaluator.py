@@ -47,13 +47,14 @@ class Evaluator(TrainEvalBase):
         """
         loss_fn = self._build_loss(testloader)
 
-        loss, f1, thresh, pr_auc = self._val_epoch(model, testloader, loss_fn)
+        loss, f1, thresh, pr_auc, roc_auc = self._val_epoch(model, testloader, loss_fn)
 
         return {
             "loss":           loss,
             "val_f1":         f1,
             "best_threshold": thresh,
             "pr_auc":         pr_auc,
+            "roc_auc":        roc_auc,
             "num_examples":   int(len(testloader.dataset)),
         }
 
@@ -77,14 +78,13 @@ class Evaluator(TrainEvalBase):
         """
         model            = self._load_model(model_path)
         loss_fn          = self._build_loss(testloader)
-        loss, f1, best_thresh, pr_auc = self._val_epoch(model, testloader, loss_fn)
+        loss, f1, best_thresh, pr_auc, roc_auc = self._val_epoch(model, testloader, loss_fn)
 
         threshold = threshold if threshold is not None else best_thresh
 
         all_probs, all_labels = self._collect_probs(model, testloader)
         all_preds = (all_probs >= threshold).astype(float)
 
-        roc_auc = roc_auc_score(all_labels, all_probs)
 
         print("\n=== Final Evaluation Results ===")
         print(f"  Threshold : {threshold:.2f}")

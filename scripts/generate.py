@@ -229,9 +229,6 @@ def _clientapp(n: int, port: int, variant: str, res: dict[str, Any]) -> str:
     return (
         f"  superexec-clientapp-{n}:\n"
         f"    image: *superexec_image\n"
-        f"    build:\n"
-        f"      context: {BUILD_CONTEXT}\n"
-        f"      dockerfile: {DOCKERFILE}\n"
         f"    command:\n"
         f"      - --insecure\n"
         f"      - --plugin-type\n"

@@ -6,13 +6,12 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -f render \
     && groupadd -f video \
-    && usermod -aG render,video app \
-    && rm -rf /usr/local/bin/python \
-    && ln -sf /python/venv/bin/python3 /usr/local/bin/python3 \
-    && ln -sf /python/venv/bin/python3 /usr/local/bin/python
+    && usermod -aG render,video app 
+    #&& rm -rf /usr/local/bin/python 
+    #&& ln -sf /python/venv/bin/python3 /usr/local/bin/python3 \
+    #&& ln -sf /python/venv/bin/python3 /usr/local/bin/python
 
-# Install uv into the venv
-RUN /python/venv/bin/pip install uv
+
 
 ENV PATH="/python/venv/bin:$PATH"
 ENV PYTHONPATH="/python/venv/lib/python3.13/site-packages:/app"
@@ -21,6 +20,9 @@ ENV MIOPEN_SYSTEM_DB_PATH="/tmp/miopen"
 ENV MIOPEN_DISABLE_CACHE=1
 # Avoid warnings about missing AMD GPU IDs file
 ENV AMDGPU_IDS_PATH="/dev/null"
+
+# Install uv into the venv
+RUN /python/venv/bin/pip install uv
 
 # requirements.txt is generated before build via:
 # python generate_requirements.py --variant <cpu|cuda|rocm>

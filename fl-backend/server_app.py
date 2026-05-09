@@ -31,7 +31,7 @@ def weighted_average_evaluate(metrics):
 
     aggregated = {}
 
-    for key in ["f1", "pr_auc", "threshold"]:
+    for key in ["f1", "pr_auc", "threshold", "roc_auc"]:
         values = [
             num_examples * m[key]
             for num_examples, m in metrics

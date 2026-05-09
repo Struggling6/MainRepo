@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from torch.utils.data import TensorDataset, DataLoader
-from sklearn.metrics import f1_score, average_precision_score, precision_recall_curve
+from sklearn.metrics import (f1_score, average_precision_score, precision_recall_curve, roc_auc_score)
 from models.utils import get_device
 
 
@@ -85,6 +85,11 @@ class TrainEvalBase:
         # -----------------------------
         pr_auc = average_precision_score(all_labels, all_probs)
 
+        try:
+            roc_auc = roc_auc_score(all_labels, all_probs)
+        except ValueError:
+            roc_auc = 0.0
+
         # -----------------------------
         # Find best threshold via PR curve
         # -----------------------------
@@ -120,4 +125,5 @@ class TrainEvalBase:
             best_f1,
             best_thresh,
             pr_auc,
+            roc_auc,
         )
