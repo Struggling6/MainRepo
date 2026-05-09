@@ -77,17 +77,22 @@ def on_train_end(context):
     # Extract metrics from eval_history
     f1_values = []
     pr_values = []
+    roc_values = []
+
     
     for eval_round in strategy.eval_history:
         if "f1" in eval_round:
             f1_values.append(eval_round["f1"])
         if "pr_auc" in eval_round:
             pr_values.append(eval_round["pr_auc"])
-    
+        if "roc_auc" in eval_round:
+            roc_values.append(eval_round["roc_auc"])
+
     print(f"F1 values: {f1_values}")
     print(f"PR-AUC values: {pr_values}")
-    
-    plot_diagrams(f1_values, pr_values)
+    print(f"ROC-AUC values: {roc_values}")
+
+    plot_diagrams(f1_values, pr_values, roc_values)
 
 
 app = ServerApp(server_fn=server_fn)
