@@ -82,6 +82,7 @@ class OptunaOptimizer(TrainEvalBase):
             LSTMConfig,
             PatchTSTConfig,
             TimesNetConfig,
+            SupervisedCNNConfig,
         )
 
         if isinstance(model_config, LSTMConfig):
@@ -94,6 +95,8 @@ class OptunaOptimizer(TrainEvalBase):
             return optuna_config.patchtst
         if isinstance(model_config, TimesNetConfig):
             return optuna_config.timesnet
+        if isinstance(model_config, SupervisedCNNConfig):
+            return optuna_config.cnn
 
         raise TypeError(
             f"No Optuna search space configured for {type(model_config).__name__}"
@@ -196,7 +199,7 @@ class OptunaOptimizer(TrainEvalBase):
 
             for epoch in range(self.epochs):
                 train_loss = self._train_epoch(model, train_dl, optimizer, loss_fn)
-                val_loss, val_f1, best_thresh, pr_auc = self._val_epoch(
+                val_loss, val_f1, best_thresh, pr_auc, roc_auc  = self._val_epoch(
                     model,
                     val_dl,
                     loss_fn,
@@ -286,6 +289,7 @@ class OptunaOptimizer(TrainEvalBase):
             LSTMConfig,
             PatchTSTConfig,
             TimesNetConfig,
+            SupervisedCNNConfig,
         )
 
         model_config = deepcopy(self.config.model)
@@ -301,6 +305,10 @@ class OptunaOptimizer(TrainEvalBase):
                 self._valid_nheads(model_config.d_model, s.nhead_candidates),
             )
             model_config.dropout = _suggest(trial, "dropout", s.dropout)
+        elif isinstance(model_config, SupervisedCNNConfig):
+            model_config.d_model = _suggest(trial, "d_model", s.d_model)
+            model_config.dropout = _suggest(trial, "dropout", s.dropout)
+            model_config.pos_weight_cap = _suggest(trial, "pos_weight_cap", s.pos_weight_cap)
 
         elif isinstance(model_config, LSTMConfig):
             model_config.hidden_size = _suggest(trial, "hidden_size", s.hidden_size)
