@@ -53,6 +53,6 @@ class MLSTM_FCN(nn.Module):
         Args:
             x: (batch, num_timesteps, input_dim)
         Returns:
-            Logits of shape (batch, num_classes).
+            Logits of shape (batch, num_classes), or (batch,) when num_classes=1.
         """
-        return self.classifier(torch.cat([self.lstm(x), self.fcn(x)], dim=1))
+        return self.classifier(torch.cat([self.lstm(x), self.fcn(x)], dim=1)).squeeze(-1)

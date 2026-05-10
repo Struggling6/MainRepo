@@ -108,6 +108,7 @@ class LSTMConfig:
     def build(self, input_dim: int, context_length: int = None):
         import torch.nn as nn
         from models.MLSTM_FCN.LSTM import LSTM
+        from models.utils import Squeeze
 
         backbone = LSTM(
             input_dim=input_dim,
@@ -116,7 +117,11 @@ class LSTMConfig:
             dropout=self.dropout,
             dimension_shuffle=self.dimension_shuffle,
         )
-        return nn.Sequential(backbone, nn.Linear(self.lstm_units, self.num_classes))
+        return nn.Sequential(
+            backbone,
+            nn.Linear(self.lstm_units, self.num_classes),
+            Squeeze(-1),
+        )
 
 
 @dataclass
@@ -132,13 +137,18 @@ class FCNConfig:
     def build(self, input_dim: int):
         import torch.nn as nn
         from models.MLSTM_FCN.FCN import FCN
+        from models.utils import Squeeze
 
         backbone = FCN(
             num_variables=input_dim,
             use_se=self.use_se,
             se_reduction=self.se_reduction,
         )
-        return nn.Sequential(backbone, nn.Linear(FCN.OUTPUT_DIM, self.num_classes))
+        return nn.Sequential(
+            backbone,
+            nn.Linear(FCN.OUTPUT_DIM, self.num_classes),
+            Squeeze(-1),
+        )
 
 
 @dataclass
