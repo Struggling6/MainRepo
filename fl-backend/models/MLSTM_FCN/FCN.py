@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from .SqueezeExciteBlock import SqueezeExciteBlock
+
 class FCN(nn.Module):
     """
     Fully Convolutional Network branch.

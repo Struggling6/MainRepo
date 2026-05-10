@@ -73,27 +73,98 @@ class TransformerConfig:
             dropout=self.dropout,
             seq_len=context_length if context_length is not None else 168,
         )
+    
+@dataclass
+class CNNConfig:
+    name:           str   = "cnn"
+    d_model:        int   = 128
+    dropout:        float = 0.3
+    pos_weight_cap: float = 10.0
+    num_classes:    int   = 1
+    loss_fn:        str   = "BCEWithLogitsLoss"
+
+    def build(self, input_dim: int):
+        from models.CNNTransformer.CNN import CNN
+
+        return CNN(
+            in_channels=input_dim,
+            d_model=self.d_model,
+            num_classes=self.num_classes,
+            dropout=self.dropout,
+        )
 
 @dataclass
 class LSTMConfig:
-    name:            str       = "lstm"
-    batch_size:      int       = 64
-    hidden_size:     int       = 128
-    num_layers:      int       = 2
-    dropout:         float     = 0.3
-    num_classes:     int       = 1
-    pos_weight_cap:  float     = 10.0
-    loss_fn:         str       = "BCEWithLogitsLoss"
+    name:              str   = "lstm"
+    batch_size:        int   = 64
+    context_length:    int   = 168
+    lstm_units:        int   = 128
+    dropout:           float = 0.3
+    dimension_shuffle: bool  = False
+    num_classes:       int   = 1
+    pos_weight_cap:    float = 10.0
+    loss_fn:           str   = "BCEWithLogitsLoss"
+
+    def build(self, input_dim: int, context_length: int = None):
+        import torch.nn as nn
+        from models.MLSTM_FCN.LSTM import LSTM
+
+        backbone = LSTM(
+            input_dim=input_dim,
+            num_timesteps=context_length or self.context_length,
+            lstm_units=self.lstm_units,
+            dropout=self.dropout,
+            dimension_shuffle=self.dimension_shuffle,
+        )
+        return nn.Sequential(backbone, nn.Linear(self.lstm_units, self.num_classes))
+
+
+@dataclass
+class FCNConfig:
+    name:           str   = "fcn"
+    batch_size:     int   = 64
+    use_se:         bool  = True
+    se_reduction:   int   = 16
+    num_classes:    int   = 1
+    pos_weight_cap: float = 10.0
+    loss_fn:        str   = "BCEWithLogitsLoss"
 
     def build(self, input_dim: int):
-        from models.MLSTM_FCN.LSTM import LSTMModel
+        import torch.nn as nn
+        from models.MLSTM_FCN.FCN import FCN
 
-        return LSTMModel(
-            in_channels=input_dim,
-            hidden_size=self.hidden_size,
-            num_layers=self.num_layers,
+        backbone = FCN(
+            num_variables=input_dim,
+            use_se=self.use_se,
+            se_reduction=self.se_reduction,
+        )
+        return nn.Sequential(backbone, nn.Linear(FCN.OUTPUT_DIM, self.num_classes))
+
+
+@dataclass
+class MLSTMFCNConfig:
+    name:              str   = "mlstm_fcn"
+    batch_size:        int   = 64
+    context_length:    int   = 168
+    lstm_units:        int   = 8
+    dropout:           float = 0.8
+    dimension_shuffle: bool  = True
+    se_reduction:      int   = 16
+    num_classes:       int   = 1
+    pos_weight_cap:    float = 10.0
+    loss_fn:           str   = "BCEWithLogitsLoss"
+
+    def build(self, input_dim: int, context_length: int = None):
+        from models.MLSTM_FCN.MLSTM_FCN import MLSTM_FCN
+
+        return MLSTM_FCN(
+            input_dim=input_dim,
+            num_timesteps=context_length or self.context_length,
             num_classes=self.num_classes,
+            dimension_shuffle=self.dimension_shuffle,
+            lstm_units=self.lstm_units,
             dropout=self.dropout,
+            se_reduction=self.se_reduction,
         )
 
 
@@ -164,25 +235,6 @@ class PatchTSTConfig():
             problem_type=self.task
         )
         return PatchTST(hf_config)
-    
-@dataclass
-class SupervisedCNNConfig:
-    name:           str   = "supervised_cnn"
-    d_model:        int   = 128
-    dropout:        float = 0.3
-    pos_weight_cap: float = 10.0
-    num_classes:    int   = 1
-    loss_fn:        str   = "BCEWithLogitsLoss"
-
-    def build(self, input_dim: int):
-        from models.CNNTransformer.CNN import SupervisedCNN
-
-        return SupervisedCNN(
-            in_channels=input_dim,
-            d_model=self.d_model,
-            num_classes=self.num_classes,
-            dropout=self.dropout,
-        )
 
 
 @dataclass
@@ -213,6 +265,9 @@ class TimesNetConfig:
             n_kernels=self.n_kernels,
             dropout=self.dropout,
         )
+    
+
+
 # ── Data configs ──────────────────────────────────────────────────────── #
 
 @dataclass
@@ -346,8 +401,23 @@ class OptunaSearchConfig:
 
 @dataclass
 class LSTMOptunaConfig(OptunaSearchConfig):
-    hidden_size: list       = field(default_factory=lambda: [64, 128, 256, 512])
-    dropout:     FloatRange = field(default_factory=lambda: FloatRange(0.1, 0.4))
+    lstm_units:        list       = field(default_factory=lambda: [64, 128, 256, 512])
+    dropout:           FloatRange = field(default_factory=lambda: FloatRange(0.1, 0.4))
+    dimension_shuffle: list       = field(default_factory=lambda: [True, False])
+
+
+@dataclass
+class FCNOptunaConfig(OptunaSearchConfig):
+    use_se:       list = field(default_factory=lambda: [True, False])
+    se_reduction: list = field(default_factory=lambda: [4, 8, 16, 32])
+
+
+@dataclass
+class MLSTMFCNOptunaConfig(OptunaSearchConfig):
+    lstm_units:        list       = field(default_factory=lambda: [8, 16, 32, 64, 128])
+    dropout:           FloatRange = field(default_factory=lambda: FloatRange(0.3, 0.8))
+    dimension_shuffle: list       = field(default_factory=lambda: [True, False])
+    se_reduction:      list       = field(default_factory=lambda: [8, 16, 32])
 
 
 @dataclass
@@ -423,7 +493,7 @@ class InterpretabilityConfig:
 @dataclass
 class ExperimentConfig:
     task:       BinaryClassificationConfig   = field(default_factory=BinaryClassificationConfig)
-    model:      SupervisedCNNConfig          = field(default_factory=SupervisedCNNConfig)
+    model:      CNNConfig                    = field(default_factory=CNNConfig)
     data:       LeadCSVConfig                = field(default_factory=LeadCSVConfig)
     training:   TrainingConfig               = field(default_factory=TrainingConfig)
     federation: FederationConfig             = field(default_factory=FederationConfig)
@@ -446,6 +516,8 @@ class OptunaConfig:
     cnn_transformer: CNNTransformerOptunaConfig = field(default_factory=CNNTransformerOptunaConfig)
     patchtst: PatchTSTOptunaConfig = field(default_factory=PatchTSTOptunaConfig)
     timesnet: TimesNetOptunaConfig = field(default_factory=TimesNetOptunaConfig)
+    fcn: FCNOptunaConfig = field(default_factory=FCNOptunaConfig)
+    mlstm_fcn: MLSTMFCNOptunaConfig = field(default_factory=MLSTMFCNOptunaConfig)
 
 
 CONFIG = ExperimentConfig()

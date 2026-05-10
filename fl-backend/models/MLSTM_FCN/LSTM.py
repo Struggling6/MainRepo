@@ -13,7 +13,7 @@ class LSTM(nn.Module):
     per-step feature.
 
     Args:
-        num_variables:     number of input variables.
+        input_dim:         dimensionality of the input features.
         num_timesteps:     number of time steps in each window.
         lstm_units:        hidden dimensionality of the LSTM.
         dropout:           dropout applied to the LSTM output.
@@ -25,7 +25,7 @@ class LSTM(nn.Module):
 
     def __init__(
         self,
-        num_variables: int,
+        input_dim: int,
         num_timesteps: int,
         lstm_units: int = 8,
         dropout: float = 0.8,
@@ -35,9 +35,9 @@ class LSTM(nn.Module):
         self.dimension_shuffle = dimension_shuffle
         self.lstm_units = lstm_units
 
-        # With shuffle:    input_size = num_timesteps, seq_len = num_variables
-        # Without shuffle: input_size = num_variables, seq_len = num_timesteps
-        input_size = num_timesteps if dimension_shuffle else num_variables
+        # With shuffle:    input_size = num_timesteps, seq_len = input_dim
+        # Without shuffle: input_size = input_dim, seq_len = num_timesteps
+        input_size = num_timesteps if dimension_shuffle else input_dim
         self.lstm = nn.LSTM(
             input_size=input_size,
             hidden_size=lstm_units,
@@ -48,7 +48,7 @@ class LSTM(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            x: (batch, num_timesteps, num_variables)
+            x: (batch, num_timesteps, input_dim)
         Returns:
             (batch, lstm_units)
         """

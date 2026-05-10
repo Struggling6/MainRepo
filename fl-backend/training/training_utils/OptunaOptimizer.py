@@ -82,7 +82,9 @@ class OptunaOptimizer(TrainEvalBase):
             LSTMConfig,
             PatchTSTConfig,
             TimesNetConfig,
-            SupervisedCNNConfig,
+            CNNConfig,
+            FCNConfig,
+            MLSTMFCNConfig,
         )
 
         if isinstance(model_config, LSTMConfig):
@@ -95,8 +97,12 @@ class OptunaOptimizer(TrainEvalBase):
             return optuna_config.patchtst
         if isinstance(model_config, TimesNetConfig):
             return optuna_config.timesnet
-        if isinstance(model_config, SupervisedCNNConfig):
+        if isinstance(model_config, CNNConfig):
             return optuna_config.cnn
+        if isinstance(model_config, FCNConfig):
+            return optuna_config.fcn
+        if isinstance(model_config, MLSTMFCNConfig):
+            return optuna_config.mlstm_fcn
 
         raise TypeError(
             f"No Optuna search space configured for {type(model_config).__name__}"
@@ -289,14 +295,19 @@ class OptunaOptimizer(TrainEvalBase):
             LSTMConfig,
             PatchTSTConfig,
             TimesNetConfig,
-            SupervisedCNNConfig,
+            CNNConfig,
+            FCNConfig,
+            MLSTMFCNConfig,
         )
 
         model_config = deepcopy(self.config.model)
         s = self.search
 
         model_config.batch_size = batch_size
-        if not isinstance(model_config, SupervisedCNNConfig):
+        if not isinstance(
+            model_config,
+            (CNNConfig, LSTMConfig, FCNConfig, MLSTMFCNConfig),
+        ):
             model_config.num_layers = num_layers
 
         if isinstance(model_config, (CNNTransformerConfig, TransformerConfig)):
@@ -306,14 +317,29 @@ class OptunaOptimizer(TrainEvalBase):
                 self._valid_nheads(model_config.d_model, s.nhead_candidates),
             )
             model_config.dropout = _suggest(trial, "dropout", s.dropout)
-        elif isinstance(model_config, SupervisedCNNConfig):
+        elif isinstance(model_config, CNNConfig):
             model_config.d_model = _suggest(trial, "d_model", s.d_model)
             model_config.dropout = _suggest(trial, "dropout", s.dropout)
             model_config.pos_weight_cap = _suggest(trial, "pos_weight_cap", s.pos_weight_cap)
 
         elif isinstance(model_config, LSTMConfig):
-            model_config.hidden_size = _suggest(trial, "hidden_size", s.hidden_size)
+            model_config.lstm_units = _suggest(trial, "lstm_units", s.lstm_units)
             model_config.dropout = _suggest(trial, "dropout", s.dropout)
+            model_config.dimension_shuffle = _suggest(
+                trial, "dimension_shuffle", s.dimension_shuffle
+            )
+
+        elif isinstance(model_config, FCNConfig):
+            model_config.use_se = _suggest(trial, "use_se", s.use_se)
+            model_config.se_reduction = _suggest(trial, "se_reduction", s.se_reduction)
+
+        elif isinstance(model_config, MLSTMFCNConfig):
+            model_config.lstm_units = _suggest(trial, "lstm_units", s.lstm_units)
+            model_config.dropout = _suggest(trial, "dropout", s.dropout)
+            model_config.dimension_shuffle = _suggest(
+                trial, "dimension_shuffle", s.dimension_shuffle
+            )
+            model_config.se_reduction = _suggest(trial, "se_reduction", s.se_reduction)
 
         elif isinstance(model_config, PatchTSTConfig):
             model_config.d_model = _suggest(trial, "d_model", s.d_model)

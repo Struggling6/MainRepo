@@ -5,7 +5,7 @@ from FeatureExtractor import FeatureExtractor
 from .Classifier import Classifier
 
 
-class SupervisedCNN(nn.Module):
+class CNN(nn.Module):
     def __init__(self, in_channels, d_model, num_classes=1, dropout=0.3):
         super().__init__()
 

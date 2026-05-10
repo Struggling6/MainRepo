@@ -1,11 +1,11 @@
+import torch.nn as nn
 from transformers import set_seed
-from .base import BaseModel
 from transformers import (
     PatchTSTForClassification,
 )
 set_seed(42)
 
-class PatchTST(BaseModel):
+class PatchTST(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.model = PatchTSTForClassification(config)
