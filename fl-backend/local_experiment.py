@@ -5,38 +5,50 @@
 from pathlib import Path
 from config import *
 
+DATASET = "power"  # "power" or "lead"
+
+
+def build_data_config(dataset: str):
+    if dataset == "power":
+        return PowerConsumptionAnomalyConfig(
+            data_dir=Path("datasets/PowerConsumptionAnomaly"),
+            file_pattern="*.csv",
+            window_size=168,
+            stride=168,
+            gap_hours=0,
+        )
+
+    if dataset == "lead":
+        return LeadCSVConfig(
+            file_path=Path("datasets/LEAD/train_features_clean.csv"),
+            window_size=168,
+            stride=168,
+            gap_hours=73,
+        )
+
+    raise ValueError(f"Unknown dataset: {dataset}. Use 'power' or 'lead'.")
+
+
 CONFIG = ExperimentConfig(
-    model=PatchTSTConfig(
-        nhead=16,
-        d_model=128,
-        head_dropout=0.2,
-        attention_dropout=0.2,
-        positional_dropout=0.2,
-        patch_length=16,
-        patch_stride=12,
-        ffn_dim=256,
-        context_length=168,
-        norm_type="batchnorm",
-        num_layers=3,  
-    ),
-    data=LeadCSVConfig(
-        file_path=Path("datasets/LEAD/train_features_clean.csv"),
-        window_size=168,
-        stride=168,
-        gap_hours=168,
-        use_precomputed_windows=False,
-        use_undersampling=False,
+    model=CNNTransformerConfig(
+        num_layers=2,
+        d_model=32,
+        nhead=4,
+        dropout=0.33383046145077466,
+        batch_size=32,
+        pos_weight_cap=4.121176156844702,
 
     ),
+    data=build_data_config(DATASET),
     training=TrainingConfig(
-        local_epochs=30,
-        learning_rate=0.0009,
-        weight_decay=0.0034,
+        local_epochs=3,
+        learning_rate= 0.00044528137981288623,
+        weight_decay=0.003617357220319353,
         patience=10,
     ),
     federation=FederationConfig(
-        num_rounds=1,
-        num_clients=1,
+        num_rounds=10,
+        num_clients=5,
         proximal_mu=0,
         partition_mode="shared",
     ),

@@ -1,9 +1,11 @@
 from .lead_csv import LeadCSVHandler
+from .power_consumption_anomaly import PowerConsumptionAnomalyHandler
 from .powergrid_csv import PowerGridCSVHandler
 from config import ExperimentConfig
 DATASET_REGISTRY = {
-    "lead_csv":      LeadCSVHandler,
-    "powergrid_csv": PowerGridCSVHandler,
+    "lead_csv":                  LeadCSVHandler,
+    "powergrid_csv":             PowerGridCSVHandler,
+    "power_consumption_anomaly": PowerConsumptionAnomalyHandler,
 }
 
 
