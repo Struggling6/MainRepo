@@ -18,6 +18,7 @@ class MLSTM_FCN(nn.Module):
         lstm_units:        LSTM hidden dimensionality.
         dropout:           dropout after the LSTM.
         se_reduction:      SE-block reduction ratio inside the FCN branch.
+        num_layers:        number of stacked LSTM layers.
     """
 
     def __init__(
@@ -29,6 +30,7 @@ class MLSTM_FCN(nn.Module):
         lstm_units: int = 8,
         dropout: float = 0.8,
         se_reduction: int = 16,
+        num_layers: int = 1,
     ):
         super().__init__()
 
@@ -38,6 +40,7 @@ class MLSTM_FCN(nn.Module):
             lstm_units=lstm_units,
             dropout=dropout,
             dimension_shuffle=dimension_shuffle,
+            num_layers=num_layers,
         )
 
         self.fcn = FCN(

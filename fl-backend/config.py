@@ -160,6 +160,7 @@ class MLSTMFCNConfig:
     dropout:           float = 0.8
     dimension_shuffle: bool  = True
     se_reduction:      int   = 16
+    num_layers:        int   = 1
     num_classes:       int   = 1
     pos_weight_cap:    float = 10.0
     loss_fn:           str   = "BCEWithLogitsLoss"
@@ -175,6 +176,7 @@ class MLSTMFCNConfig:
             lstm_units=self.lstm_units,
             dropout=self.dropout,
             se_reduction=self.se_reduction,
+            num_layers=self.num_layers,
         )
 
 
@@ -434,6 +436,7 @@ class MLSTMFCNOptunaConfig(OptunaSearchConfig):
     dropout:           FloatRange = field(default_factory=lambda: FloatRange(0.3, 0.8))
     dimension_shuffle: list       = field(default_factory=lambda: [True, False])
     se_reduction:      list       = field(default_factory=lambda: [8, 16, 32])
+    num_layers:        list       = field(default_factory=lambda: [1, 2, 3])
 
 
 @dataclass

@@ -340,6 +340,7 @@ class OptunaOptimizer(TrainEvalBase):
                 trial, "dimension_shuffle", s.dimension_shuffle
             )
             model_config.se_reduction = _suggest(trial, "se_reduction", s.se_reduction)
+            model_config.num_layers = _suggest(trial, "num_layers", s.num_layers)
 
         elif isinstance(model_config, PatchTSTConfig):
             model_config.d_model = _suggest(trial, "d_model", s.d_model)

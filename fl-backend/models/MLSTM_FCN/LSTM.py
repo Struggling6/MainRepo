@@ -16,8 +16,10 @@ class LSTM(nn.Module):
         input_dim:         dimensionality of the input features.
         num_timesteps:     number of time steps in each window.
         lstm_units:        hidden dimensionality of the LSTM.
-        dropout:           dropout applied to the LSTM output.
+        dropout:           dropout applied to the LSTM output. Also used as
+                           inter-layer dropout inside nn.LSTM when num_layers > 1.
         dimension_shuffle: see above.
+        num_layers:        number of stacked LSTM layers.
 
     Output:
         Feature vector of shape (batch, lstm_units).
@@ -30,6 +32,7 @@ class LSTM(nn.Module):
         lstm_units: int = 8,
         dropout: float = 0.8,
         dimension_shuffle: bool = True,
+        num_layers: int = 1,
     ):
         super().__init__()
         self.dimension_shuffle = dimension_shuffle
@@ -41,6 +44,8 @@ class LSTM(nn.Module):
         self.lstm = nn.LSTM(
             input_size=input_size,
             hidden_size=lstm_units,
+            num_layers=num_layers,
+            dropout=dropout if num_layers > 1 else 0.0,
             batch_first=True,
         )
         self.dropout = nn.Dropout(dropout)
