@@ -3,7 +3,7 @@ from torch import nn
 from contextlib import contextmanager
 from pathlib import Path
 from flwr.client import ClientApp, NumPyClient
-from training.training_utils.Evaluator import Evaluator
+from training.training_utils.Validator import Validator
 from flwr.common.logger import log
 from logging import INFO
 from local_experiment import CONFIG
@@ -23,7 +23,13 @@ def _gpu_file_lock(enabled: bool, lock_path: Path, label: str):
 
     lock_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with open(lock_path, "a+", encoding="utf-8") as lock_file:
+    try:
+        lock_file = open(lock_path, "a+", encoding="utf-8")  # noqa: SIM115
+    except PermissionError:
+        lock_path.unlink(missing_ok=True)
+        lock_file = open(lock_path, "a+", encoding="utf-8")  # noqa: SIM115
+
+    with lock_file:
         try:
             import fcntl
 
@@ -112,7 +118,7 @@ class FlowerClient(NumPyClient):
             self.device,
         )
 
-        self.evaluator = Evaluator(model_config=self.config.model, metadata=self.metadata)
+        self.validator = Validator(model_config=self.config.model, metadata=self.metadata)
 
     def _use_gpu_lock(self, for_evaluate: bool = False) -> bool:
         if self.device.type != "cuda":
@@ -136,7 +142,7 @@ class FlowerClient(NumPyClient):
             partition_id=self.partition_id
         )
         self.metadata = self.dataset_handler.get_metadata()
-        self.evaluator.metadata = self.metadata
+        self.validator.metadata = self.metadata
 
     def get_parameters(self, config):
         print("=== CLIENT get_parameters ENTERED ===", flush=True)
@@ -163,6 +169,9 @@ class FlowerClient(NumPyClient):
                 model_config=self.config.model,
                 device=self.device,
                 proximal_mu=proximal_mu,
+                global_pos_weight=getattr(
+                    self.dataset_handler, "global_pos_weight", None
+                ),
             )
 
         results["input_dim"] = self.metadata["input_dim"]
@@ -183,21 +192,21 @@ class FlowerClient(NumPyClient):
 
     def evaluate(self, parameters, config):
         round_num = config.get("round", "?")
-        log(INFO, "[%s] EVAL start | round=%s", self.facility_id, round_num)
+        log(INFO, "[%s] VAL start | round=%s", self.facility_id, round_num)
 
         set_model_parameters(self.model, parameters)
         self._ensure_dataloaders()
 
-        lock_label = f"{self.facility_id} evaluate round={round_num}"
+        lock_label = f"{self.facility_id} validate round={round_num}"
         with _gpu_file_lock(
             self._use_gpu_lock(for_evaluate=True),
             self._gpu_lock_path(),
             lock_label,
         ):
             self.model = self.model.to(self.device)
-            results = self.evaluator.evaluate_round(self.model, self.testloader)
+            results = self.validator.validate(self.model, self.testloader)
 
-        log(INFO, "[%s] EVAL done  | round=%s | loss=%.4f | f1=%.4f | pr_auc=%.4f | roc_auc=%.4f | thresh=%.2f",
+        log(INFO, "[%s] VAL done  | round=%s | loss=%.4f | f1=%.4f | pr_auc=%.4f | roc_auc=%.4f | thresh=%.2f",
             self.facility_id,
             round_num,
             results["loss"],

@@ -198,9 +198,12 @@ services:
     depends_on:
       - superlink
     stop_signal: SIGINT
+    environment:
+      - CHECKPOINT_DIR=/app/checkpoints
     volumes:
       - ./fl-backend/checkpoints:/app/checkpoints
       - ./fl-backend/plotting/saved_plots:/app/plotting/saved_plots
+      - ./fl-backend/datasets:/app/datasets
 
 """
 

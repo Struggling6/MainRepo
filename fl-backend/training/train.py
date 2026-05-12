@@ -19,6 +19,7 @@ def train_model(
         model_config:    ExperimentConfig,
         device:          torch.device,
         proximal_mu:     float = 0.0,
+        global_pos_weight: float | None = None,
     ):
     """
     Entry point for Flower's client training loop.
@@ -35,12 +36,16 @@ def train_model(
         # --------------------------------------------------
         # Extract labels (for pos_weight)
         # --------------------------------------------------
-        print("[TRAIN] extracting labels for pos_weight...", flush=True)
-        y_train = _extract_labels(trainloader)
-        print(f"[TRAIN] labels extracted: shape={y_train.shape}", flush=True)
+        if global_pos_weight is not None:
+            pos_weight = global_pos_weight
+            print(f"[TRAIN] using global pos_weight: {pos_weight}", flush=True)
+        else:
+            print("[TRAIN] extracting labels for pos_weight...", flush=True)
+            y_train = _extract_labels(trainloader)
+            print(f"[TRAIN] labels extracted: shape={y_train.shape}", flush=True)
 
-        pos_weight = compute_pos_weight(y_train, cap=model_config.pos_weight_cap)
-        print(f"[TRAIN] pos_weight computed: {pos_weight}", flush=True)
+            pos_weight = compute_pos_weight(y_train, cap=model_config.pos_weight_cap)
+            print(f"[TRAIN] pos_weight computed: {pos_weight}", flush=True)
 
 
         # --------------------------------------------------
@@ -56,13 +61,6 @@ def train_model(
         loss_fn = None
         
     # --------------------------------------------------
-    # Convert DataLoader -> numpy arrays (THIS IS HEAVY)
-    # --------------------------------------------------
-    print("[TRAIN] converting dataloader to arrays...", flush=True)
-    X_train, y_train = _dataloader_to_arrays(trainloader)
-    print(f"[TRAIN] arrays created: X={X_train.shape}, y={y_train.shape}", flush=True)
-
-    # --------------------------------------------------
     # Trainer setup
     # --------------------------------------------------
     print("[TRAIN] initializing Trainer...", flush=True)
@@ -73,7 +71,6 @@ def train_model(
         lr=training_config.learning_rate,
         weight_decay=training_config.weight_decay,
         patience=training_config.patience,
-        batch_size=trainloader.batch_size,
         epochs=training_config.local_epochs,
         num_classes=model_config.num_classes,
         proximal_mu=proximal_mu,
@@ -94,37 +91,17 @@ def train_model(
     # --------------------------------------------------
     result = {
         "train_loss":   trainer.history[-1]["train_loss"],
+        "val_loss":     trainer.history[-1]["val_loss"],
         "val_f1":       trainer.history[-1]["val_f1"],
+        "pr_auc":       trainer.history[-1]["pr_auc"],
+        "roc_auc":      trainer.history[-1]["roc_auc"],
+        "best_thresh":  trainer.history[-1]["best_thresh"],
         "num_examples": len(trainloader.dataset),
     }
 
     print(f"[TRAIN] returning results: {result}", flush=True)
 
     return result
-
-
-def _dataloader_to_arrays(loader):
-    """Extract all features and labels from a DataLoader into numpy arrays."""
-    print("[TRAIN] _dataloader_to_arrays start", flush=True)
-
-    all_x, all_y = [], []
-
-    for i, (x, y) in enumerate(loader):
-        if i == 0:
-            print("[TRAIN] first batch loaded", flush=True)
-
-        if i % 50 == 0:
-            print(f"[TRAIN] loading batch {i}", flush=True)
-
-        all_x.append(x.numpy())
-        all_y.append(y.numpy())
-
-    print("[TRAIN] concatenating arrays...", flush=True)
-    X = np.concatenate(all_x)
-    y = np.concatenate(all_y)
-
-    print("[TRAIN] _dataloader_to_arrays done", flush=True)
-    return X, y
 
 
 def _extract_labels(loader):

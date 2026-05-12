@@ -216,7 +216,10 @@ class PatchTSTConfig():
     positional_dropout:  float = 0.1
     head_dropout:        float = 0.1
     pre_norm:            bool  = True
-    norm_type:           Literal["batchnorm", "layernorm"] = "layernorm"
+    norm_type:           Literal["batchnorm", "layernorm"] = "batchnorm"
+    is_encoder_decoder:  bool  = False
+    share_embedding:     bool  = True
+    pooling_type:        str   = "mean",
     pos_weight_cap:      float = 10.0
     loss_fn:             str   = "BCEWithLogitsLoss"
     num_classes:         int   = 1
@@ -242,7 +245,10 @@ class PatchTSTConfig():
             pre_norm=self.pre_norm,
             norm_type=self.norm_type,
             num_targets=self.num_classes,
-            problem_type=self.task
+            problem_type=self.task,
+            is_encoder_decoder=self.is_encoder_decoder,
+            share_embedding=self.share_embedding,
+            pooling_type=self.pooling_type,
         )
         return PatchTST(hf_config)
 

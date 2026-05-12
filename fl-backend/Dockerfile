@@ -20,9 +20,14 @@ ENV MIOPEN_SYSTEM_DB_PATH="/tmp/miopen"
 ENV MIOPEN_DISABLE_CACHE=1
 # Avoid warnings about missing AMD GPU IDs file
 ENV AMDGPU_IDS_PATH="/dev/null"
+ENV PLOTS_DIR="/tmp/saved_plots"
 
 # Install uv into the venv
 RUN /python/venv/bin/pip install uv
+
+# Create directory for saved plots in /tmp (writable by app user)
+RUN mkdir -p /tmp/saved_plots && chown -R app:app /tmp/saved_plots
+
 
 # requirements.txt is generated before build via:
 # python generate_requirements.py --variant <cpu|cuda|rocm>

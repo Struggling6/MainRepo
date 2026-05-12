@@ -3,6 +3,8 @@
 #from plotting.plot_methods.loss_accuracy_plot import loss_over_time_plot
 from pathlib import Path
 
+import os
+
 import matplotlib
 
 matplotlib.use("Agg")
@@ -12,7 +14,7 @@ from plotting.plot_methods.f1_plot_method import f1_plot
 from plotting.plot_methods.roc_auc_method import roc_auc_plot
 
 BASE_DIR = Path(__file__).resolve().parent
-SAVE_DIR = Path.cwd() / "plotting" / "saved_plots"
+SAVE_DIR = Path(os.environ.get("PLOTS_DIR", str(BASE_DIR / "saved_plots")))
 SAVE_DIR.mkdir(parents=True, exist_ok=True)
 
 def plot_diagrams(pr_history, f1_history, roc_history):
