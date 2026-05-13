@@ -1,7 +1,7 @@
-from .base import BaseModel
 from pypots.classification import TimesNet as PyPOTSTimesNet
+import torch.nn as nn
 
-class TimesNetModel(BaseModel):
+class TimesNetModel(nn.Module):
     def __init__(
         self,
         n_steps: int,

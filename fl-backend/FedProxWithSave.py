@@ -106,6 +106,11 @@ class FedProxWithSave(FedProx):
 
                 print("[SAVE] model saved successfully", flush=True)
 
+                from training.training_utils.Evaluator import Evaluator
+                print("[EVAL] running final evaluation on held-out test set...", flush=True)
+                Evaluator.evaluate(model_path=path, threshold=threshold)
+                print("[EVAL] final evaluation done", flush=True)
+
             except Exception as e:
                 log(ERROR, "[SAVE] ERROR: %s", e)
                 print(f"[SAVE] ERROR: {e}", flush=True)
