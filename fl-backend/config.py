@@ -304,14 +304,14 @@ class LeadCSVConfig:
     window_size:  int   = 168
     gap_hours:    int   = 73
     stride:       int   = 168
-    use_undersampling: bool = False
-    use_oversampling: bool = False
+    use_undersampling: bool = True
+    use_oversampling: bool = True
     undersampling_ratio: float = 1.0
-    oversampling_method: str = "none" #["none", "random_over", "smote"]
+    oversampling_method: str = "smote" #["none", "random_over", "smote"]
     oversampling_ratio: float = 1.0
     smote_k_neighbors: int = 5
-    undersample_val: bool = False
-    oversample_val: bool = False
+    undersample_val: bool = True
+    oversample_val: bool = True
 
     def build_handler(self, config):
         from data.lead_csv import LeadCSVHandler
@@ -331,6 +331,32 @@ class PowerGridCSVConfig:
     def build_handler(self, config):
         from data.powergrid_csv import PowerGridCSVHandler
         return PowerGridCSVHandler(config)
+
+@dataclass
+class PowerConsumptionAnomalyConfig:
+    name:         str   = "power_consumption_anomaly"
+    file_path:    Path  = Path("")
+    data_dir:     Path  = Path("datasets/PowerConsumptionAnomaly")
+    file_pattern: str   = "*.csv"
+    target:       str   = "label"
+    test_split:   float = 0.2
+    normalize:    bool  = True
+    seed:         int   = 42
+    window_size:  int   = 60
+    gap_hours:    int   = 0
+    stride:       int   = 10
+    use_undersampling: bool = True
+    use_oversampling: bool = False
+    undersampling_ratio: float = 1.0
+    oversampling_method: str = "none" # ["none", "random_over", "smote"]
+    oversampling_ratio: float = 1.0
+    smote_k_neighbors: int = 5
+    undersample_val: bool = True
+    oversample_val: bool = False
+
+    def build_handler(self, config):
+        from data.power_consumption_anomaly import PowerConsumptionAnomalyHandler
+        return PowerConsumptionAnomalyHandler(config)
 
 # ── Training config ───────────────────────────────────────────────────── #
 

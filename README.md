@@ -190,6 +190,37 @@ One important note on `local_epochs` in `TrainingConfig` — keep it low (1–2)
 
 ---
 
+### Power Consumption Anomaly Dataset
+
+The Papaioannou et al. home appliance power-consumption anomaly dataset is supported through `PowerConsumptionAnomalyConfig`.
+
+Download/extract it into the local datasets folder:
+
+```bash
+python scripts/prepare_power_consumption_anomaly.py --source github
+```
+
+Then activate it in `fl-backend/local_experiment.py` or `config.py`:
+
+```python
+CONFIG = ExperimentConfig(
+    data=PowerConsumptionAnomalyConfig(
+        data_dir=Path("datasets/PowerConsumptionAnomaly"),
+        file_pattern="*.csv",
+        window_size=60,
+        stride=10,
+    ),
+    federation=FederationConfig(
+        partition_mode="shared",
+        num_clients=5,
+    ),
+)
+```
+
+Use this dataset as a smaller appliance-level benchmark or ablation. LEAD remains the better primary dataset for building-level federated anomaly detection because it has more buildings/clients and a stronger match to the project framing.
+
+---
+
 ### Adding a New Model
 
 The model class lives in `models/` and should extend `BaseModel`. The config class lives in `config.py` and must be a `@dataclass` with a `build(input_dim)` method — this is the only contract the pipeline requires. The pipeline always calls `CONFIG.model.build(input_dim=metadata["input_dim"])`, so as long as your config implements `build()`, everything else works automatically.
