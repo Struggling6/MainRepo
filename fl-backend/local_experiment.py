@@ -30,20 +30,18 @@ def build_data_config(dataset: str):
 
 
 CONFIG = ExperimentConfig(
-    model=CNNTransformerConfig(
-        num_layers=2,
-        d_model=32,
-        nhead=4,
-        dropout=0.33383046145077466,
+    model=SupervisedCNNConfig(
+        d_model=128,
+        dropout=0.10580883887571632,
+        pos_weight_cap=8.388510231385292,
         batch_size=32,
-        pos_weight_cap=4.121176156844702,
 
     ),
     data=build_data_config(DATASET),
     training=TrainingConfig(
-        local_epochs=3,
-        learning_rate= 0.00044528137981288623,
-        weight_decay=0.003617357220319353,
+        local_epochs=2,
+        learning_rate=0.0015420959555490362,
+        weight_decay= 0.006138054787185218,
         patience=10,
     ),
     federation=FederationConfig(

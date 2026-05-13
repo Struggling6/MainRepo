@@ -168,6 +168,7 @@ class PatchTSTConfig():
 @dataclass
 class SupervisedCNNConfig:
     name:           str   = "supervised_cnn"
+    batch_size:     int   = 64
     d_model:        int   = 128
     dropout:        float = 0.3
     pos_weight_cap: float = 10.0
@@ -273,13 +274,13 @@ class PowerConsumptionAnomalyConfig:
     gap_hours:    int   = 0
     stride:       int   = 10
     use_undersampling: bool = True
-    use_oversampling: bool = False
-    undersampling_ratio: float = 1.0
-    oversampling_method: str = "none" # ["none", "random_over", "smote"]
+    use_oversampling: bool = True
+    undersampling_ratio: float = 5.0
+    oversampling_method: str = "smote" # ["none", "random_over", "smote"]
     oversampling_ratio: float = 1.0
     smote_k_neighbors: int = 5
     undersample_val: bool = True
-    oversample_val: bool = False
+    oversample_val: bool = True
 
     def build_handler(self, config):
         from data.power_consumption_anomaly import PowerConsumptionAnomalyHandler
@@ -411,6 +412,13 @@ class PatchTSTOptunaConfig(OptunaSearchConfig):
     head_dropout:            FloatRange = field(default_factory=lambda: FloatRange(0.1, 0.4))
 
 @dataclass
+class SupervisedCNNOptunaConfig(OptunaSearchConfig):
+    d_model: list       = field(default_factory=lambda: [32, 64, 128, 256])
+    dropout: FloatRange = field(default_factory=lambda: FloatRange(0.1, 0.4))
+    pos_weight_cap: FloatRange = field(default_factory=lambda: FloatRange(1.0, 10.0, log=True))
+    batch_size: list = field(default_factory=lambda: [32, 64, 128, 256, 512])
+
+@dataclass
 class TimesNetOptunaConfig(OptunaSearchConfig):
     """Search space used by TimesNetConfig."""
 
@@ -472,6 +480,7 @@ class OptunaConfig:
     cnn_transformer: CNNTransformerOptunaConfig = field(default_factory=CNNTransformerOptunaConfig)
     patchtst: PatchTSTOptunaConfig = field(default_factory=PatchTSTOptunaConfig)
     timesnet: TimesNetOptunaConfig = field(default_factory=TimesNetOptunaConfig)
+    cnn: SupervisedCNNOptunaConfig = field(default_factory=SupervisedCNNOptunaConfig)
 
 
 CONFIG = ExperimentConfig()
