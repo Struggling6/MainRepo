@@ -274,13 +274,13 @@ class PowerConsumptionAnomalyConfig:
     gap_hours:    int   = 0
     stride:       int   = 10
     use_undersampling: bool = True
-    use_oversampling: bool = True
-    undersampling_ratio: float = 5.0
-    oversampling_method: str = "smote" # ["none", "random_over", "smote"]
+    use_oversampling: bool = None
+    undersampling_ratio: float = 1.0
+    oversampling_method: str = "none" # ["none", "random_over", "smote"]
     oversampling_ratio: float = 1.0
     smote_k_neighbors: int = 5
     undersample_val: bool = True
-    oversample_val: bool = True
+    oversample_val: bool = None
 
     def build_handler(self, config):
         from data.power_consumption_anomaly import PowerConsumptionAnomalyHandler
