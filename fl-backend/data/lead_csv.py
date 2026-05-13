@@ -81,6 +81,7 @@ class LeadCSVHandler(BaseDatasetHandler):
         self._gap_hours = config.data.gap_hours
         self._stride = config.data.stride
         self._window_size = config.data.window_size
+        self.global_pos_weight = None
 
         if self.partition_mode in ["shared", "optuna"]:
             print(f"[LEAD] Loading {self.partition_mode} file: {self.file_path}")
@@ -94,6 +95,18 @@ class LeadCSVHandler(BaseDatasetHandler):
                 )
 
             self.features, self.labels = self._prepare_data(self.df)
+
+            n_pos = int(self.labels.sum())
+            n_neg = len(self.labels) - n_pos
+            if n_pos > 0:
+                self.global_pos_weight = min(
+                    n_neg / n_pos,
+                    getattr(self.config.model, "pos_weight_cap", 10.0),
+                )
+            else:
+                self.global_pos_weight = getattr(
+                    self.config.model, "pos_weight_cap", 10.0
+                )
 
             if self.partition_mode == "shared":
                 self._prepare_partitions()
@@ -440,10 +453,13 @@ class LeadCSVHandler(BaseDatasetHandler):
 
         building_stats["num_rows"] = building_stats["num_rows"].astype(int)
         building_stats["num_anomalies"] = building_stats["num_anomalies"].astype(int)
+        building_stats["anomaly_rate"] = (
+            building_stats["num_anomalies"] / building_stats["num_rows"]
+        ).fillna(0.0)
         building_stats["_tie_break"] = rng.random(len(building_stats))
 
         building_stats = building_stats.sort_values(
-            by=["num_anomalies", "num_rows", "_tie_break"],
+            by=["anomaly_rate", "num_rows", "_tie_break"],
             ascending=[False, False, True],
         ).reset_index(drop=True)
 
@@ -457,12 +473,6 @@ class LeadCSVHandler(BaseDatasetHandler):
                 f"available buildings={total_buildings}. This would create empty clients."
             )
 
-        ideal_rows = total_rows / self.num_clients
-        ideal_anomalies = (
-            total_anomalies / self.num_clients if total_anomalies > 0 else 0.0
-        )
-        ideal_buildings = total_buildings / self.num_clients
-
         clients = [
             {
                 "buildings": [],
@@ -473,65 +483,16 @@ class LeadCSVHandler(BaseDatasetHandler):
             for _ in range(self.num_clients)
         ]
 
-        def score_client_after_assignment(client, rows_to_add, anomalies_to_add):
-            new_rows = client["num_rows"] + rows_to_add
-            new_anomalies = client["num_anomalies"] + anomalies_to_add
-            new_buildings = client["num_buildings"] + 1
-
-            row_score = ((new_rows - ideal_rows) / max(ideal_rows, 1.0)) ** 2
-
-            if total_anomalies > 0:
-                anomaly_score = (
-                    (new_anomalies - ideal_anomalies)
-                    / max(ideal_anomalies, 1.0)
-                ) ** 2
-            else:
-                anomaly_score = 0.0
-
-            building_score = (
-                (new_buildings - ideal_buildings)
-                / max(ideal_buildings, 1.0)
-            ) ** 2
-
-            return (
-                1.0 * row_score
-                + 3.0 * anomaly_score
-                + 0.2 * building_score
-            )
-
-        remaining_buildings = building_stats.copy()
-
-        for client_idx in range(self.num_clients):
-            row = remaining_buildings.iloc[0]
-            remaining_buildings = remaining_buildings.iloc[1:].reset_index(drop=True)
-
-            building_id = row[self._node_col]
-            rows = int(row["num_rows"])
-            anomalies = int(row["num_anomalies"])
-
-            clients[client_idx]["buildings"].append(building_id)
-            clients[client_idx]["num_rows"] += rows
-            clients[client_idx]["num_anomalies"] += anomalies
+        # Round-robin by anomaly rate: walk buildings from highest anomaly rate
+        # to lowest, cycling through clients (0,1,...,K-1,0,1,...). Each client
+        # gets every K-th building in the sorted order, guaranteeing balanced
+        # building counts and a representative mix of rates.
+        for i, (_, row) in enumerate(building_stats.iterrows()):
+            client_idx = i % self.num_clients
+            clients[client_idx]["buildings"].append(row[self._node_col])
+            clients[client_idx]["num_rows"] += int(row["num_rows"])
+            clients[client_idx]["num_anomalies"] += int(row["num_anomalies"])
             clients[client_idx]["num_buildings"] += 1
-
-        for _, row in remaining_buildings.iterrows():
-            building_id = row[self._node_col]
-            rows = int(row["num_rows"])
-            anomalies = int(row["num_anomalies"])
-
-            best_client_idx = min(
-                range(self.num_clients),
-                key=lambda idx: score_client_after_assignment(
-                    clients[idx],
-                    rows,
-                    anomalies,
-                ),
-            )
-
-            clients[best_client_idx]["buildings"].append(building_id)
-            clients[best_client_idx]["num_rows"] += rows
-            clients[best_client_idx]["num_anomalies"] += anomalies
-            clients[best_client_idx]["num_buildings"] += 1
 
         self.client_indices = [
             np.array(client["buildings"])

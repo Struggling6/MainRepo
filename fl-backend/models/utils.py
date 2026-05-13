@@ -1,4 +1,19 @@
 import torch
+import torch.nn as nn
+
+
+class Squeeze(nn.Module):
+    """Module wrapper around torch.squeeze. Use in nn.Sequential to drop a
+    singleton dim — e.g. (B, 1) → (B,) for binary classification heads —
+    without needing a custom forward."""
+
+    def __init__(self, dim: int = -1):
+        super().__init__()
+        self.dim = dim
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return x.squeeze(self.dim)
+
 
 def get_device():
     if torch.cuda.is_available():

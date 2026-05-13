@@ -12,7 +12,7 @@ def weighted_average_fit(metrics):
 
     aggregated = {}
 
-    for key in ["train_loss", "val_f1"]:
+    for key in ["train_loss", "val_loss", "val_f1", "pr_auc", "roc_auc", "best_thresh"]:
         values = [
             num_examples * m[key]
             for num_examples, m in metrics
@@ -24,7 +24,7 @@ def weighted_average_fit(metrics):
     return aggregated
 
 
-def weighted_average_evaluate(metrics):
+def weighted_average_validate(metrics):
     total_examples = sum(num_examples for num_examples, _ in metrics)
     if total_examples == 0:
         return {}
@@ -40,7 +40,7 @@ def weighted_average_evaluate(metrics):
         if values:
             aggregated[key] = sum(values) / total_examples
 
-    print(f"[SERVER] Aggregated evaluate metrics: {aggregated}")
+    print(f"[SERVER] Aggregated validation metrics: {aggregated}")
     return aggregated
 
 
@@ -61,7 +61,7 @@ def server_fn(context):
         min_available_clients=num_clients,
         on_evaluate_config_fn=lambda server_round: {"round": server_round},
         fit_metrics_aggregation_fn=weighted_average_fit,
-        evaluate_metrics_aggregation_fn=weighted_average_evaluate,
+        evaluate_metrics_aggregation_fn=weighted_average_validate,
         proximal_mu=proximal_mu,
     )
 

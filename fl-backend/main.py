@@ -1,7 +1,7 @@
 from local_experiment import CONFIG
 from training.train import train_model
 from models.utils import get_device
-from training.training_utils.Evaluator import Evaluator
+from training.training_utils.Validator import Validator
 #from plotting.plotting_config import plot_diagrams
 
 import argparse
@@ -64,13 +64,13 @@ def main():
     )
     print(f"Training results: {train_results}")
 
-    # ── Evaluation ───────────────────────────────────────────────────── #
-    evaluator = Evaluator(
+    # ── Validation ───────────────────────────────────────────────────── #
+    validator = Validator(
         model_config=config.model,
         metadata=metadata,
     )
-    eval_results = evaluator.evaluate_round(model, valloader)
-    print(f"Evaluation results: {eval_results}")
+    val_results = validator.validate(model, valloader)
+    print(f"Validation results: {val_results}")
 
     # plot_diagrams(train_results["pr_history"], train_results["f1_history"])
 
