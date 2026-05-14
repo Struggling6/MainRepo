@@ -82,7 +82,7 @@ CONFIG = ExperimentConfig(
         patience=10,
     ),
     federation=FederationConfig(
-        num_rounds=10,
+        num_rounds=1,
         num_clients=5,
         proximal_mu=0.0,
         partition_mode="local",

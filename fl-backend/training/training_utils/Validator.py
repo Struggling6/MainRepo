@@ -19,7 +19,7 @@ class Validator(TrainEvalBase):
 
     def validate(self, model, valloader):
         loss_fn = self._build_loss(valloader)
-        loss, f1, thresh, pr_auc, roc_auc = self._val_epoch(model, valloader, loss_fn)
+        loss, f1, thresh, pr_auc, roc_auc, accuracy, precision, recall = self._val_epoch(model, valloader, loss_fn)
 
         return {
             "loss":           loss,
@@ -27,6 +27,9 @@ class Validator(TrainEvalBase):
             "best_threshold": thresh,
             "pr_auc":         pr_auc,
             "roc_auc":        roc_auc,
+            "accuracy": accuracy,
+            "precision": precision,
+            "recall": recall,
             "num_examples":   int(len(valloader.dataset)),
         }
 

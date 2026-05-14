@@ -12,7 +12,7 @@ def weighted_average_fit(metrics):
 
     aggregated = {}
 
-    for key in ["train_loss", "val_loss", "val_f1", "pr_auc", "roc_auc", "best_thresh"]:
+    for key in ["train_loss", "val_loss", "val_f1", "pr_auc", "roc_auc", "best_thresh", "accuracy", "precision", "recall"]:
         values = [
             num_examples * m[key]
             for num_examples, m in metrics
@@ -31,7 +31,7 @@ def weighted_average_validate(metrics):
 
     aggregated = {}
 
-    for key in ["f1", "pr_auc", "threshold", "roc_auc"]:
+    for key in ["f1", "pr_auc", "threshold", "roc_auc", "accuracy", "precision", "recall"]:
         values = [
             num_examples * m[key]
             for num_examples, m in metrics

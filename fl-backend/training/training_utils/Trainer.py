@@ -47,7 +47,7 @@ class Trainer(TrainEvalBase):
 
         for epoch in range(1, self.epochs + 1):
             train_loss                            = self._train_epoch(self.model, train_loader, self.optimizer, self.loss_fn)
-            val_loss, val_f1, best_thresh, pr_auc, roc_auc = self._val_epoch(self.model, val_loader, self.loss_fn)
+            val_loss, val_f1, best_thresh, pr_auc, roc_auc, accuracy, precision, recall = self._val_epoch(self.model, val_loader, self.loss_fn)
             self.scheduler.step()
 
             metrics = {
@@ -58,6 +58,9 @@ class Trainer(TrainEvalBase):
                 "best_thresh": best_thresh,
                 "pr_auc":      pr_auc,
                 "roc_auc":     roc_auc,
+                "accuracy": accuracy,
+                "precision": precision,
+                "recall": recall,
             }
             self.history.append(metrics)
             self._print_epoch(metrics)

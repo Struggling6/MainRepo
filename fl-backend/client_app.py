@@ -214,6 +214,9 @@ class FlowerClient(NumPyClient):
             results["pr_auc"],
             results["roc_auc"],
             results["best_threshold"],
+            results["accuracy"],
+            results["precision"],
+            results["recall"],
         )
 
         return results["loss"], results["num_examples"], {
@@ -221,6 +224,9 @@ class FlowerClient(NumPyClient):
             "pr_auc":    results["pr_auc"],
             "threshold": results["best_threshold"],
             "roc_auc":   results["roc_auc"],
+            "accuracy":  results["accuracy"],
+            "precision": results["precision"],
+            "recall":    results["recall"],
         }
 
 

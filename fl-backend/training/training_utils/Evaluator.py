@@ -6,6 +6,9 @@ from torch.utils.data import DataLoader, TensorDataset
 from sklearn.metrics import (
     classification_report,
     confusion_matrix,
+    accuracy_score,
+    precision_score,
+    recall_score,
 )
 from training.training_utils.TrainEvalBase import TrainEvalBase
 from training.training_utils.utils import compute_pos_weight
@@ -57,11 +60,19 @@ class Evaluator(TrainEvalBase):
         all_probs, all_labels = self._collect_probs(model, testloader)
         all_preds = (all_probs >= threshold).astype(float)
 
+        accuracy = accuracy_score(all_labels, all_preds)
+        precision = precision_score(all_labels, all_preds, zero_division=0)
+        recall = recall_score(all_labels, all_preds, zero_division=0)
+
+
         print("\n=== Final Evaluation Results ===")
         print(f"  Threshold : {threshold:.2f}")
         print(f"  F1        : {f1:.4f}")
         print(f"  PR-AUC    : {pr_auc:.4f}")
         print(f"  ROC-AUC   : {roc_auc:.4f}")
+        print(f"  Accuracy  : {accuracy:.4f}")
+        print(f"  Precision : {precision:.4f}")
+        print(f"  Recall    : {recall:.4f}")
         print("\n--- Classification Report ---")
         print(classification_report(
             all_labels, all_preds,
@@ -77,6 +88,9 @@ class Evaluator(TrainEvalBase):
             "pr_auc":    pr_auc,
             "roc_auc":   roc_auc,
             "threshold": threshold,
+            "accuracy":  accuracy,
+            "precision": precision,
+            "recall":    recall,
         }
 
     def _build_testloader(self) -> DataLoader:
