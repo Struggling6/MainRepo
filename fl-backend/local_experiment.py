@@ -5,7 +5,7 @@
 from pathlib import Path
 from config import *
 
-DATASET = "lead"  # "power" or "lead"
+DATASET = "power"  # "power" or "lead"
 
 
 def build_data_config(dataset: str):
@@ -17,9 +17,9 @@ def build_data_config(dataset: str):
             stride=168,
             gap_hours=0,
             use_undersampling = False,
-            use_oversampling = False,
-            undersampling_ratio = 5.0,
-            oversampling_method = "none", # ["none", "random_over", "smote"]
+            use_oversampling = True,
+            undersampling_ratio = 1.0,
+            oversampling_method = "time_series_augment", # ["none", "random_over", "smote"]
             oversampling_ratio = 1.0,
             smote_k_neighbors = 5,
             undersample_val = False,
@@ -76,16 +76,16 @@ CONFIG = ExperimentConfig(
     ),
     data=build_data_config(DATASET),
     training=TrainingConfig(
-        local_epochs=3,
+        local_epochs=1,
         learning_rate=  0.00080,
         weight_decay=0.00018,
         patience=10,
     ),
     federation=FederationConfig(
-        num_rounds=10,
-        num_clients=5,
+        num_rounds=1,
+        num_clients=1,
         proximal_mu=0.0,
-        partition_mode="local",
+        partition_mode="shared",
     ),
 )
 
