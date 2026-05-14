@@ -100,7 +100,7 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument(
         "--oversampling-method",
-        choices=("none", "random_over", "smote"),
+        choices=("none", "random_over", "smote", "borderline_smote", "time_series_augment", "ts_augment"),
         default=None,
         help="Override CONFIG.data.oversampling_method.",
     )

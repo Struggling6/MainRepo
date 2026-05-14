@@ -36,9 +36,9 @@ class CNNTransformerConfig:
     loss_fn:        str   = "BCEWithLogitsLoss"
 
     def build(self, input_dim: int):
-        from models.CNNTransformer import SupervisedCNNTransformer
+        from models.CNNTransformer.CNNTransformer import CNNTransformer
 
-        return SupervisedCNNTransformer(
+        return CNNTransformer(
             in_channels=input_dim,
             d_model=self.d_model,
             nhead=self.nhead,
@@ -304,14 +304,14 @@ class LeadCSVConfig:
     window_size:  int   = 168
     gap_hours:    int   = 73
     stride:       int   = 168
-    use_undersampling: bool = True
+    use_undersampling: bool = False
     use_oversampling: bool = True
     undersampling_ratio: float = 1.0
-    oversampling_method: str = "smote" #["none", "random_over", "smote"]
-    oversampling_ratio: float = 1.0
-    smote_k_neighbors: int = 5
-    undersample_val: bool = True
-    oversample_val: bool = True
+    oversampling_method: str = "borderline_smote" #["none", "random_over", "smote", "borderline_smote"]
+    oversampling_ratio: float = 0.1
+    smote_k_neighbors: int = 2
+    undersample_val: bool = False
+    oversample_val: bool = False
 
     def build_handler(self, config):
         from data.lead_csv import LeadCSVHandler
@@ -386,7 +386,7 @@ class FederationConfig:
 @dataclass
 class EvaluationConfig:
     model_path:   Path | None  = None  # set in FedProxWithSave
-    test_path:    Path         = Path("/app/datasets/LEAD/test_features_clean.csv")
+    test_path:    Path         = Path("datasets/LEAD/train_features_clean.csv")
     target:       str          = "anomaly"
     batch_size:   int          = 64
     threshold:    float        = 0.5   # decision threshold — override with best_thresh from training

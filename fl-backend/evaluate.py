@@ -21,6 +21,7 @@ import torch
 from local_experiment import CONFIG
 from training.training_utils.Evaluator import Evaluator
 
+BASE_DIR = Path(__file__).resolve().parent
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
@@ -68,6 +69,7 @@ def main() -> None:
     print(f"Threshold:  {threshold:.4f}")
 
     CONFIG.evaluation.model_path = checkpoint_path
+    
     Evaluator.evaluate(model_path=checkpoint_path, threshold=threshold)
 
 

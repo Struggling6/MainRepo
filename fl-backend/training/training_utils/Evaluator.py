@@ -80,6 +80,15 @@ class Evaluator(TrainEvalBase):
         }
 
     def _build_testloader(self) -> DataLoader:
+        test_path = Path(CONFIG.evaluation.test_path)
+
+        if not test_path.exists():
+            app_root = Path(__file__).resolve().parents[2]
+            candidate = app_root / test_path
+
+            if candidate.exists():
+                test_path = candidate
+                
         X_test, y_test = self.data_handler.load_test_set(CONFIG.evaluation.test_path)
         return DataLoader(
             TensorDataset(
