@@ -113,11 +113,11 @@ class BaseDatasetHandler(ABC):
             feature_cols=self.feature_cols,
             node_col=self._node_col,
             time_col=self._time_col,
-            train_ratio=1.0 - self.config.test_split,
+            train_ratio=1.0 - self.config.data.test_split,
             gap_hours=self._gap_hours,
             window_size=self._window_size,
             stride=self._stride,
-            target=self.config.target,
+            target=self.config.data.target,
         )
 
     def load_test_set(self, test_path: Path):
@@ -135,5 +135,5 @@ class BaseDatasetHandler(ABC):
             stride=self._stride,
             node_col=self._node_col,
             time_col=self._time_col,
-            target=self.config.target,
+            target=self.config.data.target,
         )
