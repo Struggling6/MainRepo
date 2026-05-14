@@ -1,7 +1,14 @@
 import torch
 import numpy as np
 from torch.utils.data import TensorDataset, DataLoader
-from sklearn.metrics import (f1_score, average_precision_score, precision_recall_curve, roc_auc_score)
+from sklearn.metrics import (
+    accuracy_score,
+    average_precision_score,
+    precision_recall_curve,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
 from models.utils import get_device
 
 
@@ -102,7 +109,7 @@ class TrainEvalBase:
         if thresholds.size == 0:
             best_f1 = 0.0
             best_thresh = 0.5
- 
+
         else:
             denom = precision + recall
             f1_scores = np.zeros_like(denom, dtype=float)
@@ -119,6 +126,10 @@ class TrainEvalBase:
             best_f1 = float(f1_scores[best_idx])
             best_thresh = float(thresholds[best_idx])
 
+        best_preds = (all_probs >= best_thresh).astype(int)
+        accuracy = accuracy_score(all_labels, best_preds)
+        best_precision = precision_score(all_labels, best_preds, zero_division=0)
+        best_recall = recall_score(all_labels, best_preds, zero_division=0)
 
         return (
             total_loss / total_samples,
@@ -126,4 +137,7 @@ class TrainEvalBase:
             best_thresh,
             pr_auc,
             roc_auc,
+            accuracy,
+            best_precision,
+            best_recall,
         )

@@ -202,14 +202,22 @@ class OptunaOptimizer(TrainEvalBase):
             best_f1 = 0.0
             best_score = 0.0
             best_threshold = 0.5
+            best_accuracy = 0.0
+            best_precision = 0.0
+            best_recall = 0.0
 
             for epoch in range(self.epochs):
                 train_loss = self._train_epoch(model, train_dl, optimizer, loss_fn)
-                val_loss, val_f1, best_thresh, pr_auc, roc_auc  = self._val_epoch(
-                    model,
-                    val_dl,
-                    loss_fn,
-                )
+                (
+                    val_loss,
+                    val_f1,
+                    best_thresh,
+                    pr_auc,
+                    roc_auc,
+                    accuracy,
+                    precision,
+                    recall,
+                ) = self._val_epoch(model, val_dl, loss_fn)
 
                 score = self._objective_score(pr_auc, val_f1)
 
@@ -220,11 +228,16 @@ class OptunaOptimizer(TrainEvalBase):
                     best_f1 = val_f1
                     best_score = score
                     best_threshold = best_thresh
+                    best_accuracy = accuracy
+                    best_precision = precision
+                    best_recall = recall
 
                 self._logger(
                     f"Trial {trial.number + 1} epoch {epoch + 1}/{self.epochs}: "
                     f"train_loss={train_loss:.6f}, val_loss={val_loss:.6f}, "
                     f"val_f1={val_f1:.4f}, pr_auc={pr_auc:.4f}, "
+                    f"accuracy={accuracy:.4f}, precision={precision:.4f}, "
+                    f"recall={recall:.4f}, "
                     f"score={score:.4f}, best_score={best_score:.4f}, "
                     f"best_pr_auc={best_pr_auc:.4f}, best_f1={best_f1:.4f}, "
                     f"best_thresh={best_threshold:.2f}"
@@ -234,6 +247,9 @@ class OptunaOptimizer(TrainEvalBase):
                 trial.set_user_attr("score", float(best_score))
                 trial.set_user_attr("pr_auc", float(best_pr_auc))
                 trial.set_user_attr("f1", float(best_f1))
+                trial.set_user_attr("accuracy", float(best_accuracy))
+                trial.set_user_attr("precision", float(best_precision))
+                trial.set_user_attr("recall", float(best_recall))
                 trial.set_user_attr("threshold", float(best_threshold))
                 trial.set_user_attr("best_threshold", float(best_threshold))
                 
@@ -251,6 +267,9 @@ class OptunaOptimizer(TrainEvalBase):
                 f"Trial {trial.number + 1} complete: "
                 f"best_pr_auc={best_pr_auc:.4f}, "
                 f"best_f1={best_f1:.4f}, "
+                f"best_accuracy={best_accuracy:.4f}, "
+                f"best_precision={best_precision:.4f}, "
+                f"best_recall={best_recall:.4f}, "
                 f"best_score={best_score:.4f}, "
                 f"best_threshold={best_threshold:.2f}"
             )
@@ -416,6 +435,9 @@ class OptunaOptimizer(TrainEvalBase):
         print(f"  Score:      {study.best_trial.value:.4f}")
         print(f"  PR-AUC:     {study.best_trial.user_attrs.get('pr_auc')}")
         print(f"  F1:         {study.best_trial.user_attrs.get('f1')}")
+        print(f"  Accuracy:   {study.best_trial.user_attrs.get('accuracy')}")
+        print(f"  Precision:  {study.best_trial.user_attrs.get('precision')}")
+        print(f"  Recall:     {study.best_trial.user_attrs.get('recall')}")
         print(f"  Threshold:  {study.best_trial.user_attrs.get('threshold')}")
         print("  Params:")
 
@@ -447,6 +469,9 @@ class OptunaOptimizer(TrainEvalBase):
         print(f"     score           = {trial.user_attrs.get('score')}")
         print(f"     pr_auc          = {trial.user_attrs.get('pr_auc')}")
         print(f"     f1              = {trial.user_attrs.get('f1')}")
+        print(f"     accuracy        = {trial.user_attrs.get('accuracy')}")
+        print(f"     precision       = {trial.user_attrs.get('precision')}")
+        print(f"     recall          = {trial.user_attrs.get('recall')}")
         print(f"     threshold       = {trial.user_attrs.get('threshold')}")
         print("   params   :")
 

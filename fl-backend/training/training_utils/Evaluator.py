@@ -4,8 +4,12 @@ import numpy as np
 from pathlib import Path
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.metrics import (
+    accuracy_score,
     classification_report,
     confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
 )
 from training.training_utils.TrainEvalBase import TrainEvalBase
 from training.training_utils.utils import compute_pos_weight
@@ -50,18 +54,34 @@ class Evaluator(TrainEvalBase):
 
         model = self._load_model(model_path)
         loss_fn = self._build_loss(testloader)
-        loss, f1, best_thresh, pr_auc, roc_auc = self._val_epoch(model, testloader, loss_fn)
+        (
+            loss,
+            f1,
+            best_thresh,
+            pr_auc,
+            roc_auc,
+            accuracy,
+            precision,
+            recall,
+        ) = self._val_epoch(model, testloader, loss_fn)
 
         threshold = threshold if threshold is not None else best_thresh
 
         all_probs, all_labels = self._collect_probs(model, testloader)
         all_preds = (all_probs >= threshold).astype(float)
+        f1 = f1_score(all_labels, all_preds, zero_division=0)
+        accuracy = accuracy_score(all_labels, all_preds)
+        precision = precision_score(all_labels, all_preds, zero_division=0)
+        recall = recall_score(all_labels, all_preds, zero_division=0)
 
         print("\n=== Final Evaluation Results ===")
         print(f"  Threshold : {threshold:.2f}")
         print(f"  F1        : {f1:.4f}")
         print(f"  PR-AUC    : {pr_auc:.4f}")
         print(f"  ROC-AUC   : {roc_auc:.4f}")
+        print(f"  Accuracy  : {accuracy:.4f}")
+        print(f"  Precision : {precision:.4f}")
+        print(f"  Recall    : {recall:.4f}")
         print("\n--- Classification Report ---")
         print(classification_report(
             all_labels, all_preds,
@@ -76,6 +96,9 @@ class Evaluator(TrainEvalBase):
             "f1":        f1,
             "pr_auc":    pr_auc,
             "roc_auc":   roc_auc,
+            "accuracy":  accuracy,
+            "precision": precision,
+            "recall":    recall,
             "threshold": threshold,
         }
 
@@ -118,8 +141,8 @@ class Evaluator(TrainEvalBase):
             for features, labels in testloader:
                 features = features.to(self.device)
                 logits = model(features)
-                all_probs.append(torch.sigmoid(logits).cpu())
-                all_labels.append(labels)
+                all_probs.append(torch.sigmoid(logits).cpu().view(-1))
+                all_labels.append(labels.view(-1))
 
         return (
             torch.cat(all_probs).numpy(),

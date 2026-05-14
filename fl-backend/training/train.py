@@ -95,6 +95,9 @@ def train_model(
         "val_f1":       trainer.history[-1]["val_f1"],
         "pr_auc":       trainer.history[-1]["pr_auc"],
         "roc_auc":      trainer.history[-1]["roc_auc"],
+        "accuracy":     trainer.history[-1]["accuracy"],
+        "precision":    trainer.history[-1]["precision"],
+        "recall":       trainer.history[-1]["recall"],
         "best_thresh":  trainer.history[-1]["best_thresh"],
         "num_examples": len(trainloader.dataset),
     }
