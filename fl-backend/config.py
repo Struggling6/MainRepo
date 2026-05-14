@@ -36,9 +36,9 @@ class CNNTransformerConfig:
     loss_fn:        str   = "BCEWithLogitsLoss"
 
     def build(self, input_dim: int):
-        from models.CNNTransformer import SupervisedCNNTransformer
+        from models.CNNTransformer.CNNTransformer import CNNTransformer
 
-        return SupervisedCNNTransformer(
+        return CNNTransformer(
             in_channels=input_dim,
             d_model=self.d_model,
             nhead=self.nhead,
@@ -386,7 +386,7 @@ class FederationConfig:
 @dataclass
 class EvaluationConfig:
     model_path:   Path | None  = None  # set in FedProxWithSave
-    test_path:    Path         = Path("/app/datasets/LEAD/test_features_clean.csv")
+    test_path:    Path         = Path("datasets/LEAD/train_features_clean.csv")
     target:       str          = "anomaly"
     batch_size:   int          = 64
     threshold:    float        = 0.5   # decision threshold — override with best_thresh from training

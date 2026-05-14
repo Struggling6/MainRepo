@@ -39,7 +39,7 @@ def build_data_config(dataset: str):
             oversampling_ratio = 1.0, #best so far 0.5
             smote_k_neighbors = 2,
             undersample_val = False,
-            oversample_val = True,
+            oversample_val =False,
             use_precomputed_windows = True,
         )
 
