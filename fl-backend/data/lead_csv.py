@@ -819,10 +819,94 @@ class LeadCSVHandler(BaseDatasetHandler):
                 k_neighbors=effective_k,
             )
 
+        elif method in ["borderline_smote", "borderlinesmote"]:
+            if positives < 2:
+                print(
+                    f"[LEAD] WARNING: BorderlineSMOTE skipped for {split_name}; "
+                    "requires at least two positive samples."
+                )
+                return X, y
+
+            from imblearn.over_sampling import BorderlineSMOTE
+
+            effective_k = min(smote_k_neighbors, positives - 1)
+
+            sampler = BorderlineSMOTE(
+                sampling_strategy=target_ratio,
+                random_state=seed,
+                k_neighbors=effective_k,
+                m_neighbors=min(10, max(1, len(y) - 1)),
+                kind="borderline-1",
+            )
+        elif method in ["time_series_augment", "ts_augment"]:
+            rng = np.random.default_rng(seed)
+
+            anomaly_idx = np.where(y == 1)[0]
+            normal_idx = np.where(y == 0)[0]
+
+            target_positives = int(target_ratio * len(normal_idx))
+            n_to_generate = max(0, target_positives - len(anomaly_idx))
+
+            if n_to_generate <= 0:
+                print(
+                    f"[LEAD] Time-series augmentation skipped for {split_name}; "
+                    "target ratio already reached."
+                )
+                return X, y
+
+            source_idx = rng.choice(
+                anomaly_idx,
+                size=n_to_generate,
+                replace=True,
+            )
+
+            X_new = X[source_idx].copy()
+
+            # 1. Jittering: small Gaussian noise
+            noise_std = 0.02
+            X_new = X_new + rng.normal(
+                loc=0.0,
+                scale=noise_std,
+                size=X_new.shape,
+            ).astype(np.float32)
+
+            # 2. Magnitude scaling: slightly scale each window
+            scale = rng.normal(
+                loc=1.0,
+                scale=0.05,
+                size=(n_to_generate, 1, 1),
+            ).astype(np.float32)
+            X_new = X_new * scale
+
+            # 3. Time shift: roll the sequence slightly forward/backward
+            max_shift = 3
+            for i in range(n_to_generate):
+                shift = rng.integers(-max_shift, max_shift + 1)
+                X_new[i] = np.roll(X_new[i], shift=shift, axis=0)
+
+            y_new = np.ones(n_to_generate, dtype=np.int64)
+
+            X_resampled = np.concatenate([X, X_new], axis=0)
+            y_resampled = np.concatenate([y, y_new], axis=0)
+
+            shuffle_idx = rng.permutation(len(y_resampled))
+            X_resampled = X_resampled[shuffle_idx].astype(np.float32, copy=False)
+            y_resampled = y_resampled[shuffle_idx].astype(np.int64, copy=False)
+
+            print(
+                f"[LEAD] Applied {split_name} time-series augmentation: "
+                f"target_pos_neg={target_ratio}:1, "
+                f"before={len(y)}, pos_before={positives}, "
+                f"generated={n_to_generate}, "
+                f"after={len(y_resampled)}, pos_after={int(y_resampled.sum())}, "
+                f"anomaly_rate={float(y_resampled.mean()):.4f}"
+            )
+
+            return X_resampled, y_resampled
         else:
             raise ValueError(
                 f"Unknown oversampling_method='{method}'. "
-                "Expected 'none', 'random_over', or 'smote'."
+                "Expected 'none', 'random_over', 'smote', 'borderline_smote', or 'time_series_augment'."
             )
 
         X_resampled, y_resampled = sampler.fit_resample(X_flat, y)

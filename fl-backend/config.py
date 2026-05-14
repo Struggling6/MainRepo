@@ -231,14 +231,14 @@ class LeadCSVConfig:
     window_size:  int   = 168
     gap_hours:    int   = 73
     stride:       int   = 168
-    use_undersampling: bool = True
+    use_undersampling: bool = False
     use_oversampling: bool = True
     undersampling_ratio: float = 1.0
-    oversampling_method: str = "smote" #["none", "random_over", "smote"]
-    oversampling_ratio: float = 1.0
-    smote_k_neighbors: int = 5
-    undersample_val: bool = True
-    oversample_val: bool = True
+    oversampling_method: str = "borderline_smote" #["none", "random_over", "smote", "borderline_smote"]
+    oversampling_ratio: float = 0.1
+    smote_k_neighbors: int = 2
+    undersample_val: bool = False
+    oversample_val: bool = False
 
     def build_handler(self, config):
         from data.lead_csv import LeadCSVHandler
