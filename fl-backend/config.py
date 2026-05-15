@@ -47,11 +47,10 @@ class CNNTransformerConfig:
             dropout=self.dropout,
         )
 
-
 @dataclass
 class TransformerConfig:
     name:           str   = "transformer"
-    batch_size:   int     = 64
+    batch_size:     int   = 64
     d_model:        int   = 128
     nhead:          int   = 4
     num_layers:     int   = 2
@@ -290,28 +289,28 @@ class TimesNetConfig:
 
 @dataclass
 class LeadCSVConfig:
-    name:         str   = "lead_csv"
-    file_path:    Path  = Path("datasets/LEAD/train_features_clean.csv") # used for shared mode; should be the sentinel-cleaned CSV from scripts/clean_lead_features.py
-    precomputed_dir: Path = Path("datasets/LEAD/windowed")
-    precomputed_pattern: str = "client{client_index}.npz"
-    target:       str   = "anomaly"
-    task_name:    str   = "binary_classification"
-    test_split:   float = 0.2
-    seed:         int   = 42
-    window_size:  int   = 168
-    gap_hours:    int   = 73
-    stride:       int   = 168
-    oversampling_method: str = "none" # ["none", "random_over", "smote", "ts_augment"]
-    oversampling_ratio: float = 1.0
-    smote_k_neighbors: int = 5
-    tsaug_jitter_sigma: float = 0.03
-    tsaug_scaling_sigma: float = 0.1
-    tsaug_magwarp_sigma: float = 0.2
-    tsaug_magwarp_knots: int = 4
-    tsaug_use_jitter: bool = True
-    tsaug_use_scaling: bool = True
-    tsaug_use_magwarp: bool = True
-    oversample_val: bool = False
+    name:                str    = "lead_csv"
+    file_path:           Path   = Path("datasets/LEAD/train_features_clean.csv") # used for shared mode; should be the sentinel-cleaned CSV from scripts/clean_lead_features.py
+    precomputed_dir:     Path   = Path("datasets/LEAD/windowed")
+    precomputed_pattern: str    = "client{client_index}.npz"
+    target:              str    = "anomaly"
+    task_name:           str    = "binary_classification"
+    test_split:          float  = 0.2
+    seed:                int    = 42
+    window_size:         int    = 168
+    gap_hours:           int    = 73
+    stride:              int    = 168
+    oversampling_method: Literal["none", "random_over", "smote", "ts_augment"] = "none" 
+    oversampling_ratio:  float  = 1.0
+    smote_k_neighbors:   int    = 5
+    tsaug_jitter_sigma:  float  = 0.03
+    tsaug_scaling_sigma: float  = 0.1
+    tsaug_magwarp_sigma: float  = 0.2
+    tsaug_magwarp_knots: int    = 4
+    tsaug_use_jitter:    bool   = True
+    tsaug_use_scaling:   bool   = True
+    tsaug_use_magwarp:   bool   = True
+    oversample_val:      bool   = False
 
     def build_handler(self, config):
         from data.lead_csv import LeadCSVHandler
@@ -334,28 +333,28 @@ class PowerGridCSVConfig:
 
 @dataclass
 class PowerConsumptionAnomalyConfig:
-    name:         str   = "power_consumption_anomaly"
-    file_path:    Path  = Path("")
-    data_dir:     Path  = Path("datasets/PowerConsumptionAnomaly")
-    file_pattern: str   = "*.csv"
-    target:       str   = "label"
-    test_split:   float = 0.2
-    normalize:    bool  = True
-    seed:         int   = 42
-    window_size:  int   = 60
-    gap_hours:    int   = 0
-    stride:       int   = 10
-    oversampling_method: str = "none" # ["none", "random_over", "smote", "ts_augment"]
-    oversampling_ratio: float = 1.0
-    smote_k_neighbors: int = 5
-    tsaug_jitter_sigma: float = 0.03
+    name:                str   = "power_consumption_anomaly"
+    file_path:           Path  = Path("")
+    data_dir:            Path  = Path("datasets/PowerConsumptionAnomaly")
+    file_pattern:        str   = "*.csv"
+    target:              str   = "label"
+    test_split:          float = 0.2
+    normalize:           bool  = True
+    seed:                int   = 42
+    window_size:         int   = 60
+    gap_hours:           int   = 0
+    stride:              int   = 10
+    oversampling_method: Literal["none", "random_over", "smote", "ts_augment"] = "none"
+    oversampling_ratio:  float = 1.0
+    smote_k_neighbors:   int   = 5
+    tsaug_jitter_sigma:  float = 0.03
     tsaug_scaling_sigma: float = 0.1
     tsaug_magwarp_sigma: float = 0.2
-    tsaug_magwarp_knots: int = 4
-    tsaug_use_jitter: bool = True
-    tsaug_use_scaling: bool = True
-    tsaug_use_magwarp: bool = True
-    oversample_val: bool = False
+    tsaug_magwarp_knots: int   = 4
+    tsaug_use_jitter:    bool  = True
+    tsaug_use_scaling:   bool  = True
+    tsaug_use_magwarp:   bool  = True
+    oversample_val:      bool  = False
 
     def build_handler(self, config):
         from data.power_consumption_anomaly import PowerConsumptionAnomalyHandler
@@ -374,15 +373,15 @@ class TrainingConfig:
 
 @dataclass
 class FederationConfig:
-    partition_mode:    str   = "local" # local or shared
-    num_rounds:        int   = 15
-    num_clients:       int   = 1
-    fraction_fit:      float = 1.0
-    fraction_evaluate: float = 1.0
-    proximal_mu:       float = 2.0
-    serialize_gpu:     bool  = True
+    partition_mode:         Literal["local", "shared"] = "local" # local or shared
+    num_rounds:             int   = 15
+    num_clients:            int   = 1
+    fraction_fit:           float = 1.0
+    fraction_evaluate:      float = 1.0
+    proximal_mu:            float = 2.0
+    serialize_gpu:          bool  = True
     serialize_gpu_evaluate: bool = True
-    gpu_lock_path:     Path  = Path("datasets/.gpu.lock")
+    gpu_lock_path:          Path  = Path("datasets/.gpu.lock")
 
 # ── Evaluation config ─────────────────────────────────────────────────── #
 
@@ -418,10 +417,10 @@ class IntRange:
 
 @dataclass
 class GeneralOptunaConfig:
-    n_trials: int = 50
-    epochs: int = 10
-    n_jobs: int = 1
-    study_name: str | None = "Optuna_study"
+    n_trials:   int        = 50
+    epochs:     int        = 10
+    n_jobs:     int        = 1
+    study_name: str | None = None
 
 @dataclass
 class ScoringConfig:
@@ -434,7 +433,7 @@ class ScoringConfig:
 @dataclass
 class PrunerConfig:
     min_resource_fraction: float = 0.25
-    reduction_factor: int = 3
+    reduction_factor:      int   = 3
 
 @dataclass
 class OptunaSearchConfig:
@@ -509,15 +508,14 @@ class TimesNetOptunaConfig(OptunaSearchConfig):
     # TimesNet can be fairly memory-heavy, so keep batch sizes moderate.
     batch_size: list = field(default_factory=lambda: [32, 64, 128, 256])
 
-    d_model: list    = field(default_factory=lambda: [64, 128, 256])
-    top_k: list      = field(default_factory=lambda: [2, 3, 5])
-    d_ffn: list      = field(default_factory=lambda: [128, 256, 512])
-    n_kernels: list  = field(default_factory=lambda: [3, 6, 9])
-    dropout: FloatRange = field(default_factory=lambda: FloatRange(0.1, 0.4))
+    d_model:        list       = field(default_factory=lambda: [64, 128, 256])
+    top_k:          list       = field(default_factory=lambda: [2, 3, 5])
+    d_ffn:          list       = field(default_factory=lambda: [128, 256, 512])
+    n_kernels:      list       = field(default_factory=lambda: [3, 6, 9])
+    dropout:        FloatRange = field(default_factory=lambda: FloatRange(0.1, 0.4))
     pos_weight_cap: FloatRange = field(default_factory=lambda: FloatRange(1.0, 10.0, log=True))
-    num_layers: IntRange = field(default_factory=lambda: IntRange(1, 5))
+    num_layers:     IntRange   = field(default_factory=lambda: IntRange(1, 5))
                                                                   
-
 
 # ── Interpretability config ─────────────────────────────────────────── #
 @dataclass
@@ -525,8 +523,8 @@ class InterpretabilityConfig:
     # Number of steps in Integrated Gradients
     ig_steps: int = 50
 
-    # Baseline type: "zero", "mean", or "sample"
-    ig_baseline: str = "zero"
+    # Baseline type:
+    ig_baseline: Literal["zero", "mean", "sample"] = "zero"
 
     # Whether to use probabilities instead of raw logits
     ig_use_probability: bool = False
@@ -536,7 +534,6 @@ class InterpretabilityConfig:
 
 # ── Top-level experiment config ───────────────────────────────────────── #
 
-    
 
 @dataclass
 class ExperimentConfig:
@@ -555,17 +552,17 @@ class ExperimentConfig:
 
 @dataclass
 class OptunaConfig:
-    general: GeneralOptunaConfig = field(default_factory=GeneralOptunaConfig)
-    scoring: ScoringConfig = field(default_factory=ScoringConfig)
-    pruner: PrunerConfig = field(default_factory=PrunerConfig)
+    general:         GeneralOptunaConfig        = field(default_factory=GeneralOptunaConfig)
+    scoring:         ScoringConfig              = field(default_factory=ScoringConfig)
+    pruner:          PrunerConfig               = field(default_factory=PrunerConfig)
 
-    lstm: LSTMOptunaConfig = field(default_factory=LSTMOptunaConfig)
-    transformer: TransformerOptunaConfig = field(default_factory=TransformerOptunaConfig)
+    lstm:            LSTMOptunaConfig           = field(default_factory=LSTMOptunaConfig)
+    transformer:     TransformerOptunaConfig    = field(default_factory=TransformerOptunaConfig)
     cnn_transformer: CNNTransformerOptunaConfig = field(default_factory=CNNTransformerOptunaConfig)
-    patchtst: PatchTSTOptunaConfig = field(default_factory=PatchTSTOptunaConfig)
-    timesnet: TimesNetOptunaConfig = field(default_factory=TimesNetOptunaConfig)
-    fcn: FCNOptunaConfig = field(default_factory=FCNOptunaConfig)
-    mlstm_fcn: MLSTMFCNOptunaConfig = field(default_factory=MLSTMFCNOptunaConfig)
+    patchtst:        PatchTSTOptunaConfig       = field(default_factory=PatchTSTOptunaConfig)
+    timesnet:        TimesNetOptunaConfig       = field(default_factory=TimesNetOptunaConfig)
+    fcn:             FCNOptunaConfig            = field(default_factory=FCNOptunaConfig)
+    mlstm_fcn:       MLSTMFCNOptunaConfig       = field(default_factory=MLSTMFCNOptunaConfig)
 
 
 CONFIG = ExperimentConfig()

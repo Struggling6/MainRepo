@@ -205,7 +205,7 @@ class OptunaOptimizer(TrainEvalBase):
 
             for epoch in range(self.epochs):
                 train_loss = self._train_epoch(model, train_dl, optimizer, loss_fn)
-                val_loss, val_f1, best_thresh, pr_auc, roc_auc  = self._val_epoch(
+                val_loss, val_f1, best_thresh, pr_auc, roc_auc, _, _, _  = self._val_epoch(
                     model,
                     val_dl,
                     loss_fn,
