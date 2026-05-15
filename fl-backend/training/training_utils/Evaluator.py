@@ -53,7 +53,7 @@ class Evaluator(TrainEvalBase):
 
         model = self._load_model(model_path)
         loss_fn = self._build_loss(testloader)
-        loss, f1, best_thresh, pr_auc, roc_auc = self._val_epoch(model, testloader, loss_fn)
+        loss, f1, best_thresh, pr_auc, roc_auc, accuracy, precision, recall = self._val_epoch(model, testloader, loss_fn)
 
         threshold = threshold if threshold is not None else best_thresh
 

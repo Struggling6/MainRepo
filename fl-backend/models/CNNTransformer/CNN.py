@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from FeatureExtractor import FeatureExtractor
+from .FeatureExtractor import FeatureExtractor
 from .Classifier import Classifier
 
 

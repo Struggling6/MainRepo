@@ -77,6 +77,7 @@ class TransformerConfig:
 @dataclass
 class CNNConfig:
     name:           str   = "cnn"
+    batch_size:     int   = 64  
     d_model:        int   = 128
     dropout:        float = 0.3
     pos_weight_cap: float = 10.0
@@ -514,7 +515,13 @@ class TimesNetOptunaConfig(OptunaSearchConfig):
     pos_weight_cap: FloatRange = field(default_factory=lambda: FloatRange(1.0, 10.0, log=True))
     num_layers: IntRange = field(default_factory=lambda: IntRange(1, 5))
                                                                   
-
+@dataclass
+class CNNOptunaConfig(OptunaSearchConfig):
+    d_model: list    = field(default_factory=lambda: [32, 64, 128, 256])
+    dropout: FloatRange = field(default_factory=lambda: FloatRange(0.1, 0.4))
+    pos_weight_cap: FloatRange = field(default_factory=lambda: FloatRange(1.0, 10.0, log=True))
+    batch_size: list = field(default_factory=lambda: [32, 64, 128])
+    
 
 # ── Interpretability config ─────────────────────────────────────────── #
 @dataclass
@@ -563,6 +570,7 @@ class OptunaConfig:
     timesnet: TimesNetOptunaConfig = field(default_factory=TimesNetOptunaConfig)
     fcn: FCNOptunaConfig = field(default_factory=FCNOptunaConfig)
     mlstm_fcn: MLSTMFCNOptunaConfig = field(default_factory=MLSTMFCNOptunaConfig)
+    cnn: CNNOptunaConfig = field(default_factory=CNNOptunaConfig)
 
 
 CONFIG = ExperimentConfig()
