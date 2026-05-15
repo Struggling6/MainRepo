@@ -1,106 +1,98 @@
+# ── Active experiment ─────────────────────────────────────────────────── #
+# Change CONFIG to switch experiments. All fields have defaults so you only
+# need to specify what differs from the defaults. The chosen dataset is
+# determined by which *Config you pass as `data=`.
+
+from pathlib import Path
 from config import *
 
-OPTUNA_CONFIG = OptunaConfig(
-
-
-    # ── General Configs ─────────────────────────────────────────────────────── #
-    
-    general=GeneralOptunaConfig(
-        n_trials=75,
-        epochs=12,
-        n_jobs=1,
-        study_name="PatchTST_F1_Study"
+CONFIG = ExperimentConfig(
+    #model=PatchTSTConfig(
+    #    batch_size         = 64,
+    #    context_length     = 168, # has to match the data window_size
+    #    patch_length       = 28,
+    #    patch_stride       = 8,
+    #    d_model            = 64,
+    #    nhead              = 4,
+    #    num_layers         = 3,
+    #    ffn_dim            = 128,
+    #    channel_attention  = True,
+    #    attention_dropout  = 0.08533492544875493,
+    #    positional_dropout = 0.2304421861914936,
+    #    head_dropout       = 0.19012638100200221,
+    #    pre_norm           = True,
+    #    pos_weight_cap     = 2.572223644629402,
+    #),
+    model=MLSTMFCNConfig(
+        num_layers=1,
+        batch_size=8,
+        pos_weight_cap=3.5443,
+        lstm_units=128,
+        dropout=0.6182,
+        dimension_shuffle=False,
+        se_reduction=32,
     ),
-
-    scoring=ScoringConfig(
-        pr_auc_weight=0.0,
-        f1_weight=1.0,
-        report_metric="F1-score"
+    data=LeadCSVConfig(
+        file_path=Path("datasets/LEAD/LEAD_train_val.csv"),
+        window_size=168,
+        stride=168,
+        gap_hours=73,
+        oversampling_method="ts_augment",
+        oversampling_ratio=1.0,
     ),
-
-    pruner=PrunerConfig(
-        min_resource_fraction=0.25,
-        reduction_factor=3
+    training=TrainingConfig(
+        local_epochs=1,
+        learning_rate=0.00080,
+        weight_decay=0.00018,
+        patience=10,
     ),
-
-    # ── LSTM Config ─────────────────────────────────────────────────────── #
-
-    lstm=LSTMOptunaConfig(
-        lr=FloatRange(3e-4, 3e-3, log=True),
-        weight_decay=FloatRange(1e-5, 1e-2, log=True),
-
-        num_layers=IntRange(1, 4),
-
-        batch_size=[16, 32, 64, 128],
-
-        hidden_size=[64, 128, 256],
-
-        dropout=FloatRange(0.1, 0.4),
-
-        pos_weight_cap=FloatRange(1.0, 6.0, log=True)
+    evaluation=EvaluationConfig(
+        test_path=Path("datasets/LEAD/LEAD_test.csv"),
     ),
-    # ── Transformer Config ─────────────────────────────────────────────────────── #
-
-    transformer=TransformerOptunaConfig(
-        lr=FloatRange(3e-4, 2e-3, log=True),
-        weight_decay=FloatRange(1e-5, 1e-2, log=True),
-
-        num_layers=IntRange(1, 4),
-
-        batch_size=[16, 32, 64],
-
-        d_model=[32, 64, 128],
-        nhead_candidates=[2, 4, 8],
-
-        dropout=FloatRange(0.1, 0.3),
-
-        pos_weight_cap=FloatRange(1.0, 6.0, log=True)
+    federation=FederationConfig(
+        num_rounds=1,
+        num_clients=1,
+        proximal_mu=0.1,
+        partition_mode="shared",
     ),
-
-    # ── CNN-Transformer Config ─────────────────────────────────────────────── #
-
-    cnn_transformer=CNNTransformerOptunaConfig(
-        lr=FloatRange(3e-4, 2e-3, log=True),
-        weight_decay=FloatRange(1e-5, 1e-2, log=True),
-
-        num_layers=IntRange(1, 4),
-
-        batch_size=[16, 32, 64],
-
-        d_model=[32, 64, 128],
-        nhead_candidates=[2, 4, 8],
-
-        dropout=FloatRange(0.1, 0.35),
-
-        pos_weight_cap=FloatRange(1.0, 6.0, log=True)
-    ),
-
-    # ── PatchTST Config ─────────────────────────────────────────────────────── #
-
-    patchtst=PatchTSTOptunaConfig(
-        lr=FloatRange(3e-4, 2e-3, log=True),
-        weight_decay=FloatRange(1e-5, 5e-3, log=True),
-
-        num_layers=IntRange(2, 4),
-
-        batch_size=[16, 32, 64, 128],
-
-        d_model=[16, 32, 64, 128],
-        nhead_candidates=[2, 4, 8],
-
-        patch_length_candidates=[8, 12, 14, 21, 24, 28],
-        patch_stride_candidates=[4, 8, 12, 16],
-
-        ffn_dim=[32, 64, 128, 256],
-
-        channel_attention=[True, False],
-
-        attention_dropout=FloatRange(0.05, 0.25),
-        positional_dropout=FloatRange(0.05, 0.25),
-        head_dropout=FloatRange(0.05, 0.25),
-
-        pos_weight_cap=FloatRange(1.0, 6.0, log=True)
-        
-        
-    )
 )
+
+"""
+Examples:
+
+CONFIG = ExperimentConfig(
+    model=TimesNetConfig(num_layers=3, d_model=128, top_k=3, d_ffn=256, n_kernels=6, dropout=0.3, num_classes=1, loss_fn="BCEWithLogitsLoss"),
+    training=TrainingConfig(local_epochs=1, learning_rate=1e-4),
+    federation=FederationConfig(num_rounds=2, num_clients=1, proximal_mu=0.1, partition_mode="local"),
+)
+
+FedProx with LSTM on PowerGrid dataset:
+CONFIG = ExperimentConfig(
+    model=ModelConfig(model=LSTMConfig(hidden_size=256, dropout=0.2)),
+    data=PowerGridCSVConfig(),
+    training=TrainingConfig(learning_rate=5e-4, local_epochs=1),
+    federation=FederationConfig(num_rounds=10, num_clients=3, proximal_mu=0.1),
+    evaluation=EvaluationConfig(threshold=0.3),
+)
+
+PatchTST on LEAD dataset:
+CONFIG = ExperimentConfig(
+    model=PatchTSTConfig(nhead=4, num_layers=3),
+    data=LeadCSVConfig(batch_size=32),
+    training=TrainingConfig(local_epochs=5, learning_rate=1e-5),
+)
+
+MLP baseline on LEAD dataset:
+CONFIG = ExperimentConfig(
+    model=MLPConfig(hidden_size=64, num_layers=3),
+)
+
+Power consumption anomaly with TS-augment:
+CONFIG = ExperimentConfig(
+    model=CNNTransformerConfig(d_model=128, nhead=8, num_layers=2),
+    data=PowerConsumptionAnomalyConfig(
+        data_dir=Path("datasets/PowerConsumptionAnomaly"),
+        oversampling_method="ts_augment",
+    ),
+)
+"""
