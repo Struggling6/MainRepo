@@ -12,6 +12,7 @@ matplotlib.use("Agg")
 from plotting.plot_methods.pr_auc_method import pr_auc_plot
 from plotting.plot_methods.f1_plot_method import f1_plot
 from plotting.plot_methods.roc_auc_method import roc_auc_plot
+from plotting.plot_methods.confusion_matrix_plot import confusion_matrix_plot
 
 BASE_DIR = Path(__file__).resolve().parent
 SAVE_DIR = Path(os.environ.get("PLOTS_DIR", str(BASE_DIR / "saved_plots")))
@@ -26,3 +27,7 @@ def plot_diagrams(pr_history, f1_history, roc_history):
     pr_auc_plot(pr_history, save_dir=SAVE_DIR)
     f1_plot(f1_history, save_dir=SAVE_DIR)
     roc_auc_plot(roc_history, save_dir=SAVE_DIR)
+
+
+def plot_cm(cm):
+    confusion_matrix_plot(cm, save_dir = SAVE_DIR)

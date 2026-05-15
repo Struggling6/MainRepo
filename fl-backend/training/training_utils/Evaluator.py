@@ -13,7 +13,7 @@ from sklearn.metrics import (
 from training.training_utils.TrainEvalBase import TrainEvalBase
 from training.training_utils.utils import compute_pos_weight
 from local_experiment import CONFIG, resolve_loss_fn
-
+from plotting.plotting_config import plot_cm
 
 class Evaluator(TrainEvalBase):
     """
@@ -53,7 +53,7 @@ class Evaluator(TrainEvalBase):
 
         model = self._load_model(model_path)
         loss_fn = self._build_loss(testloader)
-        loss, f1, best_thresh, pr_auc, roc_auc = self._val_epoch(model, testloader, loss_fn)
+        loss, f1, best_thresh, pr_auc, roc_auc, accuracy, precision, recall= self._val_epoch(model, testloader, loss_fn)
 
         threshold = threshold if threshold is not None else best_thresh
 
@@ -80,7 +80,9 @@ class Evaluator(TrainEvalBase):
             zero_division=0,
         ))
         print("--- Confusion Matrix ---")
-        print(confusion_matrix(all_labels, all_preds))
+        cm = confusion_matrix(all_labels, all_preds)
+        print(cm)
+        plot_cm(cm)
 
         return {
             "loss":      loss,
@@ -103,7 +105,7 @@ class Evaluator(TrainEvalBase):
             if candidate.exists():
                 test_path = candidate
                 
-        X_test, y_test = self.data_handler.load_test_set(CONFIG.evaluation.test_path)
+        X_test, y_test = self.data_handler.load_test_set(test_path)
         return DataLoader(
             TensorDataset(
                 torch.tensor(X_test.astype(np.float32)),
