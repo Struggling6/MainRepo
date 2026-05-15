@@ -5,18 +5,19 @@ import pandas as pd
 from pathlib import Path
 from sklearn.preprocessing import StandardScaler
 
-from .time_series_utils import temporal_grouped_split
 from .BaseDataHandler import BaseDatasetHandler
+from .time_series_utils import temporal_grouped_split
+from .ts_augment_utils import jitter, magnitude_warp, scaling
 
 
 class LeadCSVHandler(BaseDatasetHandler):
     """
     Dataset handler for the LEAD building energy dataset.
 
-    Supports three modes:
+    Partition modes:
     - shared: load one large CSV and partition internally by building_id
-    - local: load one already client-specific CSV file
-    - optuna: load one large CSV and use the entire dataset as one partition
+    - local:  load this client's precomputed window artifact from disk
+    - optuna: alias for shared mode with num_clients=1 (uses the full dataset)
 
     Also enforces a fixed one-hot schema for `primary_use` so all clients
     produce the same input dimensionality.
@@ -40,51 +41,50 @@ class LeadCSVHandler(BaseDatasetHandler):
     def __init__(self, config):
         super().__init__(config)
 
-        self.file_path = config.data.file_path
-        self.target = config.data.target
+        data_cfg = config.data
+        self.file_path = data_cfg.file_path
+        self.target = data_cfg.target
         self.batch_size = config.model.batch_size
-        self.test_split = config.data.test_split
+        self.test_split = data_cfg.test_split
+        self.seed = data_cfg.seed
+
+        self.partition_mode = config.federation.partition_mode
         self.num_clients = config.federation.num_clients
-        self.seed = config.data.seed
-        self.partition_mode = getattr(config.federation, "partition_mode")
-        self.use_undersampling = getattr(config.data, "use_undersampling", False)
-        self.undersampling_ratio = getattr(config.data, "undersampling_ratio", 1.0)
-        self.undersample_val = getattr(config.data, "undersample_val", False)
 
-        self.use_oversampling = getattr(config.data, "use_oversampling", False)
-        self.oversampling_method = getattr(config.data, "oversampling_method", "none")
-        self.oversampling_ratio = getattr(config.data, "oversampling_ratio", 1.0)
-        self.smote_k_neighbors = getattr(config.data, "smote_k_neighbors", 5)
-        self.oversample_val = getattr(config.data, "oversample_val", False)
+        if self.partition_mode == "optuna":
+            print("[LEAD] Optuna mode: forcing num_clients=1 for full-dataset trial")
+            self.num_clients = 1
+            self.partition_mode = "shared"
 
-        self.data_dir = getattr(config.data, "data_dir", None)
-        self.file_pattern = getattr(config.data, "file_pattern", None)
-        self.precomputed_dir = getattr(config.data, "precomputed_dir", None)
-        self.precomputed_pattern = getattr(config.data, "precomputed_pattern", None)
-        self.use_precomputed_windows = getattr(
-            config.data,
-            "use_precomputed_windows",
-            False,
-        )
+        self.oversampling_method = data_cfg.oversampling_method
+        self.oversampling_ratio = data_cfg.oversampling_ratio
+        self.oversample_val = data_cfg.oversample_val
+        self.smote_k_neighbors = data_cfg.smote_k_neighbors
+
+        self.tsaug_jitter_sigma = data_cfg.tsaug_jitter_sigma
+        self.tsaug_scaling_sigma = data_cfg.tsaug_scaling_sigma
+        self.tsaug_magwarp_sigma = data_cfg.tsaug_magwarp_sigma
+        self.tsaug_magwarp_knots = data_cfg.tsaug_magwarp_knots
+        self.tsaug_use_jitter = data_cfg.tsaug_use_jitter
+        self.tsaug_use_scaling = data_cfg.tsaug_use_scaling
+        self.tsaug_use_magwarp = data_cfg.tsaug_use_magwarp
+
+        self.precomputed_dir = data_cfg.precomputed_dir
+        self.precomputed_pattern = data_cfg.precomputed_pattern
 
         self._node_col = "building_id"
         self._time_col = "timestamp"
+        self._gap_hours = data_cfg.gap_hours
+        self._stride = data_cfg.stride
+        self._window_size = data_cfg.window_size
 
         self.df = None
-        self.features = None
-        self.labels = None
         self.feature_cols = self._build_feature_columns()
         self.aggregation_weight = 0
-        self.num_train_windows_before_undersampling = 0
-        self.num_train_anomalies_before_undersampling = 0
-        self.num_train_windows_after_undersampling = 0
-        self._gap_hours = config.data.gap_hours
-        self._stride = config.data.stride
-        self._window_size = config.data.window_size
         self.global_pos_weight = None
 
-        if self.partition_mode in ["shared", "optuna"]:
-            print(f"[LEAD] Loading {self.partition_mode} file: {self.file_path}")
+        if self.partition_mode == "shared":
+            print(f"[LEAD] Loading shared file: {self.file_path}")
             self.df = pd.read_csv(self.file_path)
             print(f"[LEAD] Raw shape: {self.df.shape}")
 
@@ -94,28 +94,17 @@ class LeadCSVHandler(BaseDatasetHandler):
                     f"but columns were: {list(self.df.columns)}"
                 )
 
-            self.features, self.labels = self._prepare_data(self.df)
+            _, labels = self._prepare_data(self.df)
 
-            n_pos = int(self.labels.sum())
-            n_neg = len(self.labels) - n_pos
+            n_pos = int(labels.sum())
+            n_neg = len(labels) - n_pos
+            pos_weight_cap = getattr(config.model, "pos_weight_cap", 10.0)
             if n_pos > 0:
-                self.global_pos_weight = min(
-                    n_neg / n_pos,
-                    getattr(self.config.model, "pos_weight_cap", 10.0),
-                )
+                self.global_pos_weight = min(n_neg / n_pos, pos_weight_cap)
             else:
-                self.global_pos_weight = getattr(
-                    self.config.model, "pos_weight_cap", 10.0
-                )
+                self.global_pos_weight = pos_weight_cap
 
-            if self.partition_mode == "shared":
-                self._prepare_partitions()
-            else:
-                self.client_indices = [np.array(self.df[self._node_col].unique())]
-                print(
-                    "[LEAD] Optuna mode enabled: using the full dataset "
-                    "as one partition."
-                )
+            self._prepare_partitions()
 
         elif self.partition_mode == "local":
             self.client_indices = list(range(self.num_clients))
@@ -126,53 +115,90 @@ class LeadCSVHandler(BaseDatasetHandler):
                 f"Expected 'shared', 'local', or 'optuna'."
             )
 
-    def _resolve_local_file_path(self, partition_id: int) -> Path:
-        if partition_id < 0:
-            raise ValueError(f"Invalid partition_id: {partition_id}")
+    # ── Public API ─────────────────────────────────────────────────────── #
 
-        if self.data_dir and self.file_pattern:
-            client_index = partition_id + 1
-            path = Path(self.data_dir) / self.file_pattern.format(
-                client_index=client_index
-            )
-        else:
-            path = Path(self.file_path)
-
-        if not path.exists():
-            raise FileNotFoundError(
-                f"Local client file not found for partition {partition_id}: {path}"
-            )
-
-        return path
-
-    def _resolve_precomputed_file_path(self, partition_id: int) -> Path:
-        if partition_id < 0:
-            raise ValueError(f"Invalid partition_id: {partition_id}")
-
-        if not self.precomputed_dir or not self.precomputed_pattern:
-            raise ValueError(
-                "Precomputed LEAD windows require data.precomputed_dir and "
-                "data.precomputed_pattern to be configured."
-            )
-
-        client_index = partition_id + 1
-        path = Path(self.precomputed_dir) / self.precomputed_pattern.format(
-            client_index=client_index
+    def get_dataloaders(self, partition_id: int):
+        print(
+            f"[LEAD] get_dataloaders partition_mode={self.partition_mode} "
+            f"partition_id={partition_id}"
         )
 
-        if not path.exists():
-            raise FileNotFoundError(
-                f"Precomputed windows not found for partition {partition_id}: {path}. "
-                "Run scripts/precompute_lead_windows.py before starting Flower."
-            )
+        if self.partition_mode == "local":
+            return self._load_precomputed_dataloaders(partition_id)
 
-        return path
+        if partition_id < 0 or partition_id >= len(self.client_indices):
+            raise ValueError(f"Invalid partition_id: {partition_id}")
+
+        client_df = self.df[
+            self.df[self._node_col].isin(self.client_indices[partition_id])
+        ]
+        print(f"[LEAD] Client df shape: {client_df.shape}")
+
+        X_train, y_train, X_val, y_val = temporal_grouped_split(
+            client_df,
+            feature_cols=self.feature_cols,
+            node_col=self._node_col,
+            time_col=self._time_col,
+            train_ratio=1.0 - self.test_split,
+            gap_hours=self._gap_hours,
+            window_size=self._window_size,
+            stride=self._stride,
+            target=self.target,
+        )
+
+        print(f"[LEAD] Split done: X_train={X_train.shape}, X_val={X_val.shape}")
+
+        self.aggregation_weight = len(y_train)
+
+        X_train, X_val = self._scale_temporal_arrays(X_train, X_val)
+
+        X_train, y_train = self._oversample_anomalies(
+            X_train,
+            y_train,
+            method=self.oversampling_method,
+            target_ratio=self.oversampling_ratio,
+            smote_k_neighbors=self.smote_k_neighbors,
+            seed=self.seed + 20_000 + partition_id,
+            split_name="train",
+        )
+
+        if self.oversample_val:
+            X_val, y_val = self._oversample_anomalies(
+                X_val,
+                y_val,
+                method=self.oversampling_method,
+                target_ratio=self.oversampling_ratio,
+                smote_k_neighbors=self.smote_k_neighbors,
+                seed=self.seed + 30_000 + partition_id,
+                split_name="val",
+            )
+        else:
+            print("[LEAD] Keeping validation set unchanged after oversampling step")
+
+        return self._build_dataloaders_from_arrays(X_train, y_train, X_val, y_val)
+
+    def get_metadata(self):
+        if self.df is None and self.partition_mode != "local":
+            raise RuntimeError("Metadata requested before dataset was prepared")
+
+        return {
+            "input_dim": len(self.feature_cols),
+            "num_classes": self.config.model.num_classes,
+            "num_samples": self.df.shape[0] if self.df is not None else 0,
+            "task_type": self.config.task.name,
+            "data_format": "tabular",
+        }
+
+    def get_num_partitions(self) -> int:
+        return len(self.client_indices)
+
+    # ── Data preparation helpers ───────────────────────────────────────── #
 
     def _build_feature_columns(self):
         # Static per-building identity features (site_id, square_feet, year_built,
         # floor_count, primary_use_*) are excluded — they let the model memorize
         # building identity and overfit when train/val share buildings.
-        base_features = [
+        return [
             "meter_reading",
             "air_temperature",
             "cloud_coverage",
@@ -216,10 +242,8 @@ class LeadCSVHandler(BaseDatasetHandler):
             "air_temp_std_lag73_was_missing",
         ]
 
-        return base_features
-
     def _preprocess(self, df: pd.DataFrame) -> pd.DataFrame:
-        print("[LEAD] Starting _prepare_data")
+        print("[LEAD] Starting _preprocess")
         df = df.copy()
 
         df[self._time_col] = pd.to_datetime(df[self._time_col])
@@ -261,7 +285,6 @@ class LeadCSVHandler(BaseDatasetHandler):
         expected_primary_use_cols = [
             f"primary_use_{cat}" for cat in self.PRIMARY_USE_CATEGORIES
         ]
-
         for col in expected_primary_use_cols:
             if col not in df.columns:
                 df[col] = 0.0
@@ -282,7 +305,6 @@ class LeadCSVHandler(BaseDatasetHandler):
         missing_features = [
             col for col in self.feature_cols if col not in df.columns
         ]
-
         if missing_features:
             raise ValueError(
                 f"Missing expected feature columns: {missing_features}"
@@ -308,17 +330,18 @@ class LeadCSVHandler(BaseDatasetHandler):
         X_train_2d = X_train.reshape(-1, X_train.shape[-1])
         X_val_2d = X_val.reshape(-1, X_val.shape[-1])
 
+        # StandardScaler returns float64; floor back to float32 to avoid carrying
+        # a 2x-size array through the rest of the pipeline.
         X_train_scaled = scaler.fit_transform(X_train_2d).reshape(
             original_train_shape
-        )
-        X_val_scaled = scaler.transform(X_val_2d).reshape(original_val_shape)
+        ).astype(np.float32)
+        X_val_scaled = scaler.transform(X_val_2d).reshape(
+            original_val_shape
+        ).astype(np.float32)
 
         print("[LEAD] Applied StandardScaler using training data only")
 
-        return (
-            X_train_scaled.astype(np.float32),
-            X_val_scaled.astype(np.float32),
-        )
+        return X_train_scaled, X_val_scaled
 
     def _build_dataloaders_from_arrays(
         self,
@@ -331,7 +354,6 @@ class LeadCSVHandler(BaseDatasetHandler):
             torch.tensor(X_train, dtype=torch.float32),
             torch.tensor(y_train, dtype=torch.long),
         )
-
         val_dataset = torch.utils.data.TensorDataset(
             torch.tensor(X_val, dtype=torch.float32),
             torch.tensor(y_val, dtype=torch.long),
@@ -344,7 +366,6 @@ class LeadCSVHandler(BaseDatasetHandler):
             num_workers=0,
             pin_memory=False,
         )
-
         valloader = torch.utils.data.DataLoader(
             val_dataset,
             batch_size=self.batch_size,
@@ -355,79 +376,26 @@ class LeadCSVHandler(BaseDatasetHandler):
 
         return trainloader, valloader
 
-    def _load_precomputed_dataloaders(self, partition_id: int):
-        path = self._resolve_precomputed_file_path(partition_id)
-        print(f"[LEAD] Loading precomputed windows: {path}")
+    # ── Path helpers ───────────────────────────────────────────────────── #
 
-        with np.load(path) as artifact:
-            required = ["X_train", "y_train", "X_val", "y_val"]
-            missing = [key for key in required if key not in artifact]
+    def _resolve_precomputed_file_path(self, partition_id: int) -> Path:
+        if partition_id < 0:
+            raise ValueError(f"Invalid partition_id: {partition_id}")
 
-            if missing:
-                raise ValueError(
-                    f"Precomputed artifact {path} is missing arrays: {missing}"
-                )
+        client_index = partition_id + 1
+        path = Path(self.precomputed_dir) / self.precomputed_pattern.format(
+            client_index=client_index
+        )
 
-            X_train = artifact["X_train"].astype(np.float32, copy=False)
-            y_train = artifact["y_train"].astype(np.int64, copy=False)
-            X_val = artifact["X_val"].astype(np.float32, copy=False)
-            y_val = artifact["y_val"].astype(np.int64, copy=False)
-
-            self.num_train_windows_before_undersampling = int(
-                artifact["num_train_windows_before_undersampling"][0]
-            ) if "num_train_windows_before_undersampling" in artifact else len(y_train)
-            self.num_train_anomalies_before_undersampling = int(
-                artifact["num_train_anomalies_before_undersampling"][0]
-            ) if "num_train_anomalies_before_undersampling" in artifact else int(y_train.sum())
-            self.num_train_windows_after_undersampling = int(
-                artifact["num_train_windows_after_undersampling"][0]
-            ) if "num_train_windows_after_undersampling" in artifact else len(y_train)
-            self.aggregation_weight = int(
-                artifact["aggregation_weight"][0]
-            ) if "aggregation_weight" in artifact else self.num_train_windows_before_undersampling
-            oversampling_method = (
-                str(artifact["oversampling_method"][0])
-                if "oversampling_method" in artifact
-                else "unknown"
+        if not path.exists():
+            raise FileNotFoundError(
+                f"Precomputed windows not found for partition {partition_id}: {path}. "
+                "Run scripts/precompute_lead_windows.py before starting Flower."
             )
-            num_train_windows_after_oversampling = int(
-                artifact["num_train_windows_after_oversampling"][0]
-            ) if "num_train_windows_after_oversampling" in artifact else len(y_train)
-            num_train_anomalies_after_oversampling = int(
-                artifact["num_train_anomalies_after_oversampling"][0]
-            ) if "num_train_anomalies_after_oversampling" in artifact else int(y_train.sum())
-            oversample_val = bool(
-                artifact["oversample_val"][0]
-            ) if "oversample_val" in artifact else False
-            num_val_windows_after_oversampling = int(
-                artifact["num_val_windows_after_oversampling"][0]
-            ) if "num_val_windows_after_oversampling" in artifact else len(y_val)
-            num_val_anomalies_after_oversampling = int(
-                artifact["num_val_anomalies_after_oversampling"][0]
-            ) if "num_val_anomalies_after_oversampling" in artifact else int(y_val.sum())
 
-        self.df = None
-        self.features = X_train
-        self.labels = y_train
+        return path
 
-        print(
-            f"[LEAD] Precomputed shapes: "
-            f"X_train={X_train.shape}, X_val={X_val.shape}, "
-            f"aggregation_weight={self.aggregation_weight}, "
-            f"oversampling={oversampling_method}, "
-            f"train_after_oversampling={num_train_windows_after_oversampling}, "
-            f"train_anomalies_after_oversampling={num_train_anomalies_after_oversampling}, "
-            f"oversample_val={oversample_val}, "
-            f"val_after_oversampling={num_val_windows_after_oversampling}, "
-            f"val_anomalies_after_oversampling={num_val_anomalies_after_oversampling}"
-        )
-
-        return self._build_dataloaders_from_arrays(
-            X_train,
-            y_train,
-            X_val,
-            y_val,
-        )
+    # ── Partitioning ───────────────────────────────────────────────────── #
 
     def _prepare_partitions(self):
         if self.df is None:
@@ -509,7 +477,6 @@ class LeadCSVHandler(BaseDatasetHandler):
             rows = client["num_rows"]
             anomalies = client["num_anomalies"]
             anomaly_rate = anomalies / rows if rows > 0 else 0.0
-
             print(
                 f"[LEAD] client={idx} "
                 f"buildings={client['num_buildings']} "
@@ -522,7 +489,6 @@ class LeadCSVHandler(BaseDatasetHandler):
             idx for idx, client in enumerate(clients)
             if client["num_anomalies"] == 0
         ]
-
         if zero_anomaly_clients:
             print(
                 "[LEAD] WARNING: Some clients received zero anomaly rows: "
@@ -530,191 +496,8 @@ class LeadCSVHandler(BaseDatasetHandler):
                 "This may hurt federated anomaly detection."
             )
 
-    def get_dataloaders(self, partition_id: int):
-        print(
-            f"[LEAD] get_dataloaders partition_mode={self.partition_mode} "
-            f"partition_id={partition_id}"
-        )
+    # ── Resampling ─────────────────────────────────────────────────────── #
 
-        if self.partition_mode == "local" and self.use_precomputed_windows:
-            return self._load_precomputed_dataloaders(partition_id)
-
-        if self.partition_mode == "local":
-            file_path = self._resolve_local_file_path(partition_id)
-            print(f"[LEAD] Loading local client file: {file_path}")
-
-            raw_df = pd.read_csv(file_path)
-            print(f"[LEAD] Raw local shape: {raw_df.shape}")
-
-            if self.target not in raw_df.columns:
-                raise ValueError(
-                    f"CSV file must contain target column '{self.target}', "
-                    f"but columns were: {list(raw_df.columns)}"
-                )
-
-            _, _ = self._prepare_data(raw_df)
-            client_df = self.df
-
-        elif self.partition_mode == "optuna":
-            if partition_id != 0:
-                print(
-                    f"[LEAD] Optuna mode ignores partition_id={partition_id}; "
-                    "using the full dataset."
-                )
-
-            client_df = self.df
-
-        else:
-            if partition_id < 0 or partition_id >= len(self.client_indices):
-                raise ValueError(f"Invalid partition_id: {partition_id}")
-
-            client_df = self.df[
-                self.df[self._node_col].isin(self.client_indices[partition_id])
-            ]
-
-        print(f"[LEAD] Client df shape: {client_df.shape}")
-
-        X_train, y_train, X_val, y_val = temporal_grouped_split(
-            client_df,
-            feature_cols=self.feature_cols,
-            node_col=self._node_col,
-            time_col=self._time_col,
-            train_ratio=1.0 - self.test_split,
-            gap_hours=self._gap_hours,
-            window_size=self._window_size,
-            stride=self._stride,
-            target=self.target,
-        )
-
-        print(f"[LEAD] Split done: X_train={X_train.shape}, X_val={X_val.shape}")
-
-        self.num_train_windows_before_undersampling = len(y_train)
-        self.num_train_anomalies_before_undersampling = int(y_train.sum())
-        self.aggregation_weight = self.num_train_windows_before_undersampling
-
-        X_train, X_val = self._scale_temporal_arrays(X_train, X_val)
-        if self.use_undersampling:
-            X_train, y_train = self._undersample_normals(
-                X_train,
-                y_train,
-                normal_to_anomaly_ratio=self.undersampling_ratio,
-                seed=self.seed + partition_id,
-            )
-
-            if self.undersample_val:
-                X_val, y_val = self._undersample_normals(
-                    X_val,
-                    y_val,
-                    normal_to_anomaly_ratio=self.undersampling_ratio,
-                    seed=self.seed + 10_000 + partition_id,
-                )
-            else:
-                print("[LEAD] Keeping validation set unchanged after undersampling step")
-
-        if self.use_oversampling:
-            X_train, y_train = self._oversample_anomalies(
-                X_train,
-                y_train,
-                method=self.oversampling_method,
-                target_ratio=self.oversampling_ratio,
-                smote_k_neighbors=self.smote_k_neighbors,
-                seed=self.seed + 20_000 + partition_id,
-                split_name="train",
-            )
-
-            if self.oversample_val:
-                X_val, y_val = self._oversample_anomalies(
-                    X_val,
-                    y_val,
-                    method=self.oversampling_method,
-                    target_ratio=self.oversampling_ratio,
-                    smote_k_neighbors=self.smote_k_neighbors,
-                    seed=self.seed + 30_000 + partition_id,
-                    split_name="val",
-                )
-            else:
-                print("[LEAD] Keeping validation set unchanged after oversampling step")
-
-        self.num_train_windows_after_undersampling = len(y_train)
-                
-        return self._build_dataloaders_from_arrays(X_train, y_train, X_val, y_val)
-
-    def get_metadata(self):
-        if self.df is None:
-            if self.partition_mode == "local":
-                return {
-                    "input_dim": len(self.feature_cols),
-                    "num_classes": self.config.model.num_classes,
-                    "num_samples": 0,
-                    "task_type": self.config.task.name,
-                    "data_format": "tabular",
-                }
-            else:
-                raise RuntimeError("Metadata requested before dataset was prepared")
-
-        return {
-            "input_dim": len(self.feature_cols),
-            "num_classes": self.config.model.num_classes,
-            "num_samples": self.df.shape[0],
-            "task_type": self.config.task.name,
-            "data_format": "tabular",
-        }
-
-    def get_num_partitions(self) -> int:
-
-        return len(self.client_indices)
-    
-    def _undersample_normals(
-            
-        self,
-        X: np.ndarray,
-        y: np.ndarray,
-        normal_to_anomaly_ratio: float,
-        seed: int,
-    ) -> tuple[np.ndarray, np.ndarray]:
-        rng = np.random.default_rng(seed)
-
-        y = y.astype(np.int64)
-
-        anomaly_idx = np.where(y == 1)[0]
-        normal_idx = np.where(y == 0)[0]
-
-        n_anomalies = len(anomaly_idx)
-
-        if n_anomalies == 0:
-            print("[LEAD] WARNING: No anomalies found; skipping undersampling")
-            return X, y
-
-        n_normals_to_keep = int(n_anomalies * normal_to_anomaly_ratio)
-
-        if len(normal_idx) <= n_normals_to_keep:
-            print(
-                "[LEAD] WARNING: Not enough normal samples for undersampling; "
-                "keeping original data"
-            )
-            return X, y
-
-        sampled_normal_idx = rng.choice(
-            normal_idx,
-            size=n_normals_to_keep,
-            replace=False,
-        )
-
-        selected_idx = np.concatenate([anomaly_idx, sampled_normal_idx])
-        rng.shuffle(selected_idx)
-
-        X_under = X[selected_idx]
-        y_under = y[selected_idx]
-
-        print(
-            f"[LEAD] Applied undersampling: "
-            f"ratio={normal_to_anomaly_ratio}:1, "
-            f"before={len(y)}, after={len(y_under)}, "
-            f"anomaly_rate={y_under.mean():.4f}"
-        )
-
-        return X_under, y_under
-    
     def _oversample_anomalies(
         self,
         X: np.ndarray,
@@ -726,8 +509,6 @@ class LeadCSVHandler(BaseDatasetHandler):
         seed: int,
         split_name: str,
     ) -> tuple[np.ndarray, np.ndarray]:
-        y = y.astype(np.int64, copy=False)
-
         if method in [None, "none"]:
             return X, y
 
@@ -751,6 +532,50 @@ class LeadCSVHandler(BaseDatasetHandler):
             )
             return X, y
 
+        rng = np.random.default_rng(seed)
+
+        if method in ("ts_augment", "time_series_augment"):
+            target_pos_count = int(target_ratio * negatives)
+            n_needed = target_pos_count - positives
+            if n_needed <= 0:
+                return X, y
+
+            anomaly_idx = np.where(y == 1)[0]
+            base_idx = rng.choice(anomaly_idx, size=n_needed, replace=True)
+            X_synth = X[base_idx].copy()
+
+            if self.tsaug_use_jitter:
+                X_synth = jitter(X_synth, self.tsaug_jitter_sigma, rng)
+            if self.tsaug_use_scaling:
+                X_synth = scaling(X_synth, self.tsaug_scaling_sigma, rng)
+            if self.tsaug_use_magwarp:
+                X_synth = magnitude_warp(
+                    X_synth,
+                    self.tsaug_magwarp_sigma,
+                    self.tsaug_magwarp_knots,
+                    rng,
+                )
+
+            X_out = np.concatenate([X, X_synth], axis=0)
+            y_out = np.concatenate(
+                [y, np.ones(n_needed, dtype=y.dtype)], axis=0
+            )
+
+            perm = rng.permutation(len(y_out))
+            X_out = X_out[perm]
+            y_out = y_out[perm]
+
+            print(
+                f"[LEAD] Applied {split_name} oversampling: "
+                f"method={method}, "
+                f"target_pos_neg={target_ratio}:1, "
+                f"before={len(y)}, pos_before={positives}, "
+                f"after={len(y_out)}, pos_after={int(y_out.sum())}, "
+                f"anomaly_rate={float(y_out.mean()):.4f}"
+            )
+
+            return X_out, y_out
+
         original_shape = X.shape
         X_flat = X.reshape(original_shape[0], -1)
 
@@ -773,110 +598,27 @@ class LeadCSVHandler(BaseDatasetHandler):
             from imblearn.over_sampling import SMOTE
 
             effective_k = min(smote_k_neighbors, positives - 1)
-
             sampler = SMOTE(
                 sampling_strategy=target_ratio,
                 random_state=seed,
                 k_neighbors=effective_k,
             )
 
-        elif method in ["borderline_smote", "borderlinesmote"]:
-            if positives < 2:
-                print(
-                    f"[LEAD] WARNING: BorderlineSMOTE skipped for {split_name}; "
-                    "requires at least two positive samples."
-                )
-                return X, y
-
-            from imblearn.over_sampling import BorderlineSMOTE
-
-            effective_k = min(smote_k_neighbors, positives - 1)
-
-            sampler = BorderlineSMOTE(
-                sampling_strategy=target_ratio,
-                random_state=seed,
-                k_neighbors=effective_k,
-                m_neighbors=min(10, max(1, len(y) - 1)),
-                kind="borderline-1",
-            )
-        elif method in ["time_series_augment", "ts_augment"]:
-            rng = np.random.default_rng(seed)
-
-            anomaly_idx = np.where(y == 1)[0]
-            normal_idx = np.where(y == 0)[0]
-
-            target_positives = int(target_ratio * len(normal_idx))
-            n_to_generate = max(0, target_positives - len(anomaly_idx))
-
-            if n_to_generate <= 0:
-                print(
-                    f"[LEAD] Time-series augmentation skipped for {split_name}; "
-                    "target ratio already reached."
-                )
-                return X, y
-
-            source_idx = rng.choice(
-                anomaly_idx,
-                size=n_to_generate,
-                replace=True,
-            )
-
-            X_new = X[source_idx].copy()
-
-            # 1. Jittering: small Gaussian noise
-            noise_std = 0.02
-            X_new = X_new + rng.normal(
-                loc=0.0,
-                scale=noise_std,
-                size=X_new.shape,
-            ).astype(np.float32)
-
-            # 2. Magnitude scaling: slightly scale each window
-            scale = rng.normal(
-                loc=1.0,
-                scale=0.05,
-                size=(n_to_generate, 1, 1),
-            ).astype(np.float32)
-            X_new = X_new * scale
-
-            # 3. Time shift: roll the sequence slightly forward/backward
-            max_shift = 3
-            for i in range(n_to_generate):
-                shift = rng.integers(-max_shift, max_shift + 1)
-                X_new[i] = np.roll(X_new[i], shift=shift, axis=0)
-
-            y_new = np.ones(n_to_generate, dtype=np.int64)
-
-            X_resampled = np.concatenate([X, X_new], axis=0)
-            y_resampled = np.concatenate([y, y_new], axis=0)
-
-            shuffle_idx = rng.permutation(len(y_resampled))
-            X_resampled = X_resampled[shuffle_idx].astype(np.float32, copy=False)
-            y_resampled = y_resampled[shuffle_idx].astype(np.int64, copy=False)
-
-            print(
-                f"[LEAD] Applied {split_name} time-series augmentation: "
-                f"target_pos_neg={target_ratio}:1, "
-                f"before={len(y)}, pos_before={positives}, "
-                f"generated={n_to_generate}, "
-                f"after={len(y_resampled)}, pos_after={int(y_resampled.sum())}, "
-                f"anomaly_rate={float(y_resampled.mean()):.4f}"
-            )
-
-            return X_resampled, y_resampled
         else:
             raise ValueError(
                 f"Unknown oversampling_method='{method}'. "
-                "Expected 'none', 'random_over', 'smote', 'borderline_smote', or 'time_series_augment'."
+                "Expected 'none', 'random_over', 'smote', or 'ts_augment'."
             )
 
         X_resampled, y_resampled = sampler.fit_resample(X_flat, y)
 
+        # imblearn (especially SMOTE) returns float64 from its interpolation;
+        # floor back to float32 to keep memory consistent with the rest of the
+        # pipeline.
         X_resampled = X_resampled.reshape((-1, *original_shape[1:])).astype(
             np.float32,
             copy=False,
         )
-        y_resampled = y_resampled.astype(np.int64, copy=False)
 
         print(
             f"[LEAD] Applied {split_name} oversampling: "
@@ -888,3 +630,42 @@ class LeadCSVHandler(BaseDatasetHandler):
         )
 
         return X_resampled, y_resampled
+
+    # ── Precomputed loader ─────────────────────────────────────────────── #
+
+    def _load_precomputed_dataloaders(self, partition_id: int):
+        path = self._resolve_precomputed_file_path(partition_id)
+        print(f"[LEAD] Loading precomputed windows: {path}")
+
+        with np.load(path) as artifact:
+            required = ["X_train", "y_train", "X_val", "y_val"]
+            missing = [key for key in required if key not in artifact]
+            if missing:
+                raise ValueError(
+                    f"Precomputed artifact {path} is missing arrays: {missing}"
+                )
+
+            X_train = artifact["X_train"]
+            y_train = artifact["y_train"]
+            X_val = artifact["X_val"]
+            y_val = artifact["y_val"]
+
+            self.aggregation_weight = (
+                int(artifact["aggregation_weight"][0])
+                if "aggregation_weight" in artifact
+                else len(y_train)
+            )
+            oversampling_method = (
+                str(artifact["oversampling_method"][0])
+                if "oversampling_method" in artifact
+                else "unknown"
+            )
+
+        print(
+            f"[LEAD] Precomputed shapes: X_train={X_train.shape}, X_val={X_val.shape}, "
+            f"train_anomalies={int(y_train.sum())}, val_anomalies={int(y_val.sum())}, "
+            f"aggregation_weight={self.aggregation_weight}, "
+            f"oversampling={oversampling_method}"
+        )
+
+        return self._build_dataloaders_from_arrays(X_train, y_train, X_val, y_val)

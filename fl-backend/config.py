@@ -289,14 +289,11 @@ class TimesNetConfig:
 # ── Data configs ──────────────────────────────────────────────────────── #
 
 @dataclass
-class LeadCSVConfig: 
+class LeadCSVConfig:
     name:         str   = "lead_csv"
-    file_path:    Path  = Path("datasets/LEAD/train_features_clean.csv") #used for shared mode, ignored for local mode, should be the large dataset csv (sentinel-cleaned by scripts/clean_lead_features.py)
-    data_dir:     Path  = Path("datasets/LEAD")
-    file_pattern: str   = "data{client_index}.csv"
+    file_path:    Path  = Path("datasets/LEAD/train_features_clean.csv") # used for shared mode; should be the sentinel-cleaned CSV from scripts/clean_lead_features.py
     precomputed_dir: Path = Path("datasets/LEAD/windowed")
     precomputed_pattern: str = "client{client_index}.npz"
-    use_precomputed_windows: bool = False
     target:       str   = "anomaly"
     task_name:    str   = "binary_classification"
     test_split:   float = 0.2
@@ -304,13 +301,16 @@ class LeadCSVConfig:
     window_size:  int   = 168
     gap_hours:    int   = 73
     stride:       int   = 168
-    use_undersampling: bool = False
-    use_oversampling: bool = True
-    undersampling_ratio: float = 1.0
-    oversampling_method: str = "borderline_smote" #["none", "random_over", "smote", "borderline_smote"]
-    oversampling_ratio: float = 0.1
-    smote_k_neighbors: int = 2
-    undersample_val: bool = False
+    oversampling_method: str = "none" # ["none", "random_over", "smote", "ts_augment"]
+    oversampling_ratio: float = 1.0
+    smote_k_neighbors: int = 5
+    tsaug_jitter_sigma: float = 0.03
+    tsaug_scaling_sigma: float = 0.1
+    tsaug_magwarp_sigma: float = 0.2
+    tsaug_magwarp_knots: int = 4
+    tsaug_use_jitter: bool = True
+    tsaug_use_scaling: bool = True
+    tsaug_use_magwarp: bool = True
     oversample_val: bool = False
 
     def build_handler(self, config):
@@ -345,13 +345,16 @@ class PowerConsumptionAnomalyConfig:
     window_size:  int   = 60
     gap_hours:    int   = 0
     stride:       int   = 10
-    use_undersampling: bool = True
-    use_oversampling: bool = False
-    undersampling_ratio: float = 1.0
-    oversampling_method: str = "none" # ["none", "random_over", "smote"]
+    oversampling_method: str = "none" # ["none", "random_over", "smote", "ts_augment"]
     oversampling_ratio: float = 1.0
     smote_k_neighbors: int = 5
-    undersample_val: bool = True
+    tsaug_jitter_sigma: float = 0.03
+    tsaug_scaling_sigma: float = 0.1
+    tsaug_magwarp_sigma: float = 0.2
+    tsaug_magwarp_knots: int = 4
+    tsaug_use_jitter: bool = True
+    tsaug_use_scaling: bool = True
+    tsaug_use_magwarp: bool = True
     oversample_val: bool = False
 
     def build_handler(self, config):
