@@ -5,7 +5,7 @@
 from pathlib import Path
 from config import *
 
-DATASET = "power"  # "power" or "lead"
+DATASET = "lead"  # "power" or "lead"
 
 
 def build_data_config(dataset: str):
@@ -66,26 +66,24 @@ CONFIG = ExperimentConfig(
 #,
 
     #),
-    model = CNNTransformerConfig(
-        batch_size   = 16,
-        d_model   = 128,
-        nhead  = 8,
-        num_layers  = 2,
-        dropout = 0.14,
-        pos_weight_cap = 1.66,
+    model = CNNConfig(
+        batch_size   = 32,
+        d_model   = 64,
+        dropout = 0.266091,
+        pos_weight_cap = 5.16147,
     ),
     data=build_data_config(DATASET),
     training=TrainingConfig(
         local_epochs=1,
-        learning_rate=  0.00080,
-        weight_decay=0.00018,
+        learning_rate=0.000318839,
+        weight_decay=0.00190553,
         patience=10,
     ),
     federation=FederationConfig(
         num_rounds=1,
-        num_clients=5,
+        num_clients=1,
         proximal_mu=0.0,
-        partition_mode="shared",
+        partition_mode="local",
     ),
 )
 
