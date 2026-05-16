@@ -61,7 +61,7 @@ class TransformerConfig:
     loss_fn:        str   = "BCEWithLogitsLoss"
 
 
-    def build(self, input_dim: int, context_length: int = 0):
+    def build(self, input_dim: int, context_length: int = 168):
         from models.CNNTransformer.Transformer import Transformer
 
         return Transformer(
@@ -71,7 +71,7 @@ class TransformerConfig:
             num_layers=self.num_layers,
             num_classes=self.num_classes,
             dropout=self.dropout,
-            seq_len=context_length if context_length is not None else 168,
+            seq_len=context_length,
         )
     
 @dataclass
