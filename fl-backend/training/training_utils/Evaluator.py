@@ -103,7 +103,7 @@ class Evaluator(TrainEvalBase):
             if candidate.exists():
                 test_path = candidate
                 
-        X_test, y_test = self.data_handler.load_test_set(CONFIG.evaluation.test_path)
+        X_test, y_test = self.data_handler.load_test_set(test_path)
         return DataLoader(
             TensorDataset(
                 torch.tensor(X_test.astype(np.float32)),

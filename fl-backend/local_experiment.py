@@ -1,18 +1,17 @@
-# ── Active experiment ─────────────────────────────────────────────────── #
-# Change CONFIG to switch experiments. All fields have defaults so you only
-# need to specify what differs from the defaults.
-
 from pathlib import Path
 from config import *
 
-DATASET = "lead"  # "power" or "lead"
+DATASET = "power"  # "power" or "lead"
 
 
 def build_data_config(dataset: str):
     if dataset == "power":
         return PowerConsumptionAnomalyConfig(
-            data_dir=Path("datasets/PowerConsumptionAnomaly"),
-            file_pattern="*.csv",
+            data_dir=Path("datasets/PowerConsumptionAnomaly/partitions"),
+            file_pattern="data{client_index}.csv",
+            precomputed_dir=Path("datasets/PowerConsumptionAnomaly/windowed"),
+            precomputed_pattern="client{client_index}.npz",
+            use_precomputed_windows=True,
             window_size=168,
             stride=168,
             gap_hours=0,
@@ -66,54 +65,30 @@ CONFIG = ExperimentConfig(
 #,
 
     #),
-    model = CNNConfig(
-        batch_size   = 32,
-        d_model   = 64,
-        dropout = 0.266091,
-        pos_weight_cap = 5.16147,
+    model = CNNTransformerConfig(
+        batch_size   = 16,
+        d_model   = 128,
+        nhead  = 8,
+        num_layers  = 2,
+        dropout = 0.14,
+        pos_weight_cap = 1.66,
     ),
     data=build_data_config(DATASET),
     training=TrainingConfig(
         local_epochs=1,
-        learning_rate=0.000318839,
-        weight_decay=0.00190553,
+        learning_rate=  0.00080,
+        weight_decay=0.00018,
         patience=10,
     ),
     federation=FederationConfig(
         num_rounds=1,
-        num_clients=1,
+        num_clients=2,
         proximal_mu=0.0,
         partition_mode="local",
     ),
+    evaluation=EvaluationConfig(
+        test_path =Path("datasets/PowerConsumptionAnomaly/Power-Consumption-Anomaly-Dataset-main/eval"),
+        target = "label",
+        batch_size = 64, 
+    ),
 )
-
-"""
-Examples:
-
-CONFIG = ExperimentConfig(
-    model=TimesNetConfig(num_layers=3,d_model=128,top_k=3,d_ffn=256,n_kernels=6,dropout=0.3,num_classes=1,loss_fn="BCEWithLogitsLoss",),
-    training=TrainingConfig(local_epochs=1, learning_rate=1e-4),
-    federation=FederationConfig(num_rounds=2,num_clients=1, proximal_mu=0.1,partition_mode="local",),
-)
-    
-FedProx with LSTM on PowerGrid dataset:
-CONFIG = ExperimentConfig(
-    model=ModelConfig(model=LSTMConfig(hidden_size=256, dropout=0.2)),
-    data=PowerGridCSVConfig(),
-    training=TrainingConfig(learning_rate=5e-4, local_epochs=1),
-    federation=FederationConfig(num_rounds=10, num_clients=3, proximal_mu=0.1),
-    evaluation=EvaluationConfig(threshold=0.3),
-)
-
-PatchTST on LEAD dataset:
-CONFIG = ExperimentConfig(
-    model=PatchTSTConfig(nhead=4, num_layers=3),
-    data=LeadCSVConfig(batch_size=32),
-    training=TrainingConfig(local_epochs=5, learning_rate=1e-5),
-)
-
-MLP baseline on LEAD dataset:
-CONFIG = ExperimentConfig(
-    model=MLPConfig(hidden_size=64, num_layers=3),
-)
-"""

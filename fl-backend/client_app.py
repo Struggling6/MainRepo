@@ -206,7 +206,11 @@ class FlowerClient(NumPyClient):
             self.model = self.model.to(self.device)
             results = self.validator.validate(self.model, self.testloader)
 
-        log(INFO, "[%s] VAL done  | round=%s | loss=%.4f | f1=%.4f | pr_auc=%.4f | roc_auc=%.4f | thresh=%.2f",
+        log(
+            INFO,
+            "[%s] VAL done  | round=%s | loss=%.4f | f1=%.4f | "
+            "pr_auc=%.4f | roc_auc=%.4f | thresh=%.2f | "
+            "accuracy=%.4f | precision=%.4f | recall=%.4f",
             self.facility_id,
             round_num,
             results["loss"],

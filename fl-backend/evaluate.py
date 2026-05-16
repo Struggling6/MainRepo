@@ -63,7 +63,7 @@ def main() -> None:
     threshold = args.threshold
     if threshold is None:
         ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-        threshold = float(ckpt.get("threshold", 0.5))
+        threshold = float(ckpt.get("threshold", 0.5)) #Ret threshhold til at bruge den udregnet threshhold under training
 
     print(f"Evaluating: {checkpoint_path}")
     print(f"Threshold:  {threshold:.4f}")
