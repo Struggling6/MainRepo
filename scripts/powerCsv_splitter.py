@@ -13,12 +13,11 @@ By default this script reads every CSV under:
     fl-backend/datasets/PowerConsumptionAnomaly/
     Power-Consumption-Anomaly-Dataset-main/data
 
-That is the training data folder. It does not use overall_eval_set.csv unless
-you explicitly pass it with --input-file.
+That is the training data folder. 
 
 If the input contains an appliance/device column, whole series are kept together
 in one client file. If not, the script tries to infer a device_id from timestamp
-resets in combined files such as overall_eval_set.csv. As a last fallback, it
+resets in combined files. As a last fallback, it
 creates contiguous temporal chunks.
 
 Example:
