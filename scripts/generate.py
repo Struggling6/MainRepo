@@ -200,6 +200,7 @@ services:
     stop_signal: SIGINT
     environment:
       - CHECKPOINT_DIR=/app/checkpoints
+      - PLOTS_DIR=/app/plotting/saved_plots
     volumes:
       - ./fl-backend/checkpoints:/app/checkpoints
       - ./fl-backend/plotting/saved_plots:/app/plotting/saved_plots

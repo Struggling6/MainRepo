@@ -1,10 +1,10 @@
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix
 import seaborn as sns
+from pathlib import Path
 
-def confusion_matrix_plot(y_true, y_pred):
+def confusion_matrix_plot(cm, save_dir: Path):
 
-    cm = confusion_matrix(y_true, y_pred)
     '''
     Cm ville returnere : 
     [[TN, FP],
@@ -18,34 +18,16 @@ def confusion_matrix_plot(y_true, y_pred):
     '''
 
     plt.figure()
-    sns.heatmap(cm, annot=True, fmt="d",  xticklabels=["True 0", "Pred 1"], yticklabels=["Pred 0", "True 1"])
-    plt.xlabel("Predicted")
-    plt.ylabel("True")
+    sns.heatmap(cm, annot=True, fmt="d",  xticklabels=["0", "1"], yticklabels=["1", "0"])
+    plt.xlabel("Predicted label")
+    plt.ylabel("True label")
     plt.title("Confusion Matrix")
 
-    plt.savefig("fl-backend/plotting/saved_plots/confusion_matrix.png")
+    save_dir.mkdir(parents=True, exist_ok=True)
+    output_path = save_dir / "confusion_matrix.png"
+    plt.savefig(output_path, dpi=300)
     plt.close()
-
-    precision = cm[1][1] / (cm[1][1] + cm[0][1]) #Når modellen siger 1, hvor ofte er det rigtigt 
-    #TP / (TP + FP)
-    print("precision : ", precision)
-    recall = cm[1][1] / (cm[1][1] + cm[1][0]) #Af alle de rigtige 1’ere, hvor mange fandt modellen    
-    #TP / (TP + FN)
-    print("recall : ", recall)
-
-    accuracy = (cm[1][1] + cm[0][0]) / (cm[0][0]+cm[0][1]+cm[1][0]+cm[1][1]) #hvor mange preds er rigtige i alt
-    #(TP + TN) / (TP + TN + FP + FN)
-    print(accuracy)
-
-
-    '''
-    - Kombination af precision OG recall, fordi hver for sig ser du kun de seperate eksempleer
-    - Men med kombinationen af begge, ser vi en mere præcis measurement af hvor mange predictions vi faktisk får korrekt.
-    - Så jo højere den er, jo bedere er modellen er til både at finde positives og undgå fejl
-    '''
-    f1_score = 2 * (precision*recall)/(precision + recall)
-
-    print("F1 score : ", f1_score)
+    print(f"Saved Confusion Matrix plot to: {output_path}")
 
 '''
 How to interpret : 

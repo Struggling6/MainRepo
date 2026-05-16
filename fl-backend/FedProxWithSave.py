@@ -106,17 +106,11 @@ class FedProxWithSave(FedProx):
 
                 print("[SAVE] model saved successfully", flush=True)
 
-                if CONFIG.data.name == "power_consumption_anomaly":
-                    print(
-                        "[EVAL] skipping final held-out evaluation for power_consumption_anomaly",
-                        flush=True,
-                    )
-                else:
-                    from training.training_utils.Evaluator import Evaluator
+                from training.training_utils.Evaluator import Evaluator
 
-                    print("[EVAL] running final evaluation on held-out test set...", flush=True)
-                    Evaluator.evaluate(model_path=path, threshold=threshold)
-                    print("[EVAL] final evaluation done", flush=True)
+                print("[EVAL] running final evaluation on held-out test set...", flush=True)
+                Evaluator.evaluate(model_path=path, threshold=threshold)
+                print("[EVAL] final evaluation done", flush=True)
 
             except Exception as e:
                 log(ERROR, "[SAVE] ERROR: %s", e)

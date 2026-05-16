@@ -6,7 +6,7 @@ import torch
 from sklearn.preprocessing import StandardScaler
 
 from .BaseDataHandler import BaseDatasetHandler
-from .time_series_utils import temporal_grouped_split
+from .time_series_utils import create_test_windows, temporal_grouped_split
 
 
 class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
@@ -485,6 +485,53 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
         print(f"[PCAD] Split done: X_train={X_train.shape}, X_val={X_val.shape}")
 
         return self._build_dataloaders_from_arrays(X_train, y_train, X_val, y_val)
+
+    def load_test_set(self, test_path: Path):
+        """
+        Load a held-out PCAD evaluation set from either one CSV file or a
+        directory tree containing appliance CSV files.
+        """
+        test_path = Path(test_path)
+
+        if test_path.is_file():
+            raw_df = self._read_csv_with_source(test_path)
+        elif test_path.is_dir():
+            paths = sorted(test_path.rglob(self.file_pattern))
+            if not paths:
+                raise FileNotFoundError(
+                    f"No files matching '{self.file_pattern}' found under {test_path}."
+                )
+
+            frames = [self._read_csv_with_source(path) for path in paths]
+            frames = [frame for frame in frames if not frame.empty]
+            if not frames:
+                raise ValueError(
+                    f"No readable power-consumption CSV files found under {test_path}."
+                )
+            raw_df = pd.concat(frames, ignore_index=True)
+        else:
+            raise FileNotFoundError(f"Evaluation path not found: {test_path}")
+
+        test_df = self._preprocess(raw_df)
+        X_test, y_test = create_test_windows(
+            test_df,
+            feature_cols=self.feature_cols,
+            window_size=self.window_size,
+            stride=self.stride,
+            node_col=self._node_col,
+            time_col=self._time_col,
+            target=self.target,
+        )
+
+        if self.normalize:
+            original_shape = X_test.shape
+            scaler = StandardScaler()
+            X_test = scaler.fit_transform(
+                X_test.reshape(-1, X_test.shape[-1])
+            ).reshape(original_shape)
+            print("[PCAD] Applied StandardScaler to evaluation windows")
+
+        return X_test.astype(np.float32, copy=False), y_test.astype(np.int64, copy=False)
 
     def get_metadata(self):
         return {
