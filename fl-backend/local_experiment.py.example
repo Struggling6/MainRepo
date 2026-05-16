@@ -1,109 +1,7 @@
-Soz
-soz03
-Usynlig
-
-Soz — i går kl. 21:27
-den må gerne stoppe snart
-Lil Nerd X — i går kl. 21:29
-:0f5ee145964e68d39aa5004fd3014489:
-Soz — i går kl. 21:29
-:0f5ee145964e68d39aa5004fd3014489:
-
-Lil Nerd X — i går kl. 21:30
-:0f5ee145964e68d39aa5004fd3014489:
-Soz — i går kl. 21:30
-
-Lil Nerd X — i går kl. 21:31
-:NEEEJ:
-Model saved to /app/checkpoints/supervised_cnn_transformer_power_consumption_anomaly.pt
-[SAVE] model saved successfully
-[EVAL] skipping final held-out evaluation for power_consumption_anomaly
-INFO :      configure_evaluate: strategy sampled 1 clients (out of 1)
-INFO :      aggregate_evaluate: received 1 results and 0 failures
-[SERVER] Aggregated validation metrics: {'f1': 0.1592920353982301, 'pr_auc': 0.12982271754481328, 'threshold': 0.028165776282548904, 'roc_auc': 0.8360389610389609, 'accuracy': 0.9459613196814562, 'precision': 0.1267605633802817, 'recall': 0.21428571428571425}
-[PLOTS] Final round reached. Saving plots...
-Saved PR-AUC plot to: /tmp/saved_plots/pr_auc_plot.png
-Saved F1 plot to: /tmp/saved_plots/f1_plot.png
-Saved ROC-AUC plot to: /tmp/saved_plots/roc_auc_plot.png
-[PLOTS] Plots saved successfully.
-INFO :
-INFO :      [SUMMARY]
-INFO :      Run finished 1 round(s) in 114.75s
-INFO :          History (loss, distributed):
-INFO :                  round 1: 0.1862687283917092
-INFO :          History (metrics, distributed, fit):
-INFO :          {'best_thresh': [(1, 0.028165776282548904)],
-INFO :           'pr_auc': [(1, 0.12982271754481328)],
-INFO :           'roc_auc': [(1, 0.8360389610389609)],
-INFO :           'train_loss': [(1, 0.13463433925971885)],
-INFO :           'val_f1': [(1, 0.1592920353982301)],
-INFO :           'val_loss': [(1, 0.127869611569978)]}
-INFO :          History (metrics, distributed, evaluate):
-INFO :          {'accuracy': [(1, 0.9459613196814562)],
-INFO :           'f1': [(1, 0.1592920353982301)],
-INFO :           'pr_auc': [(1, 0.12982271754481328)],
-INFO :           'precision': [(1, 0.1267605633802817)],
-INFO :           'recall': [(1, 0.21428571428571425)],
-INFO :           'roc_auc': [(1, 0.8360389610389609)],
-INFO :           'threshold': [(1, 0.028165776282548904)]}
-Den printer evaluatation ud i summary iogså selv om vi skipper den med power
-SÅ jeg ved ikke hvad der sker men det virker?
-WOAH [MUSH],  — 19:09
-Billede
-RedPanda — 19:41
-=== Final Evaluation Results ===
-  Threshold : 0.50
-  F1        : 0.5738
-  PR-AUC    : 0.5522
-  ROC-AUC   : 0.8735
-  Accuracy  : 0.9845
-  Precision : 0.9205
-  Recall    : 0.3649
-
---- Classification Report ---
-              precision    recall  f1-score   support
-
-      Normal       0.99      1.00      0.99      9344
-     Anomaly       0.92      0.36      0.52       222
-
-    accuracy                           0.98      9566
-   macro avg       0.95      0.68      0.76      9566
-weighted avg       0.98      0.98      0.98      9566
-
---- Confusion Matrix ---
-[[9337    7]
- [ 141   81]]
-
-
-
-
-
-Summary results
- 
-Accuracy: (10, 0.8094965675057209)],
-f1: (10, 0.15198023658811496)],
-pr_auc:  (10, 0.08146205084845683)]
-precision:  (10, 0.2635440874914559)],
-recall: (10, 0.3608502481500193)],
-roc_auc:   (10, 0.5992426045444331)],
-RedPanda — 19:58
-[link1 ]
-
-bla bla bla [1]
-Soz — 20:12
-kan i give mig jeres local_experiment.py.example 😮
-fordi på dev så er det optunaconfig example der er inde i den
-WOAH [MUSH],  — 20:13
-lol ja
-RedPanda — 20:13
-# ── Active experiment ─────────────────────────────────────────────────── #
-# Change CONFIG to switch experiments. All fields have defaults so you only
-# need to specify what differs from the defaults.
-
 from pathlib import Path
 from config import *
 
-DATASET = "lead"  # "power" or "lead"
+DATASET = "power"  # "power" or "lead"
 
 
 def build_data_config(dataset: str):
@@ -115,9 +13,9 @@ def build_data_config(dataset: str):
             stride=168,
             gap_hours=0,
             use_undersampling = False,
-            use_oversampling = False,
-            undersampling_ratio = 5.0,
-            oversampling_method = "none", # ["none", "random_over", "smote"]
+            use_oversampling = True,
+            undersampling_ratio = 1.0,
+            oversampling_method = "time_series_augment", # ["none", "random_over", "smote"]
             oversampling_ratio = 1.0,
             smote_k_neighbors = 5,
             undersample_val = False,
@@ -131,7 +29,7 @@ def build_data_config(dataset: str):
             stride=168,
             gap_hours=73,
             use_undersampling = False,
-            use_oversampling = False,
+            use_oversampling = True,
             undersampling_ratio = 5.0,
             oversampling_method = "time_series_augment", # ["none", "random_over", "smote", "borderline_smote","time_series_augment"]
             oversampling_ratio = 1.0, #best so far 0.5
@@ -165,172 +63,29 @@ CONFIG = ExperimentConfig(
 
     #),
     model = CNNTransformerConfig(
-        batch_size   = 32,
-        d_model   = 32,
-        nhead  = 4,
-        num_layers  = 1,
-        dropout = 0.22,
-        pos_weight_cap = 4.7849629098421635,
+        batch_size   = 16,
+        d_model   = 128,
+        nhead  = 8,
+        num_layers  = 2,
+        dropout = 0.14,
+        pos_weight_cap = 1.66,
     ),
     data=build_data_config(DATASET),
     training=TrainingConfig(
-        local_epochs=3,
-        learning_rate=  0.0005556798170474068,
-        weight_decay=5.468087411644153e-05,
+        local_epochs=1,
+        learning_rate=  0.00080,
+        weight_decay=0.00018,
         patience=10,
     ),
     federation=FederationConfig(
-        num_rounds=10,
-        num_clients=5,
-        proximal_mu=0.05,
-        partition_mode="local",
+        num_rounds=1,
+        num_clients=1,
+        proximal_mu=0.0,
+        partition_mode="shared",
+    ),
+    evaluation=EvaluationConfig(
+        test_path =Path("datasets/PowerConsumptionAnomaly/Power-Consumption-Anomaly-Dataset-main/eval"),
+        target = "anomaly",
+        batch_size = 64, 
     ),
 )
-
-"""
-Examples:
-
-CONFIG = ExperimentConfig(
-    model=TimesNetConfig(num_layers=3,d_model=128,top_k=3,d_ffn=256,n_kernels=6,dropout=0.3,num_classes=1,loss_fn="BCEWithLogitsLoss",),
-    training=TrainingConfig(local_epochs=1, learning_rate=1e-4),
-    federation=FederationConfig(num_rounds=2,num_clients=1, proximal_mu=0.1,partition_mode="local",),
-)
-    
-... (21 linjer linjer tilbage)
-
-message.txt
-4 KB
-Soz — 20:13
-tysm
-WOAH [MUSH],  — 20:13
-# ── Active experiment ─────────────────────────────────────────────────── #
-# Change CONFIG to switch experiments. All fields have defaults so you only
-# need to specify what differs from the defaults. The chosen dataset is
-# determined by which *Config you pass as `data=`.
-
-from pathlib import Path
-
-message.txt
-3 KB
-﻿
-# ── Active experiment ─────────────────────────────────────────────────── #
-# Change CONFIG to switch experiments. All fields have defaults so you only
-# need to specify what differs from the defaults.
-
-from pathlib import Path
-from config import *
-
-DATASET = "lead"  # "power" or "lead"
-
-
-def build_data_config(dataset: str):
-    if dataset == "power":
-        return PowerConsumptionAnomalyConfig(
-            data_dir=Path("datasets/PowerConsumptionAnomaly"),
-            file_pattern="*.csv",
-            window_size=168,
-            stride=168,
-            gap_hours=0,
-            use_undersampling = False,
-            use_oversampling = False,
-            undersampling_ratio = 5.0,
-            oversampling_method = "none", # ["none", "random_over", "smote"]
-            oversampling_ratio = 1.0,
-            smote_k_neighbors = 5,
-            undersample_val = False,
-            oversample_val = False,
-        )
-
-    if dataset == "lead":
-        return LeadCSVConfig(
-            file_path=Path("datasets/LEAD/train_features_clean.csv"),
-            window_size=168,
-            stride=168,
-            gap_hours=73,
-            use_undersampling = False,
-            use_oversampling = False,
-            undersampling_ratio = 5.0,
-            oversampling_method = "time_series_augment", # ["none", "random_over", "smote", "borderline_smote","time_series_augment"]
-            oversampling_ratio = 1.0, #best so far 0.5
-            smote_k_neighbors = 2,
-            undersample_val = False,
-            oversample_val =False,
-            use_precomputed_windows = True,
-        )
-
-    raise ValueError(f"Unknown dataset: {dataset}. Use 'power' or 'lead'.")
-
-
-CONFIG = ExperimentConfig(
-    
-    #model=PatchTSTConfig(
-      #  batch_size   = 64,
-      #  context_length   = 168, # Has to mach the window_size used in data config
-     #   patch_length   = 28,
-     #   patch_stride   = 8,
-     #   d_model   = 64,
-     #   nhead   = 4,
-     #   num_layers   = 3,
-      #  ffn_dim   = 128,
-     #   channel_attention  = True,
-       # attention_dropout = 0.08533492544875493,
-        #positional_dropout =0.2304421861914936,
-        #head_dropout = 0.19012638100200221,
-        #pre_norm  = True,
-        #pos_weight_cap = 2.572223644629402
-#,
-
-    #),
-    model = CNNTransformerConfig(
-        batch_size   = 32,
-        d_model   = 32,
-        nhead  = 4,
-        num_layers  = 1,
-        dropout = 0.22,
-        pos_weight_cap = 4.7849629098421635,
-    ),
-    data=build_data_config(DATASET),
-    training=TrainingConfig(
-        local_epochs=3,
-        learning_rate=  0.0005556798170474068,
-        weight_decay=5.468087411644153e-05,
-        patience=10,
-    ),
-    federation=FederationConfig(
-        num_rounds=10,
-        num_clients=5,
-        proximal_mu=0.05,
-        partition_mode="local",
-    ),
-)
-
-"""
-Examples:
-
-CONFIG = ExperimentConfig(
-    model=TimesNetConfig(num_layers=3,d_model=128,top_k=3,d_ffn=256,n_kernels=6,dropout=0.3,num_classes=1,loss_fn="BCEWithLogitsLoss",),
-    training=TrainingConfig(local_epochs=1, learning_rate=1e-4),
-    federation=FederationConfig(num_rounds=2,num_clients=1, proximal_mu=0.1,partition_mode="local",),
-)
-    
-FedProx with LSTM on PowerGrid dataset:
-CONFIG = ExperimentConfig(
-    model=ModelConfig(model=LSTMConfig(hidden_size=256, dropout=0.2)),
-    data=PowerGridCSVConfig(),
-    training=TrainingConfig(learning_rate=5e-4, local_epochs=1),
-    federation=FederationConfig(num_rounds=10, num_clients=3, proximal_mu=0.1),
-    evaluation=EvaluationConfig(threshold=0.3),
-)
-
-PatchTST on LEAD dataset:
-CONFIG = ExperimentConfig(
-    model=PatchTSTConfig(nhead=4, num_layers=3),
-    data=LeadCSVConfig(batch_size=32),
-    training=TrainingConfig(local_epochs=5, learning_rate=1e-5),
-)
-
-MLP baseline on LEAD dataset:
-CONFIG = ExperimentConfig(
-    model=MLPConfig(hidden_size=64, num_layers=3),
-)
-"""
