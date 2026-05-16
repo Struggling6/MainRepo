@@ -36,7 +36,8 @@ RUN uv pip install --python /python/venv/bin/python --index-strategy unsafe-best
 
 WORKDIR /app
 COPY --chown=app:app . .
-RUN uv pip install --python /python/venv/bin/python --no-deps .
+RUN uv pip install --python /python/venv/bin/python --no-deps . \
+    && mkdir -p /app/checkpoints && chown app:app /app/checkpoints
 USER app
 
 ENTRYPOINT ["flower-superexec"]
