@@ -339,6 +339,9 @@ class PowerConsumptionAnomalyConfig:
     file_path:    Path  = Path("")
     data_dir:     Path  = Path("datasets/PowerConsumptionAnomaly")
     file_pattern: str   = "*.csv"
+    precomputed_dir: Path = Path("datasets/PowerConsumptionAnomaly/windowed")
+    precomputed_pattern: str = "client{client_index}.npz"
+    use_precomputed_windows: bool = False
     target:       str   = "label"
     test_split:   float = 0.2
     normalize:    bool  = True
