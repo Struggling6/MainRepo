@@ -18,9 +18,9 @@ def confusion_matrix_plot(cm, save_dir: Path):
     '''
 
     plt.figure()
-    sns.heatmap(cm, annot=True, fmt="d",  xticklabels=["True 0", "Pred 1"], yticklabels=["Pred 0", "True 1"])
-    plt.xlabel("Predicted")
-    plt.ylabel("True")
+    sns.heatmap(cm, annot=True, fmt="d",  xticklabels=["0", "1"], yticklabels=["1", "0"])
+    plt.xlabel("Predicted label")
+    plt.ylabel("True label")
     plt.title("Confusion Matrix")
 
     save_dir.mkdir(parents=True, exist_ok=True)
