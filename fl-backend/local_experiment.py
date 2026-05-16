@@ -23,6 +23,7 @@ def build_data_config(dataset: str):
             smote_k_neighbors = 5,
             undersample_val = False,
             oversample_val = False,
+            use_precomputed_windows = True,
         )
 
     if dataset == "lead":
