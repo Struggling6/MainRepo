@@ -11,7 +11,6 @@ def build_data_config(dataset: str):
             file_pattern="data{client_index}.csv",
             precomputed_dir=Path("datasets/PowerConsumptionAnomaly/windowed"),
             precomputed_pattern="client{client_index}.npz",
-            use_precomputed_windows=True,
             window_size=168,
             stride=168,
             gap_hours=0,
@@ -85,7 +84,7 @@ CONFIG = ExperimentConfig(
         num_rounds=1,
         num_clients=2,
         proximal_mu=0.0,
-        partition_mode="local",
+        partition_mode="shared",
     ),
     evaluation=EvaluationConfig(
         test_path =Path("datasets/PowerConsumptionAnomaly/Power-Consumption-Anomaly-Dataset-main/eval"),

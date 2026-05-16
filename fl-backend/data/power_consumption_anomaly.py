@@ -141,13 +141,39 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
                 f"file_path={self.file_path} or data_dir={self.data_dir}."
             )
 
-        paths = sorted(self.data_dir.rglob(self.file_pattern))
+        #Check the index for when shared mode is on, since the shared mode pattern does not recognise the client_index value
+        if "{client_index}" in self.file_pattern:
+            paths = []
+            missing_paths = []
+            for client_index in range(1, self.num_clients + 1):
+                path = self.data_dir / self.file_pattern.format(
+                    client_index=client_index
+                )
+                if path.exists():
+                    paths.append(path)
+                else:
+                    missing_paths.append(path)
+
+            if missing_paths:
+                raise FileNotFoundError(
+                    "Shared power data is configured with an indexed file_pattern, "
+                    f"but these expected client files are missing: {missing_paths}"
+                )
+        else:
+            paths = sorted(self.data_dir.rglob(self.file_pattern))
+
         if not paths:
             raise FileNotFoundError(
                 f"No files matching '{self.file_pattern}' found under {self.data_dir}."
             )
 
         frames = [self._read_csv_with_source(path) for path in paths]
+        frames = [frame for frame in frames if not frame.empty]
+        if not frames:
+            raise ValueError(
+                f"No readable power-consumption CSV files found under {self.data_dir}."
+            )
+
         return pd.concat(frames, ignore_index=True)
 
     def _resolve_local_file_path(self, partition_id: int) -> Path:
