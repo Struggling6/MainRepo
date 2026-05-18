@@ -444,6 +444,11 @@ class OptunaSearchConfig:
     batch_size:     list       = field(default_factory=lambda: [16, 32, 64, 128, 256, 512, 1024])
     pos_weight_cap: FloatRange = field(default_factory=lambda: FloatRange(1.0, 10.0, log=True))
 
+    tsaug_magwarp_knots:  IntRange   = field(default_factory=lambda: IntRange(2, 6))
+    tsaug_scaling_sigma:  FloatRange = field(default_factory=lambda: FloatRange(0.05, 0.3))
+    tsaug_jitter_sigma:   FloatRange = field(default_factory=lambda: FloatRange(0.01, 0.1))
+    tsaug_magwarp_sigma:  FloatRange = field(default_factory=lambda: FloatRange(0.1, 0.5))
+
 
 @dataclass
 class LSTMOptunaConfig(OptunaSearchConfig):

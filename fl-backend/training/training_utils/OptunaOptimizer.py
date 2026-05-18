@@ -164,10 +164,23 @@ class OptunaOptimizer(TrainEvalBase):
             batch_size = _suggest(trial, "batch_size", s.batch_size)
             pos_weight_cap = _suggest(trial, "pos_weight_cap", s.pos_weight_cap)
 
+            tsaug_magwarp_knots = _suggest(trial, "tsaug_magwarp_knots", s.tsaug_magwarp_knots)
+            tsaug_scaling_sigma = _suggest(trial, "tsaug_scaling_sigma", s.tsaug_scaling_sigma)
+            tsaug_jitter_sigma = _suggest(trial, "tsaug_jitter_sigma", s.tsaug_jitter_sigma)
+            tsaug_magwarp_sigma = _suggest(trial, "tsaug_magwarp_sigma", s.tsaug_magwarp_sigma)
+            self.config.data.tsaug_magwarp_knots = tsaug_magwarp_knots
+            self.config.data.tsaug_scaling_sigma = tsaug_scaling_sigma
+            self.config.data.tsaug_jitter_sigma = tsaug_jitter_sigma
+            self.config.data.tsaug_magwarp_sigma = tsaug_magwarp_sigma
+
             self._logger(
                 f"Trial {trial.number + 1}: sampled lr={lr:.3e}, "
                 f"wd={weight_decay:.3e}, layers={num_layers}, "
-                f"batch_size={batch_size}, pos_weight_cap={pos_weight_cap}"
+                f"batch_size={batch_size}, pos_weight_cap={pos_weight_cap}, "
+                f"tsaug_magwarp_knots={tsaug_magwarp_knots}, "
+                f"tsaug_scaling_sigma={tsaug_scaling_sigma:.4f}, "
+                f"tsaug_jitter_sigma={tsaug_jitter_sigma:.4f}, "
+                f"tsaug_magwarp_sigma={tsaug_magwarp_sigma:.4f}"
             )
 
             model = self._build_model(trial, num_layers, batch_size)

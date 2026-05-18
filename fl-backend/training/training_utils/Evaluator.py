@@ -9,6 +9,10 @@ from sklearn.metrics import (
     accuracy_score,
     precision_score,
     recall_score,
+    f1_score,
+    precision_recall_curve,
+    average_precision_score,
+    roc_auc_score,
 )
 from training.training_utils.TrainEvalBase import TrainEvalBase
 from training.training_utils.utils import compute_pos_weight
@@ -27,6 +31,7 @@ class Evaluator(TrainEvalBase):
         self.model_config = CONFIG.model
         self._data_handler = None
         self._metadata = None
+        self._checkpoint_threshold = None
 
     @property
     def data_handler(self):
@@ -52,27 +57,47 @@ class Evaluator(TrainEvalBase):
         testloader = testloader if testloader is not None else self._build_testloader()
 
         model = self._load_model(model_path)
-        loss_fn = self._build_loss(testloader)
-        loss, f1, best_thresh, pr_auc, roc_auc = self._val_epoch(model, testloader, loss_fn)
-
-        threshold = threshold if threshold is not None else best_thresh
 
         all_probs, all_labels = self._collect_probs(model, testloader)
+
+        # Threshold precedence: explicit arg > checkpoint > PR-curve best > 0.5
+        if threshold is None:
+            threshold = self._checkpoint_threshold
+
+        if threshold is None:
+            precision, recall, thresholds = precision_recall_curve(all_labels, all_probs)
+            precision = precision[:-1]
+            recall = recall[:-1]
+            if thresholds.size > 0:
+                denom = precision + recall
+                f1_scores = np.zeros_like(denom, dtype=float)
+                np.divide(2 * precision * recall, denom, out=f1_scores, where=denom > 0)
+                threshold = float(thresholds[np.argmax(f1_scores)])
+            else:
+                threshold = 0.5
+
         all_preds = (all_probs >= threshold).astype(float)
 
+        f1_val = f1_score(all_labels, all_preds, zero_division=0)
         accuracy = accuracy_score(all_labels, all_preds)
-        precision = precision_score(all_labels, all_preds, zero_division=0)
-        recall = recall_score(all_labels, all_preds, zero_division=0)
+        precision_val = precision_score(all_labels, all_preds, zero_division=0)
+        recall_val = recall_score(all_labels, all_preds, zero_division=0)
+        pr_auc = average_precision_score(all_labels, all_probs)
+        try:
+            roc_auc = roc_auc_score(all_labels, all_probs)
+        except ValueError:
+            roc_auc = 0.0
 
+        loss = self._compute_loss(model, testloader)
 
         print("\n=== Final Evaluation Results ===")
         print(f"  Threshold : {threshold:.2f}")
-        print(f"  F1        : {f1:.4f}")
+        print(f"  F1        : {f1_val:.4f}")
         print(f"  PR-AUC    : {pr_auc:.4f}")
         print(f"  ROC-AUC   : {roc_auc:.4f}")
         print(f"  Accuracy  : {accuracy:.4f}")
-        print(f"  Precision : {precision:.4f}")
-        print(f"  Recall    : {recall:.4f}")
+        print(f"  Precision : {precision_val:.4f}")
+        print(f"  Recall    : {recall_val:.4f}")
         print("\n--- Classification Report ---")
         print(classification_report(
             all_labels, all_preds,
@@ -84,13 +109,13 @@ class Evaluator(TrainEvalBase):
 
         return {
             "loss":      loss,
-            "f1":        f1,
+            "f1":        f1_val,
             "pr_auc":    pr_auc,
             "roc_auc":   roc_auc,
             "threshold": threshold,
             "accuracy":  accuracy,
-            "precision": precision,
-            "recall":    recall,
+            "precision": precision_val,
+            "recall":    recall_val,
         }
 
     def _build_testloader(self) -> DataLoader:
@@ -121,8 +146,12 @@ class Evaluator(TrainEvalBase):
         model.to(self.device)
         model.eval()
 
-        loaded_threshold = checkpoint.get("threshold", 0.5)
-        print(f"Model loaded from {path}  (threshold={loaded_threshold:.2f})")
+        self._checkpoint_threshold = checkpoint.get("threshold")
+        loaded_info = self._checkpoint_threshold
+        if loaded_info is not None:
+            print(f"Model loaded from {path}  (threshold={loaded_info:.2f})")
+        else:
+            print(f"Model loaded from {path}  (no threshold in checkpoint)")
         return model
 
     def _build_loss(self, testloader: DataLoader):
@@ -141,10 +170,26 @@ class Evaluator(TrainEvalBase):
             for features, labels in testloader:
                 features = features.to(self.device)
                 logits = model(features)
-                all_probs.append(torch.sigmoid(logits).cpu())
-                all_labels.append(labels)
+                all_probs.append(torch.sigmoid(logits).cpu().view(-1))
+                all_labels.append(labels.cpu().view(-1))
 
         return (
             torch.cat(all_probs).numpy(),
             torch.cat(all_labels).numpy(),
         )
+
+    def _compute_loss(self, model: nn.Module, testloader: DataLoader) -> float:
+        loss_fn = self._build_loss(testloader)
+        model.eval()
+        total_loss, total_samples = 0.0, 0
+
+        with torch.no_grad():
+            for features, labels in testloader:
+                features = features.to(self.device)
+                labels = labels.to(self.device)
+                logits = model(features)
+                loss_labels = labels.float().view_as(logits)
+                total_loss += loss_fn(logits, loss_labels).item() * features.size(0)
+                total_samples += features.size(0)
+
+        return total_loss / total_samples if total_samples > 0 else 0.0
