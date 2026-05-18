@@ -377,6 +377,21 @@ class OptunaOptimizer(TrainEvalBase):
                 "head_dropout",
                 s.head_dropout,
             )
+            model_config.norm_type = _suggest(
+                trial,
+                "norm_type",
+                s.norm_type,
+            )
+            model_config.pre_norm = _suggest(
+                trial,
+                "pre_norm",
+                s.pre_norm,
+            )
+            model_config.pooling_type = _suggest(
+                trial,
+                "pooling_type",
+                s.pooling_type,
+            )
 
         elif isinstance(model_config, TimesNetConfig):
             model_config.d_model = _suggest(trial, "d_model", s.d_model)

@@ -133,13 +133,20 @@ class FlowerClient(NumPyClient):
     def _gpu_lock_path(self) -> Path:
         return Path(getattr(self.config.federation, "gpu_lock_path", "datasets/.gpu.lock"))
 
-    def _ensure_dataloaders(self):
+    def _ensure_dataloaders(self, round_seed_salt: int = 0):
         if self.trainloader is not None and self.testloader is not None:
             return
 
-        log(INFO, "[%s] loading dataloaders for partition=%s", self.facility_id, self.partition_id)
+        log(
+            INFO,
+            "[%s] loading dataloaders for partition=%s round_seed_salt=%s",
+            self.facility_id,
+            self.partition_id,
+            round_seed_salt,
+        )
         self.trainloader, self.testloader = self.dataset_handler.get_dataloaders(
-            partition_id=self.partition_id
+            partition_id=self.partition_id,
+            round_seed_salt=round_seed_salt,
         )
         self.metadata = self.dataset_handler.get_metadata()
         self.validator.metadata = self.metadata
@@ -154,7 +161,12 @@ class FlowerClient(NumPyClient):
         round_num = config.get("round", "?")
         log(INFO, "[%s] FIT start | round=%s", self.facility_id, round_num)
         set_model_parameters(self.model, parameters)
-        self._ensure_dataloaders()
+        # Drop cached loaders so oversampling/augmentation re-runs each round
+        # with a round-dependent seed (see _oversample_anomalies).
+        self.trainloader = None
+        self.testloader = None
+        round_seed_salt = int(round_num) if isinstance(round_num, int) else 0
+        self._ensure_dataloaders(round_seed_salt=round_seed_salt)
 
         # Flower FedProx sends this value to tell the client how strong the penalty is.
         proximal_mu = config.get("proximal_mu", self.config.federation.proximal_mu)
@@ -206,7 +218,7 @@ class FlowerClient(NumPyClient):
             self.model = self.model.to(self.device)
             results = self.validator.validate(self.model, self.testloader)
 
-        log(INFO, "[%s] VAL done  | round=%s | loss=%.4f | f1=%.4f | pr_auc=%.4f | roc_auc=%.4f | thresh=%.2f",
+        log(INFO, "[%s] VAL done  | round=%s | loss=%.4f | f1=%.4f | pr_auc=%.4f | roc_auc=%.4f | thresh=%.2f | acc=%.4f | prec=%.4f | rec=%.4f",
             self.facility_id,
             round_num,
             results["loss"],

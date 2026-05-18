@@ -207,7 +207,7 @@ class PatchTSTConfig():
     batch_size:          int   = 64
     context_length:      int   = 168 # Has to mach the window_size used in data config
     patch_length:        int   = 16
-    patch_stride:        int   = 8
+    patch_stride:        int   = None
     d_model:             int   = 128
     nhead:               int   = 4
     num_layers:          int   = 3
@@ -218,9 +218,9 @@ class PatchTSTConfig():
     head_dropout:        float = 0.1
     pre_norm:            bool  = True
     norm_type:           Literal["batchnorm", "layernorm"] = "batchnorm"
+    pooling_type:        Literal["mean", "max"] = "mean"
     is_encoder_decoder:  bool  = False
     share_embedding:     bool  = True
-    pooling_type:        str   = "mean",
     pos_weight_cap:      float = 10.0
     loss_fn:             str   = "BCEWithLogitsLoss"
     num_classes:         int   = 1
@@ -234,7 +234,7 @@ class PatchTSTConfig():
             num_input_channels=input_dim,
             context_length=context_length or self.context_length,
             patch_length=self.patch_length,
-            patch_stride=self.patch_stride,
+            patch_stride=self.patch_length // 2 if self.patch_stride is None else self.patch_stride,
             d_model=self.d_model,
             num_attention_heads=self.nhead,
             num_hidden_layers=self.num_layers,
@@ -295,7 +295,7 @@ class LeadCSVConfig:
     precomputed_pattern: str    = "client{client_index}.npz"
     target:              str    = "anomaly"
     task_name:           str    = "binary_classification"
-    test_split:          float  = 0.2
+    test_split:          float  = 0.3
     seed:                int    = 42
     window_size:         int    = 168
     gap_hours:           int    = 73
@@ -500,6 +500,9 @@ class PatchTSTOptunaConfig(OptunaSearchConfig):
     attention_dropout:       FloatRange = field(default_factory=lambda: FloatRange(0.1, 0.4))
     positional_dropout:      FloatRange = field(default_factory=lambda: FloatRange(0.1, 0.4))
     head_dropout:            FloatRange = field(default_factory=lambda: FloatRange(0.1, 0.4))
+    pre_norm:                list       = field(default_factory=lambda: [True, False])
+    norm_type:               list       = field(default_factory=lambda: ["batchnorm", "layernorm"])
+    pooling_type:            list       = field(default_factory=lambda: ["mean", "max"])
 
 @dataclass
 class TimesNetOptunaConfig(OptunaSearchConfig):

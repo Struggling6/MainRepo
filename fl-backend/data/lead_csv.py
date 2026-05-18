@@ -7,7 +7,14 @@ from sklearn.preprocessing import StandardScaler
 
 from .BaseDataHandler import BaseDatasetHandler
 from .time_series_utils import temporal_grouped_split
-from .ts_augment_utils import jitter, magnitude_warp, scaling
+from .ts_augment_utils import (
+    jitter,
+    magnitude_warp,
+    mixup,
+    scaling,
+    time_warp,
+    window_slicing,
+)
 
 
 class LeadCSVHandler(BaseDatasetHandler):
@@ -72,6 +79,9 @@ class LeadCSVHandler(BaseDatasetHandler):
         self.precomputed_dir = data_cfg.precomputed_dir
         self.precomputed_pattern = data_cfg.precomputed_pattern
 
+        self.use_precomputed_windows = getattr(data_cfg, 'use_precomputed_windows', True)
+        self.data_dir = getattr(data_cfg, 'data_dir', None)
+
         self._node_col = "building_id"
         self._time_col = "timestamp"
         self._gap_hours = data_cfg.gap_hours
@@ -117,14 +127,16 @@ class LeadCSVHandler(BaseDatasetHandler):
 
     # ── Public API ─────────────────────────────────────────────────────── #
 
-    def get_dataloaders(self, partition_id: int):
+    def get_dataloaders(self, partition_id: int, round_seed_salt: int = 0):
         print(
             f"[LEAD] get_dataloaders partition_mode={self.partition_mode} "
-            f"partition_id={partition_id}"
+            f"partition_id={partition_id} round_seed_salt={round_seed_salt}"
         )
 
         if self.partition_mode == "local":
-            return self._load_precomputed_dataloaders(partition_id)
+            if self.use_precomputed_windows:
+                return self._load_precomputed_dataloaders(partition_id)
+            return self._generate_local_dataloaders(partition_id)
 
         if partition_id < 0 or partition_id >= len(self.client_indices):
             raise ValueError(f"Invalid partition_id: {partition_id}")
@@ -158,9 +170,29 @@ class LeadCSVHandler(BaseDatasetHandler):
             method=self.oversampling_method,
             target_ratio=self.oversampling_ratio,
             smote_k_neighbors=self.smote_k_neighbors,
-            seed=self.seed + 20_000 + partition_id,
+            seed=self.seed + 20_000 + partition_id + round_seed_salt * 1_000_000,
             split_name="train",
         )
+        # ← ADD THIS
+        n_pos = int(y_train.sum())
+        n_neg = len(y_train) - n_pos
+        print(
+            f"[LEAD] Post-oversample train: total={len(y_train)}, "
+            f"pos={n_pos}, neg={n_neg}, "
+            f"ratio={n_pos/n_neg:.4f}, "
+            f"global_pos_weight={self.global_pos_weight:.2f}"
+        )
+
+        # Recompute pos_weight to reflect the actual training distribution
+        # (after oversampling, data may be balanced — the pre-computed
+        #  global_pos_weight from the raw full dataset does not apply).
+
+        if n_pos > 0:
+            self.global_pos_weight = min(
+                n_neg / n_pos, self.config.model.pos_weight_cap
+            )
+        else:
+            self.global_pos_weight = self.config.model.pos_weight_cap
 
         if self.oversample_val:
             X_val, y_val = self._oversample_anomalies(
@@ -169,7 +201,7 @@ class LeadCSVHandler(BaseDatasetHandler):
                 method=self.oversampling_method,
                 target_ratio=self.oversampling_ratio,
                 smote_k_neighbors=self.smote_k_neighbors,
-                seed=self.seed + 30_000 + partition_id,
+                seed=self.seed + 30_000 + partition_id + round_seed_salt * 1_000_000,
                 split_name="val",
             )
         else:
@@ -339,7 +371,7 @@ class LeadCSVHandler(BaseDatasetHandler):
             original_val_shape
         ).astype(np.float32)
 
-        print("[LEAD] Applied StandardScaler using training data only")
+        print("[LEAD] Applied StandardScaler")
 
         return X_train_scaled, X_val_scaled
 
@@ -555,6 +587,9 @@ class LeadCSVHandler(BaseDatasetHandler):
                     self.tsaug_magwarp_knots,
                     rng,
                 )
+            X_synth = time_warp(X_synth, rng=rng)
+            X_synth = window_slicing(X_synth, rng=rng)
+            X_synth = mixup(X_synth, rng=rng)
 
             X_out = np.concatenate([X, X_synth], axis=0)
             y_out = np.concatenate(
@@ -630,6 +665,106 @@ class LeadCSVHandler(BaseDatasetHandler):
         )
 
         return X_resampled, y_resampled
+
+    # ── Local (non-precomputed) generation ─────────────────────────────── #
+
+    def _generate_local_dataloaders(self, partition_id: int):
+        client_index = partition_id + 1
+        data_path = Path(self.data_dir) / f"data{client_index}.csv"
+        print(f"[LEAD] Loading local client file: {data_path}")
+
+        df = pd.read_csv(data_path)
+
+        if self.target not in df.columns:
+            raise ValueError(
+                f"CSV {data_path} missing target column '{self.target}'. "
+                f"Columns: {list(df.columns)}"
+            )
+
+        df = self._preprocess(df)
+
+        missing_features = [
+            col for col in self.feature_cols if col not in df.columns
+        ]
+        if missing_features:
+            raise ValueError(
+                f"Missing expected feature columns in {data_path}: {missing_features}"
+            )
+
+        X = df[self.feature_cols].values.astype(np.float32)
+        y = df[self.target].values.astype(np.int64)
+
+        n_pos = int(y.sum())
+        n_neg = len(y) - n_pos
+        pos_weight_cap = getattr(self.config.model, "pos_weight_cap", 10.0)
+        if n_pos > 0:
+            self.global_pos_weight = min(n_neg / n_pos, pos_weight_cap)
+        else:
+            self.global_pos_weight = pos_weight_cap
+
+        X_train, y_train, X_val, y_val = temporal_grouped_split(
+            df,
+            feature_cols=self.feature_cols,
+            node_col=self._node_col,
+            time_col=self._time_col,
+            train_ratio=1.0 - self.test_split,
+            gap_hours=self._gap_hours,
+            window_size=self._window_size,
+            stride=self._stride,
+            target=self.target,
+        )
+
+        print(f"[LEAD] Split done: X_train={X_train.shape}, X_val={X_val.shape}")
+
+        self.aggregation_weight = len(y_train)
+
+        self.num_train_windows_before_undersampling = len(y_train)
+        self.num_train_anomalies_before_undersampling = int(y_train.sum())
+
+        X_train, X_val = self._scale_temporal_arrays(X_train, X_val)
+
+        X_train, y_train = self._oversample_anomalies(
+            X_train,
+            y_train,
+            method=self.oversampling_method,
+            target_ratio=self.oversampling_ratio,
+            smote_k_neighbors=self.smote_k_neighbors,
+            seed=self.seed + 20_000 + partition_id,
+            split_name="train",
+        )
+
+        self.num_train_windows_after_undersampling = len(y_train)
+
+        n_pos = int(y_train.sum())
+        n_neg = len(y_train) - n_pos
+        print(
+            f"[LEAD] Post-oversample train: total={len(y_train)}, "
+            f"pos={n_pos}, neg={n_neg}, "
+            f"ratio={n_pos/n_neg:.4f}, "
+            f"global_pos_weight={self.global_pos_weight:.2f}"
+        )
+
+        if n_pos > 0:
+            self.global_pos_weight = min(
+                n_neg / n_pos, self.config.model.pos_weight_cap
+            )
+        else:
+            self.global_pos_weight = self.config.model.pos_weight_cap
+
+        if self.oversample_val:
+            X_val, y_val = self._oversample_anomalies(
+                X_val,
+                y_val,
+                method=self.oversampling_method,
+                target_ratio=self.oversampling_ratio,
+                smote_k_neighbors=self.smote_k_neighbors,
+                seed=self.seed + 30_000 + partition_id,
+                split_name="val",
+            )
+        else:
+            print("[LEAD] Keeping validation set unchanged after oversampling step")
+
+        return self._build_dataloaders_from_arrays(X_train, y_train, X_val, y_val)
 
     # ── Precomputed loader ─────────────────────────────────────────────── #
 

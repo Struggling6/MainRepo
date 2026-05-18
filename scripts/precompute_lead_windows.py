@@ -237,10 +237,6 @@ def main() -> None:
     print(f"Output artifact directory: {output_dir}")
     print(
         "Balancing config: "
-        f"use_undersampling={config.data.use_undersampling}, "
-        f"undersampling_ratio={config.data.undersampling_ratio}, "
-        f"undersample_val={config.data.undersample_val}, "
-        f"use_oversampling={config.data.use_oversampling}, "
         f"oversampling_method={config.data.oversampling_method}, "
         f"oversampling_ratio={config.data.oversampling_ratio}, "
         f"smote_k_neighbors={config.data.smote_k_neighbors}, "
@@ -317,14 +313,7 @@ def main() -> None:
                 dtype=np.int64,
             ),
 
-            use_undersampling=np.array([config.data.use_undersampling], dtype=np.bool_),
-            undersampling_ratio=np.array(
-                [config.data.undersampling_ratio],
-                dtype=np.float32,
-            ),
-            undersample_val=np.array([config.data.undersample_val], dtype=np.bool_),
 
-            use_oversampling=np.array([config.data.use_oversampling], dtype=np.bool_),
             oversampling_method=np.array([config.data.oversampling_method]),
             oversampling_ratio=np.array(
                 [config.data.oversampling_ratio],

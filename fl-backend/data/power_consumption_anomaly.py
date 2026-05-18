@@ -7,7 +7,14 @@ from sklearn.preprocessing import StandardScaler
 
 from .BaseDataHandler import BaseDatasetHandler
 from .time_series_utils import temporal_grouped_split
-from .ts_augment_utils import jitter, magnitude_warp, scaling
+from .ts_augment_utils import (
+    jitter,
+    magnitude_warp,
+    mixup,
+    scaling,
+    time_warp,
+    window_slicing,
+)
 
 
 class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
@@ -116,10 +123,10 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
 
     # ── Public API ─────────────────────────────────────────────────────── #
 
-    def get_dataloaders(self, partition_id: int):
+    def get_dataloaders(self, partition_id: int, round_seed_salt: int = 0):
         print(
             f"[PCAD] get_dataloaders partition_mode={self.partition_mode} "
-            f"partition_id={partition_id}"
+            f"partition_id={partition_id} round_seed_salt={round_seed_salt}"
         )
 
         if self.partition_mode == "local":
@@ -153,7 +160,7 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
             method=self.oversampling_method,
             target_ratio=self.oversampling_ratio,
             smote_k_neighbors=self.smote_k_neighbors,
-            seed=self.seed + 20_000 + partition_id,
+            seed=self.seed + 20_000 + partition_id + round_seed_salt * 1_000_000,
             split_name="train",
         )
 
@@ -164,7 +171,7 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
                 method=self.oversampling_method,
                 target_ratio=self.oversampling_ratio,
                 smote_k_neighbors=self.smote_k_neighbors,
-                seed=self.seed + 30_000 + partition_id,
+                seed=self.seed + 30_000 + partition_id + round_seed_salt * 1_000_000,
                 split_name="val",
             )
         else:
@@ -558,6 +565,9 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
                     self.tsaug_magwarp_knots,
                     rng,
                 )
+            X_synth = time_warp(X_synth, rng=rng)
+            X_synth = window_slicing(X_synth, rng=rng)
+            X_synth = mixup(X_synth, rng=rng)
 
             X_out = np.concatenate([X, X_synth], axis=0)
             y_out = np.concatenate(

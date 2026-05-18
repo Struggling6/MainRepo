@@ -67,10 +67,12 @@ class BaseDatasetHandler(ABC):
         pass
 
     @abstractmethod
-    def get_dataloaders(self, partition_id: int):
+    def get_dataloaders(self, partition_id: int, round_seed_salt: int = 0):
         """
         Return train and validation DataLoaders for the given client
-        partition. Flower calls this during client initialisation.
+        partition. Flower calls this each FL round; ``round_seed_salt``
+        is mixed into stochastic steps (oversampling/augmentation) so
+        each round produces fresh synthetic data.
         """
         pass
 

@@ -124,7 +124,7 @@ class PowerGridCSVHandler(BaseDatasetHandler):
             "data_format": "tabular",
         }
 
-    def get_dataloaders(self, partition_id: int):
+    def get_dataloaders(self, partition_id: int, round_seed_salt: int = 0):
         #In local mode each SuperNode has its own dataset file, so the
         #requested partition_id is ignored and the full local dataset is used.
         if self.partition_mode == "local":
