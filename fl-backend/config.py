@@ -52,6 +52,7 @@ class CNNTransformerConfig:
 class TransformerConfig:
     name:           str   = "transformer"
     batch_size:   int     = 64
+    context_length: int   = 168
     d_model:        int   = 128
     nhead:          int   = 4
     num_layers:     int   = 2
@@ -61,7 +62,7 @@ class TransformerConfig:
     loss_fn:        str   = "BCEWithLogitsLoss"
 
 
-    def build(self, input_dim: int, context_length: int = 0):
+    def build(self, input_dim: int, context_length: int = None):
         from models.CNNTransformer.Transformer import Transformer
 
         return Transformer(
@@ -71,7 +72,7 @@ class TransformerConfig:
             num_layers=self.num_layers,
             num_classes=self.num_classes,
             dropout=self.dropout,
-            seq_len=context_length if context_length is not None else 168,
+            seq_len=context_length or self.context_length,
         )
     
 @dataclass
@@ -221,7 +222,7 @@ class PatchTSTConfig():
     norm_type:           Literal["batchnorm", "layernorm"] = "batchnorm"
     is_encoder_decoder:  bool  = False
     share_embedding:     bool  = True
-    pooling_type:        str   = "mean",
+    pooling_type:        str   = "mean"
     pos_weight_cap:      float = 10.0
     loss_fn:             str   = "BCEWithLogitsLoss"
     num_classes:         int   = 1

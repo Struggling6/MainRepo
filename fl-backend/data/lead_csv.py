@@ -209,7 +209,6 @@ class LeadCSVHandler(BaseDatasetHandler):
             # Each flag is 1.0 when the corresponding raw feature was a sentinel
             # in the source CSV and was replaced by an imputed value.
             "cloud_coverage_was_missing",
-            "wind_dir_missing",
             "wind_speed_was_missing",
             "precip_depth_was_missing",
             "air_temp_std_lag7_was_missing",
