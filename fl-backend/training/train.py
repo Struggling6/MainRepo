@@ -92,10 +92,10 @@ def train_model(
     result = {
         "train_loss":   trainer.history[-1]["train_loss"],
         "val_loss":     trainer.history[-1]["val_loss"],
-        "val_f1":       trainer.history[-1]["val_f1"],
+        "f1":           trainer.history[-1]["val_f1"],
         "pr_auc":       trainer.history[-1]["pr_auc"],
         "roc_auc":      trainer.history[-1]["roc_auc"],
-        "best_thresh":  trainer.history[-1]["best_thresh"],
+        "threshold":    trainer.history[-1]["best_thresh"],
         "num_examples": len(trainloader.dataset),
     }
 

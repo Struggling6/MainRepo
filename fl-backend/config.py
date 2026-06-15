@@ -390,7 +390,7 @@ class EvaluationConfig:
     test_path:    Path         = Path("datasets/LEAD/train_features_clean.csv")
     target:       str          = "anomaly"
     batch_size:   int          = 64
-    threshold:    float        = 0.5   # decision threshold — override with best_thresh from training
+    threshold:    float        = 0.5   # decision threshold — overridden by the trained `threshold` metric
     input_dim:    int          = 0     # set after data loading
 
 

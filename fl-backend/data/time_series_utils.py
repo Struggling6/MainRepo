@@ -100,10 +100,9 @@ def temporal_grouped_split(
     -------
     X_train, y_train, X_val, y_val : np.ndarray
     """
+    # _prepare_groups already copies, parses datetimes, and sorts by
+    # (node_col, time_col), so rows are ordered correctly within each node.
     df = _prepare_groups(df, node_col, time_col)
-    #Ensures rows are ordered correctly within each node over time
-    #ER IKKE SIKKER PÅ OM DET HER BARE GØR DET SAMME???? TJEK LIGE
-    df = df.sort_values([node_col, time_col])
 
     # Compute the global cutoff from all rows sorted by time
     all_times = df[time_col].sort_values()
@@ -175,8 +174,8 @@ def estimate_split_mem_usage(df, feature_cols):
     arrays in RAM before running the full pipeline.
     """
     total_rows     = len(df)
-    approx_windows = total_rows / 168   # stride=24
     window_size    = 168
+    approx_windows = total_rows / window_size   # assumes stride == window_size
     n_features     = len(feature_cols)
 
     memory_gb = (approx_windows * window_size * n_features * 4) / 1e9  # float32 = 4 bytes

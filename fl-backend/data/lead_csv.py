@@ -218,7 +218,7 @@ class LeadCSVHandler(BaseDatasetHandler):
         return base_features
 
     def _preprocess(self, df: pd.DataFrame) -> pd.DataFrame:
-        print("[LEAD] Starting _prepare_data")
+        print("[LEAD] Starting _preprocess")
         df = df.copy()
 
         df[self._time_col] = pd.to_datetime(df[self._time_col])
