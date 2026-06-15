@@ -34,7 +34,7 @@ clientapp = "client_app:app"
 serverapp = "server_app:app"
 
 [tool.hatch.build.targets.wheel]
-packages = ["data", "models", "tasks", "training","plotting"]
+packages = ["data", "models", "training", "plotting"]
 include = [
   "client_app.py",
   "server_app.py",

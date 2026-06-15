@@ -5,7 +5,6 @@ from models.utils import get_device
 from optuna_config import OPTUNA_CONFIG
 from local_experiment import CONFIG
 from .training_utils.OptunaOptimizer import OptunaOptimizer
-from data.registry import create_dataset_handler
 
 # Compute default storage path
 _db_path = Path(__file__).resolve().parents[1] / "optuna_study.db"
@@ -39,7 +38,7 @@ print("  federation =", CONFIG.federation)
 print("  dataset    =", CONFIG.data.name)
 print("  device     =", get_device())
 
-datahandler = create_dataset_handler(CONFIG) #Optuna will choose the dataset that is in local_experiment.py
+datahandler = CONFIG.data.build_handler(CONFIG) #Optuna will choose the dataset that is in local_experiment.py
 
 # Use partition 0 just to get a dataset (Optuna is centralized anyway)
 train_loader, val_loader = datahandler.get_dataloaders(partition_id=0)
