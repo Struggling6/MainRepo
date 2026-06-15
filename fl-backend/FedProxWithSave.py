@@ -87,10 +87,7 @@ class FedProxWithSave(FedProx):
                                 sum(values) / num_examples_total
                             )
 
-                threshold = aggregated_metrics.pop(
-                    "threshold",
-                    CONFIG.evaluation.threshold,
-                )
+                threshold = aggregated_metrics.pop("best_thresh", CONFIG.evaluation.threshold)
 
                 base_dir = Path(os.getenv("CHECKPOINT_DIR", Path(__file__).resolve().parent / "checkpoints"))
                 path = base_dir / f"{CONFIG.model.name}_{CONFIG.data.name}.pt"
