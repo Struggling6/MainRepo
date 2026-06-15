@@ -82,14 +82,18 @@ def temporal_grouped_split(
     stride: int,
     node_col: str,
     time_col="timestamp",
-    train_ratio=0.8,
+    train_ratio=0.6,
+    val_ratio=0.2,
+    test_ratio=0.2,
     gap_hours=0,
     target="anomaly",
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
-    Split a time series DataFrame into train and validation windows
-    per node, using a single global temporal cutoff computed from all
-    rows across all nodes combined.
+    Split a time series DataFrame into train, validation, and test windows
+    per node, using global temporal cutoffs computed from all rows across all nodes.
+
+    Ratios: train_ratio (default 0.6), val_ratio (default 0.2), test_ratio (default 0.2)
+    These must sum to 1.0.
 
     The gap between train end and val start prevents lag features from
     leaking across the boundary. For example, if your longest lag is
@@ -98,49 +102,103 @@ def temporal_grouped_split(
 
     Returns
     -------
-    X_train, y_train, X_val, y_val : np.ndarray
+    X_train, y_train, X_val, y_val, X_test, y_test : np.ndarray
     """
+    # Validate ratios
+    if not (abs(train_ratio + val_ratio + test_ratio - 1.0) < 1e-6):
+        raise ValueError(
+            f"Ratios must sum to 1.0, got train={train_ratio}, val={val_ratio}, test={test_ratio}"
+        )
+
     df = _prepare_groups(df, node_col, time_col)
-    #Ensures rows are ordered correctly within each node over time
-    #ER IKKE SIKKER PÅ OM DET HER BARE GØR DET SAMME???? TJEK LIGE
     df = df.sort_values([node_col, time_col])
 
-    # Compute the global cutoff from all rows sorted by time
+    # Compute global cutoffs from all rows sorted by time
     all_times = df[time_col].sort_values()
-    cutoff    = pd.Timestamp(all_times.iloc[int(len(all_times) * train_ratio)])
+    train_cutoff = pd.Timestamp(all_times.iloc[int(len(all_times) * train_ratio)])
+    val_cutoff = pd.Timestamp(
+        all_times.iloc[int(len(all_times) * (train_ratio + val_ratio))]
+    )
 
     X_train_list, y_train_list = [], []
-    X_val_list,   y_val_list   = [], []
-    nid_train, nid_test        = [], []
+    X_val_list, y_val_list = [], []
+    X_test_list, y_test_list = [], []
 
-    #Process each node seperately so different time series are not mixed together
+    # Process each node separately so different time series are not mixed together
     for node, group in df.groupby(node_col):
-        group    = group.sort_values(time_col)
+        group = group.sort_values(time_col)
 
-        # Train: everything up to and including the cutoff
-        train_df = group[group[time_col] <= cutoff] #Older data for training
+        # Train: everything up to and including train_cutoff
+        train_df = group[group[time_col] <= train_cutoff]
 
-        # Val: everything after cutoff + gap to avoid lag leakage
-        val_df   = group[group[time_col] > cutoff + pd.Timedelta(hours=gap_hours)] #Newer data for testing, after optinal gap
+        # Val: everything after train_cutoff + gap, up to val_cutoff
+        val_df = group[
+            (group[time_col] > train_cutoff + pd.Timedelta(hours=gap_hours))
+            & (group[time_col] <= val_cutoff)
+        ]
 
+        # Test: everything after val_cutoff + gap
+        test_df = group[group[time_col] > val_cutoff + pd.Timedelta(hours=gap_hours)]
+
+        # Window train data
         if len(train_df) > window_size:
-            Xtr, ytr = create_windowed_data(train_df, feature_cols, window_size, stride, target)
+            Xtr, ytr = create_windowed_data(
+                train_df, feature_cols, window_size, stride, target
+            )
             X_train_list.append(Xtr)
             y_train_list.append(ytr)
-            nid_train.extend([node] * len(Xtr)) #Store which node each window came from
 
+        # Window validation data
         if len(val_df) > window_size:
-            Xva, yva = create_windowed_data(val_df, feature_cols, window_size, stride, target)
+            Xva, yva = create_windowed_data(
+                val_df, feature_cols, window_size, stride, target
+            )
             X_val_list.append(Xva)
             y_val_list.append(yva)
 
-    return (
-        np.concatenate(X_train_list, axis=0),
-        np.concatenate(y_train_list, axis=0),
-        np.concatenate(X_val_list,   axis=0),
-        np.concatenate(y_val_list,   axis=0),
+        # Window test data
+        if len(test_df) > window_size:
+            Xte, yte = create_windowed_data(
+                test_df, feature_cols, window_size, stride, target
+            )
+            X_test_list.append(Xte)
+            y_test_list.append(yte)
+
+    # Concatenate all windows from all nodes
+    X_train = (
+        np.concatenate(X_train_list, axis=0)
+        if X_train_list
+        else np.array([], dtype=np.float32).reshape(0, window_size, len(feature_cols))
+    )
+    y_train = (
+        np.concatenate(y_train_list, axis=0)
+        if y_train_list
+        else np.array([], dtype=np.int64)
     )
 
+    X_val = (
+        np.concatenate(X_val_list, axis=0)
+        if X_val_list
+        else np.array([], dtype=np.float32).reshape(0, window_size, len(feature_cols))
+    )
+    y_val = (
+        np.concatenate(y_val_list, axis=0)
+        if y_val_list
+        else np.array([], dtype=np.int64)
+    )
+
+    X_test = (
+        np.concatenate(X_test_list, axis=0)
+        if X_test_list
+        else np.array([], dtype=np.float32).reshape(0, window_size, len(feature_cols))
+    )
+    y_test = (
+        np.concatenate(y_test_list, axis=0)
+        if y_test_list
+        else np.array([], dtype=np.int64)
+    )
+
+    return X_train, y_train, X_val, y_val, X_test, y_test
 
 def create_test_windows(
     df: pd.DataFrame,

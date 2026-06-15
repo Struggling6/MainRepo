@@ -12,7 +12,7 @@ Assumptions:
 - each building_id is placed in exactly one output file
 
 Example:
-    python split_lead.py --num-parts 10 --output-dir ./datasets/LEAD
+    python scripts/leadCsv_splitter.py --num-parts 10 --output-dir .scripts/datasets/LEAD
 
 Result:
     ./datasets/LEAD/data1.csv

@@ -574,25 +574,29 @@ class LeadCSVHandler(BaseDatasetHandler):
 
         print(f"[LEAD] Client df shape: {client_df.shape}")
 
-        X_train, y_train, X_val, y_val = temporal_grouped_split(
+        # Split into train (60%), val (20%), test (20%)
+        X_train, y_train, X_val, y_val, X_test, y_test = temporal_grouped_split(
             client_df,
             feature_cols=self.feature_cols,
             node_col=self._node_col,
             time_col=self._time_col,
-            train_ratio=1.0 - self.test_split,
+            train_ratio=0.6,
+            val_ratio=0.2,
+            test_ratio=0.2,
             gap_hours=self._gap_hours,
             window_size=self._window_size,
             stride=self._stride,
             target=self.target,
         )
 
-        print(f"[LEAD] Split done: X_train={X_train.shape}, X_val={X_val.shape}")
+        print(f"[LEAD] Split done: X_train={X_train.shape}, X_val={X_val.shape}, X_test={X_test.shape}")
 
         self.num_train_windows_before_undersampling = len(y_train)
         self.num_train_anomalies_before_undersampling = int(y_train.sum())
         self.aggregation_weight = self.num_train_windows_before_undersampling
 
-        X_train, X_val = self._scale_temporal_arrays(X_train, X_val)
+        X_train, X_val, X_test = self._scale_temporal_arrays(X_train, X_val, X_test)
+
         if self.use_undersampling:
             X_train, y_train = self._undersample_normals(
                 X_train,
@@ -608,8 +612,6 @@ class LeadCSVHandler(BaseDatasetHandler):
                     normal_to_anomaly_ratio=self.undersampling_ratio,
                     seed=self.seed + 10_000 + partition_id,
                 )
-            else:
-                print("[LEAD] Keeping validation set unchanged after undersampling step")
 
         if self.use_oversampling:
             X_train, y_train = self._oversample_anomalies(
@@ -632,13 +634,67 @@ class LeadCSVHandler(BaseDatasetHandler):
                     seed=self.seed + 30_000 + partition_id,
                     split_name="val",
                 )
-            else:
-                print("[LEAD] Keeping validation set unchanged after oversampling step")
 
         self.num_train_windows_after_undersampling = len(y_train)
-                
-        return self._build_dataloaders_from_arrays(X_train, y_train, X_val, y_val)
 
+        trainloader, valloader = self._build_dataloaders_from_arrays(X_train, y_train, X_val, y_val)
+        testloader = self._build_test_dataloader_from_arrays(X_test, y_test)
+
+        return trainloader, valloader, testloader
+
+    def _scale_temporal_arrays(
+        self,
+        X_train: np.ndarray,
+        X_val: np.ndarray,
+        X_test: np.ndarray = None,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        scaler = StandardScaler()
+
+        original_train_shape = X_train.shape
+        original_val_shape = X_val.shape
+        original_test_shape = X_test.shape if X_test is not None else None
+
+        X_train_2d = X_train.reshape(-1, X_train.shape[-1])
+        X_val_2d = X_val.reshape(-1, X_val.shape[-1])
+
+        X_train_scaled = scaler.fit_transform(X_train_2d).reshape(original_train_shape)
+        X_val_scaled = scaler.transform(X_val_2d).reshape(original_val_shape)
+
+        if X_test is not None:
+            X_test_2d = X_test.reshape(-1, X_test.shape[-1])
+            X_test_scaled = scaler.transform(X_test_2d).reshape(original_test_shape)
+            print("[LEAD] Applied StandardScaler using training data only (train/val/test)")
+            return (
+                X_train_scaled.astype(np.float32),
+                X_val_scaled.astype(np.float32),
+                X_test_scaled.astype(np.float32),
+            )
+
+        print("[LEAD] Applied StandardScaler using training data only (train/val)")
+        return (
+            X_train_scaled.astype(np.float32),
+            X_val_scaled.astype(np.float32),
+        )
+
+    def _build_test_dataloader_from_arrays(
+        self,
+        X_test: np.ndarray,
+        y_test: np.ndarray,
+    ):
+        test_dataset = torch.utils.data.TensorDataset(
+            torch.tensor(X_test, dtype=torch.float32),
+            torch.tensor(y_test, dtype=torch.long),
+        )
+
+        testloader = torch.utils.data.DataLoader(
+            test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=0,
+            pin_memory=False,
+        )
+
+        return testloader
     def get_metadata(self):
         if self.df is None:
             if self.partition_mode == "local":

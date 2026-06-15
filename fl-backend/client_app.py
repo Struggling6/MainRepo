@@ -134,11 +134,11 @@ class FlowerClient(NumPyClient):
         return Path(getattr(self.config.federation, "gpu_lock_path", "datasets/.gpu.lock"))
 
     def _ensure_dataloaders(self):
-        if self.trainloader is not None and self.testloader is not None:
+        if self.trainloader is not None and self.testloader is not None and self.valloader is not None:
             return
 
         log(INFO, "[%s] loading dataloaders for partition=%s", self.facility_id, self.partition_id)
-        self.trainloader, self.testloader = self.dataset_handler.get_dataloaders(
+        self.trainloader, self.valloader, self.testloader = self.dataset_handler.get_dataloaders(
             partition_id=self.partition_id
         )
         self.metadata = self.dataset_handler.get_metadata()
@@ -164,7 +164,7 @@ class FlowerClient(NumPyClient):
             results = train_model(
                 model=self.model,
                 trainloader=self.trainloader,
-                valloader=self.testloader,
+                valloader=self.valloader,
                 training_config=self.config.training,
                 model_config=self.config.model,
                 device=self.device,
