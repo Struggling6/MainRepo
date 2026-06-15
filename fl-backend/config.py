@@ -62,7 +62,7 @@ class TransformerConfig:
     loss_fn:        str   = "BCEWithLogitsLoss"
 
 
-    def build(self, input_dim: int, context_length: int = None):
+    def build(self, input_dim: int, context_length: int = 168):
         from models.CNNTransformer.Transformer import Transformer
 
         return Transformer(
@@ -72,12 +72,13 @@ class TransformerConfig:
             num_layers=self.num_layers,
             num_classes=self.num_classes,
             dropout=self.dropout,
-            seq_len=context_length or self.context_length,
+            seq_len=context_length,
         )
     
 @dataclass
 class CNNConfig:
     name:           str   = "cnn"
+    batch_size:     int   = 64  
     d_model:        int   = 128
     dropout:        float = 0.3
     pos_weight_cap: float = 10.0
@@ -339,6 +340,9 @@ class PowerConsumptionAnomalyConfig:
     file_path:    Path  = Path("")
     data_dir:     Path  = Path("datasets/PowerConsumptionAnomaly")
     file_pattern: str   = "*.csv"
+    precomputed_dir: Path = Path("datasets/PowerConsumptionAnomaly/windowed")
+    precomputed_pattern: str = "client{client_index}.npz"
+    use_precomputed_windows: bool = False
     target:       str   = "label"
     test_split:   float = 0.2
     normalize:    bool  = True
@@ -515,7 +519,13 @@ class TimesNetOptunaConfig(OptunaSearchConfig):
     pos_weight_cap: FloatRange = field(default_factory=lambda: FloatRange(1.0, 10.0, log=True))
     num_layers: IntRange = field(default_factory=lambda: IntRange(1, 5))
                                                                   
-
+@dataclass
+class CNNOptunaConfig(OptunaSearchConfig):
+    d_model: list    = field(default_factory=lambda: [32, 64, 128, 256])
+    dropout: FloatRange = field(default_factory=lambda: FloatRange(0.1, 0.4))
+    pos_weight_cap: FloatRange = field(default_factory=lambda: FloatRange(1.0, 10.0, log=True))
+    batch_size: list = field(default_factory=lambda: [32, 64, 128])
+    
 
 # ── Interpretability config ─────────────────────────────────────────── #
 @dataclass
@@ -564,6 +574,7 @@ class OptunaConfig:
     timesnet: TimesNetOptunaConfig = field(default_factory=TimesNetOptunaConfig)
     fcn: FCNOptunaConfig = field(default_factory=FCNOptunaConfig)
     mlstm_fcn: MLSTMFCNOptunaConfig = field(default_factory=MLSTMFCNOptunaConfig)
+    cnn: CNNOptunaConfig = field(default_factory=CNNOptunaConfig)
 
 
 CONFIG = ExperimentConfig()

@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from .BaseDataHandler import BaseDatasetHandler
-from .time_series_utils import temporal_grouped_split
+from .time_series_utils import create_test_windows, temporal_grouped_split
 
 
 class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
@@ -42,10 +42,11 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
         "class",
     ]
     NODE_CANDIDATES = [
+        "series_id",
+        "device_id",
         "appliance",
         "appliance_type",
         "device",
-        "device_id",
         "building_id",
         "household",
     ]
@@ -56,6 +57,13 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
         self.file_path = Path(config.data.file_path)
         self.data_dir = Path(config.data.data_dir)
         self.file_pattern = config.data.file_pattern
+        self.precomputed_dir = getattr(config.data, "precomputed_dir", None)
+        self.precomputed_pattern = getattr(config.data, "precomputed_pattern", None)
+        self.use_precomputed_windows = getattr(
+            config.data,
+            "use_precomputed_windows",
+            False,
+        )
         self.target = config.data.target
         self.batch_size = config.model.batch_size
         self.test_split = config.data.test_split
@@ -78,6 +86,10 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
         self._node_col = "series_id"
         self._time_col = "timestamp"
         self.feature_cols = self._build_feature_columns()
+        self.aggregation_weight = 0
+        self.num_train_windows_before_undersampling = 0
+        self.num_train_anomalies_before_undersampling = 0
+        self.num_train_windows_after_undersampling = 0
 
         if self.partition_mode in ["shared", "optuna"]:
             print(f"[PCAD] Loading {self.partition_mode} data")
@@ -129,13 +141,39 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
                 f"file_path={self.file_path} or data_dir={self.data_dir}."
             )
 
-        paths = sorted(self.data_dir.rglob(self.file_pattern))
+        #Check the index for when shared mode is on, since the shared mode pattern does not recognise the client_index value
+        if "{client_index}" in self.file_pattern:
+            paths = []
+            missing_paths = []
+            for client_index in range(1, self.num_clients + 1):
+                path = self.data_dir / self.file_pattern.format(
+                    client_index=client_index
+                )
+                if path.exists():
+                    paths.append(path)
+                else:
+                    missing_paths.append(path)
+
+            if missing_paths:
+                raise FileNotFoundError(
+                    "Shared power data is configured with an indexed file_pattern, "
+                    f"but these expected client files are missing: {missing_paths}"
+                )
+        else:
+            paths = sorted(self.data_dir.rglob(self.file_pattern))
+
         if not paths:
             raise FileNotFoundError(
                 f"No files matching '{self.file_pattern}' found under {self.data_dir}."
             )
 
         frames = [self._read_csv_with_source(path) for path in paths]
+        frames = [frame for frame in frames if not frame.empty]
+        if not frames:
+            raise ValueError(
+                f"No readable power-consumption CSV files found under {self.data_dir}."
+            )
+
         return pd.concat(frames, ignore_index=True)
 
     def _resolve_local_file_path(self, partition_id: int) -> Path:
@@ -152,8 +190,33 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
 
         return path
 
-    def _read_csv_with_source(self, path: Path) -> pd.DataFrame:
+    def _resolve_precomputed_file_path(self, partition_id: int) -> Path:
+        if partition_id < 0:
+            raise ValueError(f"Invalid partition_id: {partition_id}")
+
+        if not self.precomputed_dir or not self.precomputed_pattern:
+            raise ValueError(
+                "Precomputed power windows require data.precomputed_dir and "
+                "data.precomputed_pattern to be configured."
+            )
+
+        client_index = partition_id + 1
+        path = Path(self.precomputed_dir) / self.precomputed_pattern.format(
+            client_index=client_index
+        )
+
+        if not path.exists():
+            raise FileNotFoundError(
+                f"Precomputed windows not found for partition {partition_id}: {path}. "
+                "Run scripts/precompute_power_windows.py before starting Flower."
+            )
+
+        return path
+
+    def _read_csv_with_source(self, path: Path, root: Path | None = None) -> pd.DataFrame:
         df = pd.read_csv(path)
+        df.columns = [str(column).strip() for column in df.columns]
+        df = df.loc[:, ~df.columns.str.match(r"^Unnamed")]
 
         has_timestamp = self._first_existing_column(df, self.TIMESTAMP_CANDIDATES)
         has_power = self._first_existing_column(df, self.POWER_CANDIDATES)
@@ -162,6 +225,26 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
 
         if "label" not in df.columns:
             df["label"] = 0
+
+        relative_parts = path.relative_to(root).parts if root is not None else path.parts
+        appliance = relative_parts[0] if len(relative_parts) >= 1 else ""
+        device = relative_parts[1] if len(relative_parts) >= 2 else path.stem
+        scenario = relative_parts[2] if len(relative_parts) >= 3 else ""
+
+        if "appliance" not in df.columns:
+            df["appliance"] = appliance
+        if "scenario" not in df.columns:
+            df["scenario"] = scenario
+        if "source_file" not in df.columns:
+            df["source_file"] = path.stem
+        if "source_path" not in df.columns:
+            df["source_path"] = str(path)
+        if "device_id" not in df.columns:
+            df["device_id"] = "__".join(
+                part
+                for part in [appliance, device, scenario, path.stem]
+                if part
+            )
 
         df["_source_file"] = path.stem
         return df
@@ -358,6 +441,9 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
             f"partition_id={partition_id}"
         )
 
+        if self.partition_mode == "local" and self.use_precomputed_windows:
+            return self._load_precomputed_dataloaders(partition_id)
+
         if self.partition_mode == "local":
             path = self._resolve_local_file_path(partition_id)
             _, _ = self._prepare_data(self._read_csv_with_source(path))
@@ -382,6 +468,10 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
             stride=self.stride,
             target=self.target,
         )
+
+        self.num_train_windows_before_undersampling = len(y_train)
+        self.num_train_anomalies_before_undersampling = int(y_train.sum())
+        self.aggregation_weight = self.num_train_windows_before_undersampling
 
         X_train, X_val = self._scale_temporal_arrays(X_train, X_val)
 
@@ -429,7 +519,56 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
 
         print(f"[PCAD] Split done: X_train={X_train.shape}, X_val={X_val.shape}")
 
+        self.num_train_windows_after_undersampling = len(y_train)
+
         return self._build_dataloaders_from_arrays(X_train, y_train, X_val, y_val)
+
+    def load_test_set(self, test_path: Path):
+        """
+        Load a held-out PCAD evaluation set from either one CSV file or a
+        directory tree containing appliance CSV files.
+        """
+        test_path = Path(test_path)
+
+        if test_path.is_file():
+            raw_df = self._read_csv_with_source(test_path)
+        elif test_path.is_dir():
+            paths = sorted(test_path.rglob(self.file_pattern))
+            if not paths:
+                raise FileNotFoundError(
+                    f"No files matching '{self.file_pattern}' found under {test_path}."
+                )
+
+            frames = [self._read_csv_with_source(path) for path in paths]
+            frames = [frame for frame in frames if not frame.empty]
+            if not frames:
+                raise ValueError(
+                    f"No readable power-consumption CSV files found under {test_path}."
+                )
+            raw_df = pd.concat(frames, ignore_index=True)
+        else:
+            raise FileNotFoundError(f"Evaluation path not found: {test_path}")
+
+        test_df = self._preprocess(raw_df)
+        X_test, y_test = create_test_windows(
+            test_df,
+            feature_cols=self.feature_cols,
+            window_size=self.window_size,
+            stride=self.stride,
+            node_col=self._node_col,
+            time_col=self._time_col,
+            target=self.target,
+        )
+
+        if self.normalize:
+            original_shape = X_test.shape
+            scaler = StandardScaler()
+            X_test = scaler.fit_transform(
+                X_test.reshape(-1, X_test.shape[-1])
+            ).reshape(original_shape)
+            print("[PCAD] Applied StandardScaler to evaluation windows")
+
+        return X_test.astype(np.float32, copy=False), y_test.astype(np.int64, copy=False)
 
     def get_metadata(self):
         return {

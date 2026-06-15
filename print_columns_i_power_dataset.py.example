@@ -1,0 +1,23 @@
+python - <<'PY'
+import numpy as np
+
+path = "fl-backend/datasets/PowerConsumptionAnomaly/windowed/client1.npz"
+
+with np.load(path) as data:
+    print("Keys:")
+    print(data.files)
+
+    print("\nFeature columns:")
+    print(data["feature_cols"].tolist())
+
+    print("\nShapes:")
+    for key in ["X_train", "y_train", "X_val", "y_val"]:
+        print(key, data[key].shape)
+
+    print("\nFirst training window, first timestep:")
+    feature_cols = data["feature_cols"].tolist()
+    first_row = data["X_train"][0, 0]
+
+    for name, value in zip(feature_cols, first_row):
+        print(f"{name}: {value}")
+PY
