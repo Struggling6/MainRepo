@@ -32,11 +32,11 @@ def _suggest(trial, name, spec):
 
 class OptunaOptimizer(TrainEvalBase):
     optuna.logging.set_verbosity(optuna.logging.WARNING)
+    _print_lock = threading.Lock()
 
-    def _logger(self, msg: str):
-        _print_lock = threading.Lock()
-        with _print_lock:
-            print(f"[Optuna] {msg}", flush=True)
+    def _logger(self, msg: str) -> None:
+            with self._print_lock:
+                print(f"[Optuna] {msg}", flush=True)
 
     def __init__(
         self,

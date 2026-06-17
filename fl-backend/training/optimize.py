@@ -1,4 +1,4 @@
-import argparse, os, signal, sys
+import argparse, os
 
 from pathlib import Path
 from models.utils import get_device
