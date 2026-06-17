@@ -6,7 +6,10 @@ import torch
 from sklearn.preprocessing import StandardScaler
 
 from .BaseDataHandler import BaseDatasetHandler
-from .time_series_utils import create_test_windows, temporal_grouped_split
+from .time_series_utils import (
+    create_test_windows,
+    temporal_grouped_train_val_eval_split,
+)
 
 
 class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
@@ -66,7 +69,10 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
         )
         self.target = config.data.target
         self.batch_size = config.model.batch_size
-        self.test_split = config.data.test_split
+        self.train_split = getattr(config.data, "train_split", 0.6)
+        self.val_split = getattr(config.data, "val_split", 0.2)
+        self.eval_split = getattr(config.data, "eval_split", 0.2)
+        self.evalloader = None
         self.num_clients = config.federation.num_clients
         self.seed = config.data.seed
         self.partition_mode = getattr(config.federation, "partition_mode", "shared")
@@ -439,9 +445,16 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
         self,
         X_train: np.ndarray,
         X_val: np.ndarray,
-    ) -> tuple[np.ndarray, np.ndarray]:
+        X_eval: np.ndarray | None = None,
+    ):
         if not self.normalize:
-            return X_train.astype(np.float32), X_val.astype(np.float32)
+            if X_eval is None:
+                return X_train.astype(np.float32), X_val.astype(np.float32)
+            return (
+                X_train.astype(np.float32),
+                X_val.astype(np.float32),
+                X_eval.astype(np.float32),
+            )
 
         scaler = StandardScaler()
         train_shape = X_train.shape
@@ -455,7 +468,29 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
         ).reshape(val_shape)
 
         print("[PCAD] Applied StandardScaler using training windows only")
-        return X_train_scaled.astype(np.float32), X_val_scaled.astype(np.float32)
+
+        if X_eval is None:
+            return X_train_scaled.astype(np.float32), X_val_scaled.astype(np.float32)
+
+        eval_shape = X_eval.shape
+        X_eval_scaled = scaler.transform(
+            X_eval.reshape(-1, X_eval.shape[-1])
+        ).reshape(eval_shape)
+
+        return (
+            X_train_scaled.astype(np.float32),
+            X_val_scaled.astype(np.float32),
+            X_eval_scaled.astype(np.float32),
+        )
+
+    def get_eval_loader(self):
+        """
+        Return the held-out final evaluation DataLoader created in get_dataloaders().
+        This split is scaled using the training scaler, but is never sampled.
+        """
+        if self.evalloader is None:
+            raise RuntimeError("Evaluation loader has not been created yet. Call get_dataloaders() first.")
+        return self.evalloader
 
     def _build_dataloaders_from_arrays(
         self,
@@ -598,12 +633,14 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
                 self.df[self._node_col].isin(self.client_indices[partition_id])
             ]
 
-        X_train, y_train, X_val, y_val = temporal_grouped_split(
+        X_train, y_train, X_val, y_val, X_eval, y_eval = temporal_grouped_train_val_eval_split(
             client_df,
             feature_cols=self.feature_cols,
             node_col=self._node_col,
             time_col=self._time_col,
-            train_ratio=1.0 - self.test_split,
+            train_ratio=self.train_split,
+            val_ratio=self.val_split,
+            eval_ratio=self.eval_split,
             gap_hours=self.gap_hours,
             window_size=self.window_size,
             stride=self.stride,
@@ -614,7 +651,7 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
         self.num_train_anomalies_before_undersampling = int(y_train.sum())
         self.aggregation_weight = self.num_train_windows_before_undersampling
 
-        X_train, X_val = self._scale_temporal_arrays(X_train, X_val)
+        X_train, X_val, X_eval = self._scale_temporal_arrays(X_train, X_val, X_eval)
 
         if self.use_undersampling:
             X_train, y_train = self._undersample_normals(
@@ -658,9 +695,23 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
             else:
                 print("[PCAD] Keeping validation set unchanged after oversampling")
 
-        print(f"[PCAD] Split done: X_train={X_train.shape}, X_val={X_val.shape}")
+        print(
+            f"[PCAD] Split done: X_train={X_train.shape}, "
+            f"X_val={X_val.shape}, X_eval={X_eval.shape}"
+        )
 
         self.num_train_windows_after_undersampling = len(y_train)
+        eval_dataset = torch.utils.data.TensorDataset(
+            torch.tensor(X_eval, dtype=torch.float32),
+            torch.tensor(y_eval, dtype=torch.long),
+        )
+        self.evalloader = torch.utils.data.DataLoader(
+            eval_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=0,
+            pin_memory=False,
+        )
 
         return self._build_dataloaders_from_arrays(X_train, y_train, X_val, y_val)
 
@@ -724,44 +775,14 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
         return len(self.client_indices)
 
     def load_test_set(self, test_path: Path):
-        """
-        Load a held-out power test file or directory of CSV files.
-
-        The public power dataset stores eval data as a nested directory, unlike
-        LEAD's single test CSV. Combine every CSV while preserving file-level
-        device_id values so windows never cross appliance/scenario boundaries.
-        """
         test_path = Path(test_path)
 
-        if test_path.is_dir():
-            paths = sorted(test_path.rglob("*.csv"))
-            if not paths:
-                raise FileNotFoundError(f"No CSV files found under {test_path}")
-            frames = [
-                self._read_csv_with_source(path, root=test_path)
-                for path in paths
-            ]
-            raw_df = pd.concat(
-                [frame for frame in frames if not frame.empty],
-                ignore_index=True,
+        with np.load(test_path) as artifact:
+            return (
+                artifact["X_eval"].astype(np.float32, copy=False),
+                artifact["y_eval"].astype(np.int64, copy=False),
             )
-        else:
-            raw_df = self._read_csv_with_source(test_path, root=test_path.parent)
-
-        if raw_df.empty:
-            raise ValueError(f"No usable power test rows found at {test_path}")
-
-        test_df = self._preprocess(raw_df)
-        return create_test_windows(
-            test_df,
-            feature_cols=self.feature_cols,
-            window_size=self.window_size,
-            stride=self.stride,
-            node_col=self._node_col,
-            time_col=self._time_col,
-            target=self.target,
-        )
-
+        
     def _undersample_normals(
         self,
         X: np.ndarray,

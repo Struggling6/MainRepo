@@ -8,21 +8,18 @@ version = "0.1.0"
 description = "Federated anomaly detection backend"
 license = {text = "Apache-2.0"}
 dependencies = [
-    # NOTE: Concrete versions (incl. ROCm-tagged torch) are installed in the
-    # Docker image via requirements.txt. The deps listed here only need to
-    # satisfy `flwr build` packaging metadata and are intentionally permissive
-    # so the project's own wheel can be installed `--no-deps` without
-    # conflicting against the venv's actual installed wheels.
-    "flwr[simulation]>=1.27.0",
-    "torch>=2.0",
-    "pandas",
-    "numpy",
-    "scikit-learn",
-    "matplotlib",
-    "transformers",
-    "captum",
-    "pypots",
-    "optuna-dashboard",
+  "flwr[simulation]==1.27.0",
+  "torch==2.7.0",
+  "pandas==2.2.3",
+  "numpy==2.2.6",
+  "scikit-learn==1.6.1",
+  "matplotlib==3.10.3",
+  "transformers==4.52.4",
+  "captum==0.8.0",
+  "optuna",
+  "optuna-dashboard",
+  "pypots==1.0",
+  "imbalanced-learn",
 ]
 
 [tool.flwr.app]
