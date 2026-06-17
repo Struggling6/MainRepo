@@ -300,6 +300,11 @@ class LeadCSVConfig:
     use_precomputed_windows: bool = False
     target:       str   = "anomaly"
     task_name:    str   = "binary_classification"
+    # 60/20/20 temporal split: train/validation/final evaluation.
+    # test_split is kept only for backwards compatibility with old code.
+    train_split:  float = 0.6
+    val_split:    float = 0.2
+    eval_split:   float = 0.2
     test_split:   float = 0.2
     seed:         int   = 42
     window_size:  int   = 168
@@ -343,6 +348,11 @@ class PowerConsumptionAnomalyConfig:
     precomputed_pattern: str = "client{client_index}.npz"
     use_precomputed_windows: bool = False
     target:       str   = "label"
+    # 60/20/20 temporal split: train/validation/final evaluation.
+    # test_split is kept only for backwards compatibility with old code.
+    train_split:  float = 0.6
+    val_split:    float = 0.2
+    eval_split:   float = 0.2
     test_split:   float = 0.2
     normalize:    bool  = True
     seed:         int   = 42

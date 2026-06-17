@@ -88,9 +88,16 @@ class FedProxWithSave(FedProx):
                             )
 
                 threshold = aggregated_metrics.pop(
-                    "threshold",
-                    CONFIG.evaluation.threshold,
+                    "best_thresh",
+                    aggregated_metrics.pop(
+                        "threshold",
+                        CONFIG.evaluation.threshold,
+                    ),
                 )
+
+                CONFIG.evaluation.threshold = float(threshold)
+
+                print(f"[SAVE] using final evaluation threshold={threshold:.6f}", flush=True)
 
                 base_dir = Path(os.getenv("CHECKPOINT_DIR", Path(__file__).resolve().parent / "checkpoints"))
                 path = base_dir / f"{CONFIG.model.name}_{CONFIG.data.name}.pt"

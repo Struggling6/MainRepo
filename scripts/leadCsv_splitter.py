@@ -12,7 +12,7 @@ Assumptions:
 - each building_id is placed in exactly one output file
 
 Example:
-    python split_lead.py --num-parts 10 --output-dir ./datasets/LEAD
+    python .\leadCsv_splitter.py --num-parts 2 --output-dir ../fl-backend/datasets/LEAD
 
 Result:
     ./datasets/LEAD/data1.csv
@@ -20,7 +20,7 @@ Result:
     ...
     ./datasets/LEAD/data10.csv
 """
-
+    
 from __future__ import annotations
 
 import argparse
@@ -31,7 +31,7 @@ import numpy as np
 import pandas as pd
 
 
-INPUT_FILENAME = Path("fl-backend/datasets/LEAD/train_features_clean.csv")
+INPUT_FILENAME = Path("../fl-backend/datasets/LEAD/train_features_clean.csv")
 OUTPUT_DIR = Path("fl-backend/datasets/LEAD/partitions")
 
 
