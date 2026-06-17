@@ -42,7 +42,7 @@ class Trainer(TrainEvalBase):
             ]
 
     def train(self, train_loader, val_loader) -> nn.Module:
-        best_pr_auc, epochs_without_improvement = 0.0, 0
+        best_pr_auc, best_state, epochs_without_improvement = 0.0, None, 0
         self.history = []
 
         for epoch in range(1, self.epochs + 1):
@@ -67,12 +67,15 @@ class Trainer(TrainEvalBase):
 
             if pr_auc > best_pr_auc:
                 best_pr_auc = pr_auc
+                best_state = {k: v.detach().clone() for k, v in self.model.state_dict().items()}
                 epochs_without_improvement = 0
             else:
                 epochs_without_improvement += 1
                 if epochs_without_improvement >= self.patience:
                     print(f"Early stopping at epoch {epoch} (best PR-AUC: {best_pr_auc:.4f})")
                     break
+        if best_state is not None:
+             self.model.load_state_dict(best_state)
 
         return self.model
 

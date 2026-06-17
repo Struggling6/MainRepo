@@ -1,4 +1,4 @@
-## Hyperparamemters for the different models
+## Hyperparameters for the different models
 
  
 |Model name| Learning rate | Weight Decay | num layers| batch_size| pos weight cap| dropout| nhead| dmodel|
