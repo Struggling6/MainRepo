@@ -9,6 +9,7 @@ from sklearn.metrics import (
     accuracy_score,
     precision_score,
     recall_score,
+    f1_score,
 )
 from training.training_utils.TrainEvalBase import TrainEvalBase
 from training.training_utils.utils import compute_pos_weight
@@ -63,6 +64,7 @@ class Evaluator(TrainEvalBase):
         accuracy = accuracy_score(all_labels, all_preds)
         precision = precision_score(all_labels, all_preds, zero_division=0)
         recall = recall_score(all_labels, all_preds, zero_division=0)
+        f1 = f1_score(all_labels, all_preds, zero_division=0)
 
 
         print("\n=== Final Evaluation Results ===")
@@ -99,11 +101,7 @@ class Evaluator(TrainEvalBase):
         test_path = Path(CONFIG.evaluation.test_path)
 
         if not test_path.exists():
-            app_root = Path(__file__).resolve().parents[2]
-            candidate = app_root / test_path
-
-            if candidate.exists():
-                test_path = candidate
+            raise FileNotFoundError(f"Test set not found at {test_path}")
                 
         X_test, y_test = self.data_handler.load_test_set(test_path)
         return DataLoader(
