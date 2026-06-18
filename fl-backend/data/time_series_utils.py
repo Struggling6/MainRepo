@@ -75,6 +75,108 @@ def _window_groups(df, feature_cols, window_size, stride, node_col, time_col, ta
     )
 
 
+def temporal_grouped_train_val_eval_split(
+    df: pd.DataFrame,
+    feature_cols: list[str],
+    window_size: int,
+    stride: int,
+    node_col: str,
+    time_col="timestamp",
+    train_ratio=0.6,
+    val_ratio=0.2,
+    eval_ratio=0.2,
+    gap_hours=0,
+    target="anomaly",
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Split a time series DataFrame into train, validation, and final-evaluation
+    windows per node, using global temporal cutoffs.
+
+    Intended split:
+      - train: used for model fitting and may be over/undersampled
+      - val: used during training/early stopping/hyperparameter selection and may
+             optionally be over/undersampled if your config says so
+      - eval: final held-out evaluation set; should never be sampled or used during
+              training
+
+    The same gap is applied between train->val and val->eval to reduce leakage from
+    lagged features across split boundaries.
+
+    Returns
+    -------
+    X_train, y_train, X_val, y_val, X_eval, y_eval : np.ndarray
+    """
+    total = train_ratio + val_ratio + eval_ratio
+    if not np.isclose(total, 1.0):
+        raise ValueError(
+            f"train_ratio + val_ratio + eval_ratio must equal 1.0, got {total:.4f}"
+        )
+
+    df = _prepare_groups(df, node_col, time_col)
+
+    all_times = df[time_col].sort_values().reset_index(drop=True)
+    if all_times.empty:
+        raise ValueError("Cannot split an empty DataFrame")
+
+    train_cutoff_idx = int(len(all_times) * train_ratio)
+    val_cutoff_idx = int(len(all_times) * (train_ratio + val_ratio))
+
+    # Keep indices inside bounds for very small datasets.
+    train_cutoff_idx = min(max(train_cutoff_idx, 0), len(all_times) - 1)
+    val_cutoff_idx = min(max(val_cutoff_idx, 0), len(all_times) - 1)
+
+    train_cutoff = pd.Timestamp(all_times.iloc[train_cutoff_idx])
+    val_cutoff = pd.Timestamp(all_times.iloc[val_cutoff_idx])
+
+    train_end = train_cutoff
+    val_start = train_cutoff + pd.Timedelta(hours=gap_hours)
+    val_end = val_cutoff
+    eval_start = val_cutoff + pd.Timedelta(hours=gap_hours)
+
+    X_train_list, y_train_list = [], []
+    X_val_list, y_val_list = [], []
+    X_eval_list, y_eval_list = [], []
+
+    for node, group in df.groupby(node_col):
+        group = group.sort_values(time_col)
+
+        train_df = group[group[time_col] <= train_end]
+        val_df = group[(group[time_col] > val_start) & (group[time_col] <= val_end)]
+        eval_df = group[group[time_col] > eval_start]
+
+        if len(train_df) > window_size:
+            Xtr, ytr = create_windowed_data(train_df, feature_cols, window_size, stride, target)
+            X_train_list.append(Xtr)
+            y_train_list.append(ytr)
+
+        if len(val_df) > window_size:
+            Xva, yva = create_windowed_data(val_df, feature_cols, window_size, stride, target)
+            X_val_list.append(Xva)
+            y_val_list.append(yva)
+
+        if eval_ratio > 0 and len(eval_df) > window_size:
+            Xev, yev = create_windowed_data(eval_df, feature_cols, window_size, stride, target)
+            X_eval_list.append(Xev)
+            y_eval_list.append(yev)
+
+    def _concat_or_raise(items, split_name: str):
+        if not items:
+            raise ValueError(
+                f"No {split_name} windows were created. "
+                "Try reducing window_size/stride/gap_hours or changing split ratios."
+            )
+        return np.concatenate(items, axis=0)
+
+    return (
+        _concat_or_raise(X_train_list, "train"),
+        _concat_or_raise(y_train_list, "train labels"),
+        _concat_or_raise(X_val_list, "validation"),
+        _concat_or_raise(y_val_list, "validation labels"),
+        _concat_or_raise(X_eval_list, "evaluation") if eval_ratio > 0 else np.empty((0,), dtype=np.float32),
+        _concat_or_raise(y_eval_list, "evaluation labels") if eval_ratio > 0 else np.empty((0,), dtype=np.int64),
+    )
+
+
 def temporal_grouped_split(
     df: pd.DataFrame,
     feature_cols: list[str],
@@ -87,59 +189,23 @@ def temporal_grouped_split(
     target="anomaly",
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
-    Split a time series DataFrame into train and validation windows
-    per node, using a single global temporal cutoff computed from all
-    rows across all nodes combined.
-
-    The gap between train end and val start prevents lag features from
-    leaking across the boundary. For example, if your longest lag is
-    73 hours, set gap_hours=73 so the validation set never contains
-    rows whose lag features were computed from training data.
-
-    Returns
-    -------
-    X_train, y_train, X_val, y_val : np.ndarray
+    Backwards-compatible two-way split.
+    New code should prefer temporal_grouped_train_val_eval_split.
     """
-    # _prepare_groups already copies, parses datetimes, and sorts by
-    # (node_col, time_col), so rows are ordered correctly within each node.
-    df = _prepare_groups(df, node_col, time_col)
-
-    # Compute the global cutoff from all rows sorted by time
-    all_times = df[time_col].sort_values()
-    cutoff    = pd.Timestamp(all_times.iloc[int(len(all_times) * train_ratio)])
-
-    X_train_list, y_train_list = [], []
-    X_val_list,   y_val_list   = [], []
-    nid_train, nid_test        = [], []
-
-    #Process each node seperately so different time series are not mixed together
-    for node, group in df.groupby(node_col):
-        group    = group.sort_values(time_col)
-
-        # Train: everything up to and including the cutoff
-        train_df = group[group[time_col] <= cutoff] #Older data for training
-
-        # Val: everything after cutoff + gap to avoid lag leakage
-        val_df   = group[group[time_col] > cutoff + pd.Timedelta(hours=gap_hours)] #Newer data for testing, after optinal gap
-
-        if len(train_df) > window_size:
-            Xtr, ytr = create_windowed_data(train_df, feature_cols, window_size, stride, target)
-            X_train_list.append(Xtr)
-            y_train_list.append(ytr)
-            nid_train.extend([node] * len(Xtr)) #Store which node each window came from
-
-        if len(val_df) > window_size:
-            Xva, yva = create_windowed_data(val_df, feature_cols, window_size, stride, target)
-            X_val_list.append(Xva)
-            y_val_list.append(yva)
-
-    return (
-        np.concatenate(X_train_list, axis=0),
-        np.concatenate(y_train_list, axis=0),
-        np.concatenate(X_val_list,   axis=0),
-        np.concatenate(y_val_list,   axis=0),
+    X_train, y_train, X_val, y_val, _, _ = temporal_grouped_train_val_eval_split(
+        df=df,
+        feature_cols=feature_cols,
+        window_size=window_size,
+        stride=stride,
+        node_col=node_col,
+        time_col=time_col,
+        train_ratio=train_ratio,
+        val_ratio=1.0 - train_ratio,
+        eval_ratio=0.0,
+        gap_hours=gap_hours,
+        target=target,
     )
-
+    return X_train, y_train, X_val, y_val
 
 def create_test_windows(
     df: pd.DataFrame,

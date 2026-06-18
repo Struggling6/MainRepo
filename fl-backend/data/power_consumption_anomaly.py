@@ -2,9 +2,14 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import torch
+from sklearn.preprocessing import StandardScaler
 
 from .BaseDataHandler import BaseDatasetHandler
-from .time_series_utils import create_test_windows, temporal_grouped_split
+from .time_series_utils import (
+    create_test_windows,
+    temporal_grouped_train_val_eval_split,
+)
 
 
 class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
@@ -66,7 +71,10 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
         )
         self.target = config.data.target
         self.batch_size = config.model.batch_size
-        self.test_split = config.data.test_split
+        self.train_split = getattr(config.data, "train_split", 0.6)
+        self.val_split = getattr(config.data, "val_split", 0.2)
+        self.eval_split = getattr(config.data, "eval_split", 0.2)
+        self.evalloader = None
         self.num_clients = config.federation.num_clients
         self.seed = config.data.seed
         self.partition_mode = getattr(config.federation, "partition_mode", "shared")
@@ -435,6 +443,92 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
                 f"anomaly_rate={anomaly_rate:.4f}"
             )
 
+    def _load_precomputed_dataloaders(self, partition_id: int):
+        path = self._resolve_precomputed_file_path(partition_id)
+        print(f"[PCAD] Loading precomputed windows: {path}")
+
+        with np.load(path) as artifact:
+            required = ["X_train", "y_train", "X_val", "y_val"]
+            missing = [key for key in required if key not in artifact]
+
+            if missing:
+                raise ValueError(
+                    f"Precomputed artifact {path} is missing arrays: {missing}"
+                )
+
+            X_train = artifact["X_train"].astype(np.float32, copy=False)
+            y_train = artifact["y_train"].astype(np.int64, copy=False)
+            X_val = artifact["X_val"].astype(np.float32, copy=False)
+            y_val = artifact["y_val"].astype(np.int64, copy=False)
+            feature_cols = (
+                [str(column) for column in artifact["feature_cols"]]
+                if "feature_cols" in artifact
+                else None
+            )
+
+            if feature_cols is not None and feature_cols != self.feature_cols:
+                raise ValueError(
+                    f"Precomputed artifact {path} feature_cols do not match "
+                    f"handler feature_cols. artifact={feature_cols}, "
+                    f"handler={self.feature_cols}"
+                )
+
+            self.num_train_windows_before_undersampling = int(
+                artifact["num_train_windows_before_undersampling"][0]
+            ) if "num_train_windows_before_undersampling" in artifact else len(y_train)
+            self.num_train_anomalies_before_undersampling = int(
+                artifact["num_train_anomalies_before_undersampling"][0]
+            ) if "num_train_anomalies_before_undersampling" in artifact else int(y_train.sum())
+            self.num_train_windows_after_undersampling = int(
+                artifact["num_train_windows_after_undersampling"][0]
+            ) if "num_train_windows_after_undersampling" in artifact else len(y_train)
+            self.aggregation_weight = int(
+                artifact["aggregation_weight"][0]
+            ) if "aggregation_weight" in artifact else self.num_train_windows_before_undersampling
+            oversampling_method = (
+                str(artifact["oversampling_method"][0])
+                if "oversampling_method" in artifact
+                else "unknown"
+            )
+            num_train_windows_after_oversampling = int(
+                artifact["num_train_windows_after_oversampling"][0]
+            ) if "num_train_windows_after_oversampling" in artifact else len(y_train)
+            num_train_anomalies_after_oversampling = int(
+                artifact["num_train_anomalies_after_oversampling"][0]
+            ) if "num_train_anomalies_after_oversampling" in artifact else int(y_train.sum())
+            oversample_val = bool(
+                artifact["oversample_val"][0]
+            ) if "oversample_val" in artifact else False
+            num_val_windows_after_oversampling = int(
+                artifact["num_val_windows_after_oversampling"][0]
+            ) if "num_val_windows_after_oversampling" in artifact else len(y_val)
+            num_val_anomalies_after_oversampling = int(
+                artifact["num_val_anomalies_after_oversampling"][0]
+            ) if "num_val_anomalies_after_oversampling" in artifact else int(y_val.sum())
+
+        self.df = None
+        self.features = X_train
+        self.labels = y_train
+
+        print(
+            f"[PCAD] Precomputed shapes: "
+            f"X_train={X_train.shape}, X_val={X_val.shape}, "
+            f"aggregation_weight={self.aggregation_weight}, "
+            f"oversampling={oversampling_method}, "
+            f"train_after_oversampling={num_train_windows_after_oversampling}, "
+            f"train_anomalies_after_oversampling={num_train_anomalies_after_oversampling}, "
+            f"oversample_val={oversample_val}, "
+            f"val_after_oversampling={num_val_windows_after_oversampling}, "
+            f"val_anomalies_after_oversampling={num_val_anomalies_after_oversampling}"
+        )
+
+        return self._build_dataloaders_from_arrays(
+            X_train,
+            y_train,
+            X_val,
+            y_val,
+        )
+
     def get_dataloaders(self, partition_id: int):
         print(
             f"[PCAD] get_dataloaders partition_mode={self.partition_mode} "
@@ -457,12 +551,14 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
                 self.df[self._node_col].isin(self.client_indices[partition_id])
             ]
 
-        X_train, y_train, X_val, y_val = temporal_grouped_split(
+        X_train, y_train, X_val, y_val, X_eval, y_eval = temporal_grouped_train_val_eval_split(
             client_df,
             feature_cols=self.feature_cols,
             node_col=self._node_col,
             time_col=self._time_col,
-            train_ratio=1.0 - self.test_split,
+            train_ratio=self.train_split,
+            val_ratio=self.val_split,
+            eval_ratio=self.eval_split,
             gap_hours=self.gap_hours,
             window_size=self.window_size,
             stride=self.stride,
@@ -473,7 +569,7 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
         self.num_train_anomalies_before_undersampling = int(y_train.sum())
         self.aggregation_weight = self.num_train_windows_before_undersampling
 
-        X_train, X_val = self._scale_temporal_arrays(X_train, X_val)
+        X_train, X_val, X_eval = self._scale_temporal_arrays(X_train, X_val, X_eval)
 
         if self.use_undersampling:
             X_train, y_train = self._undersample_normals(
@@ -517,9 +613,23 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
             else:
                 print("[PCAD] Keeping validation set unchanged after oversampling")
 
-        print(f"[PCAD] Split done: X_train={X_train.shape}, X_val={X_val.shape}")
+        print(
+            f"[PCAD] Split done: X_train={X_train.shape}, "
+            f"X_val={X_val.shape}, X_eval={X_eval.shape}"
+        )
 
         self.num_train_windows_after_undersampling = len(y_train)
+        eval_dataset = torch.utils.data.TensorDataset(
+            torch.tensor(X_eval, dtype=torch.float32),
+            torch.tensor(y_eval, dtype=torch.long),
+        )
+        self.evalloader = torch.utils.data.DataLoader(
+            eval_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=0,
+            pin_memory=False,
+        )
 
         return self._build_dataloaders_from_arrays(X_train, y_train, X_val, y_val)
 
@@ -581,3 +691,15 @@ class PowerConsumptionAnomalyHandler(BaseDatasetHandler):
 
     def get_num_partitions(self) -> int:
         return len(self.client_indices)
+
+    # NOTE: dev intentionally redefines load_test_set here to read a
+    # precomputed npz eval artifact; this second definition shadows the
+    # CSV-based one above and is the version used at runtime.
+    def load_test_set(self, test_path: Path):
+        test_path = Path(test_path)
+
+        with np.load(test_path) as artifact:
+            return (
+                artifact["X_eval"].astype(np.float32, copy=False),
+                artifact["y_eval"].astype(np.int64, copy=False),
+            )

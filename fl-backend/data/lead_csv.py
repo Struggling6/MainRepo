@@ -1,9 +1,10 @@
 import numpy as np
 import pandas as pd
+import torch
 
 from pathlib import Path
 
-from .time_series_utils import temporal_grouped_split
+from .time_series_utils import temporal_grouped_train_val_eval_split
 from .BaseDataHandler import BaseDatasetHandler
 
 
@@ -43,7 +44,10 @@ class LeadCSVHandler(BaseDatasetHandler):
         self.file_path = config.data.file_path
         self.target = config.data.target
         self.batch_size = config.model.batch_size
-        self.test_split = config.data.test_split
+        self.train_split = getattr(config.data, "train_split", 0.6)
+        self.val_split = getattr(config.data, "val_split", 0.2)
+        self.eval_split = getattr(config.data, "eval_split", 0.2)
+        self.evalloader = None
         self.num_clients = config.federation.num_clients
         self.seed = config.data.seed
         self.partition_mode = getattr(config.federation, "partition_mode")
@@ -513,25 +517,30 @@ class LeadCSVHandler(BaseDatasetHandler):
 
         print(f"[LEAD] Client df shape: {client_df.shape}")
 
-        X_train, y_train, X_val, y_val = temporal_grouped_split(
+        X_train, y_train, X_val, y_val, X_eval, y_eval = temporal_grouped_train_val_eval_split(
             client_df,
             feature_cols=self.feature_cols,
             node_col=self._node_col,
             time_col=self._time_col,
-            train_ratio=1.0 - self.test_split,
+            train_ratio=self.train_split,
+            val_ratio=self.val_split,
+            eval_ratio=self.eval_split,
             gap_hours=self._gap_hours,
             window_size=self._window_size,
             stride=self._stride,
             target=self.target,
         )
 
-        print(f"[LEAD] Split done: X_train={X_train.shape}, X_val={X_val.shape}")
+        print(
+            f"[LEAD] Split done: X_train={X_train.shape}, "
+            f"X_val={X_val.shape}, X_eval={X_eval.shape}"
+        )
 
         self.num_train_windows_before_undersampling = len(y_train)
         self.num_train_anomalies_before_undersampling = int(y_train.sum())
         self.aggregation_weight = self.num_train_windows_before_undersampling
 
-        X_train, X_val = self._scale_temporal_arrays(X_train, X_val)
+        X_train, X_val, X_eval = self._scale_temporal_arrays(X_train, X_val, X_eval)
         if self.use_undersampling:
             X_train, y_train = self._undersample_normals(
                 X_train,
@@ -575,8 +584,27 @@ class LeadCSVHandler(BaseDatasetHandler):
                 print("[LEAD] Keeping validation set unchanged after oversampling step")
 
         self.num_train_windows_after_undersampling = len(y_train)
+        eval_dataset = torch.utils.data.TensorDataset(
+            torch.tensor(X_eval, dtype=torch.float32),
+            torch.tensor(y_eval, dtype=torch.long),
+        )
+        self.evalloader = torch.utils.data.DataLoader(
+            eval_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=0,
+            pin_memory=False,
+        )
                 
         return self._build_dataloaders_from_arrays(X_train, y_train, X_val, y_val)
+    
+    def load_test_set(self, test_path: Path):
+
+        with np.load(test_path) as artifact:
+            return (
+                artifact["X_eval"].astype(np.float32),
+                artifact["y_eval"].astype(np.int64),
+            )
 
     def get_metadata(self):
         if self.df is None:

@@ -75,7 +75,7 @@ CONFIG = ExperimentConfig(
     ),
     data=build_data_config(DATASET),
     training=TrainingConfig(
-        local_epochs=1,
+        local_epochs=2,
         learning_rate=  0.00080,
         weight_decay=0.00018,
         patience=10,
@@ -84,10 +84,10 @@ CONFIG = ExperimentConfig(
         num_rounds=1,
         num_clients=2,
         proximal_mu=0.0,
-        partition_mode="shared",
+        partition_mode="local",
     ),
     evaluation=EvaluationConfig(
-        test_path =Path("datasets/PowerConsumptionAnomaly/Power-Consumption-Anomaly-Dataset-main/eval"),
+        test_path =Path("datasets/PowerConsumptionAnomaly/windowed/eval.npz"),
         target = "label",
         batch_size = 64, 
     ),

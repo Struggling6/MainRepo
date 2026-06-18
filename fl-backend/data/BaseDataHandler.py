@@ -153,14 +153,22 @@ class BaseDatasetHandler(ABC):
         self,
         X_train: np.ndarray,
         X_val: np.ndarray,
-    ) -> tuple[np.ndarray, np.ndarray]:
+        X_eval: np.ndarray | None = None,
+    ):
         """Standardize windowed arrays using training-set statistics only.
 
         Honours self.normalize when present (defaults to True for handlers
-        that always scale, e.g. LEAD).
+        that always scale, e.g. LEAD). When X_eval is supplied it is scaled
+        with the same training-fitted scaler and returned as a third array.
         """
         if not getattr(self, "normalize", True):
-            return X_train.astype(np.float32), X_val.astype(np.float32)
+            if X_eval is None:
+                return X_train.astype(np.float32), X_val.astype(np.float32)
+            return (
+                X_train.astype(np.float32),
+                X_val.astype(np.float32),
+                X_eval.astype(np.float32),
+            )
 
         scaler = StandardScaler()
         train_shape = X_train.shape
@@ -175,10 +183,35 @@ class BaseDatasetHandler(ABC):
 
         print(f"{self._log_prefix} Applied StandardScaler using training data only")
 
+        if X_eval is None:
+            return (
+                X_train_scaled.astype(np.float32),
+                X_val_scaled.astype(np.float32),
+            )
+
+        eval_shape = X_eval.shape
+        X_eval_scaled = scaler.transform(
+            X_eval.reshape(-1, X_eval.shape[-1])
+        ).reshape(eval_shape)
+
         return (
             X_train_scaled.astype(np.float32),
             X_val_scaled.astype(np.float32),
+            X_eval_scaled.astype(np.float32),
         )
+
+    def get_eval_loader(self):
+        """
+        Return the held-out final evaluation DataLoader created in
+        get_dataloaders(). This split is scaled using the training scaler
+        but is never sampled. Subclasses populate self.evalloader.
+        """
+        if getattr(self, "evalloader", None) is None:
+            raise RuntimeError(
+                "Evaluation loader has not been created yet. "
+                "Call get_dataloaders() first."
+            )
+        return self.evalloader
 
     def _build_dataloaders_from_arrays(
         self,
