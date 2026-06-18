@@ -84,7 +84,7 @@ CONFIG = ExperimentConfig(
         partition_mode="shared",
     ),
     evaluation=EvaluationConfig(
-        test_path =Path("datasets/PowerConsumptionAnomaly/Power-Consumption-Anomaly-Dataset-main/eval"),
+        test_path =Path("datasets/PowerConsumptionAnomaly/windowed/eval.npz"),
         target = "anomaly",
         batch_size = 64, 
     ),
