@@ -3,7 +3,6 @@ from flwr.common.logger import log
 from logging import INFO
 from local_experiment import CONFIG
 from FedProxWithSave import FedProxWithSave
-from plotting.plotting_config import plot_diagrams
 
 def weighted_average_fit(metrics):
     total_examples = sum(num_examples for num_examples, _ in metrics)
@@ -12,7 +11,7 @@ def weighted_average_fit(metrics):
 
     aggregated = {}
 
-    for key in ["train_loss", "val_loss", "val_f1", "pr_auc", "roc_auc", "best_thresh", "accuracy", "precision", "recall"]:
+    for key in ["train_loss", "val_loss", "f1", "pr_auc", "roc_auc", "threshold"]:
         values = [
             num_examples * m[key]
             for num_examples, m in metrics
@@ -67,32 +66,6 @@ def server_fn(context):
 
     config = ServerConfig(num_rounds=fed_config.num_rounds)
     return ServerAppComponents(strategy=strategy, config=config)
-
-
-
-def on_train_end(context):
-    #Called after all rounds complete.
-    strategy = context.strategy
-    
-    # Extract metrics from eval_history
-    f1_values = []
-    pr_values = []
-    roc_values = []
-
-    
-    for eval_round in strategy.eval_history:
-        if "f1" in eval_round:
-            f1_values.append(eval_round["f1"])
-        if "pr_auc" in eval_round:
-            pr_values.append(eval_round["pr_auc"])
-        if "roc_auc" in eval_round:
-            roc_values.append(eval_round["roc_auc"])
-
-    print(f"F1 values: {f1_values}")
-    print(f"PR-AUC values: {pr_values}")
-    print(f"ROC-AUC values: {roc_values}")
-
-    plot_diagrams(f1_values, pr_values, roc_values)
 
 
 app = ServerApp(server_fn=server_fn)

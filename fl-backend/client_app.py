@@ -206,23 +206,23 @@ class FlowerClient(NumPyClient):
             self.model = self.model.to(self.device)
             results = self.validator.validate(self.model, self.testloader)
 
-        log(INFO, "[%s] VAL done  | round=%s | loss=%.4f | f1=%.4f | pr_auc=%.4f | roc_auc=%.4f | thresh=%.2f| acc=%.4f | prec=%.4f | rec=%.4f",
+        log(INFO, "[%s] VAL done  | round=%s | loss=%.4f | f1=%.4f | pr_auc=%.4f | roc_auc=%.4f | thresh=%.2f | acc=%.4f | prec=%.4f | recall=%.4f",
             self.facility_id,
             round_num,
             results["loss"],
-            results["val_f1"],
+            results["f1"],
             results["pr_auc"],
             results["roc_auc"],
-            results["best_threshold"],
+            results["threshold"],
             results["accuracy"],
             results["precision"],
             results["recall"],
         )
 
         return results["loss"], results["num_examples"], {
-            "f1":        results["val_f1"],
+            "f1":        results["f1"],
             "pr_auc":    results["pr_auc"],
-            "threshold": results["best_threshold"],
+            "threshold": results["threshold"],
             "roc_auc":   results["roc_auc"],
             "accuracy":  results["accuracy"],
             "precision": results["precision"],

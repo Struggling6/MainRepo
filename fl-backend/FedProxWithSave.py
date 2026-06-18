@@ -88,11 +88,8 @@ class FedProxWithSave(FedProx):
                             )
 
                 threshold = aggregated_metrics.pop(
-                    "best_thresh",
-                    aggregated_metrics.pop(
-                        "threshold",
-                        CONFIG.evaluation.threshold,
-                    ),
+                    "threshold",
+                    CONFIG.evaluation.threshold,
                 )
 
                 CONFIG.evaluation.threshold = float(threshold)

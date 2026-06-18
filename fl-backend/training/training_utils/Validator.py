@@ -22,15 +22,15 @@ class Validator(TrainEvalBase):
         loss, f1, thresh, pr_auc, roc_auc, accuracy, precision, recall = self._val_epoch(model, valloader, loss_fn)
 
         return {
-            "loss":           loss,
-            "val_f1":         f1,
-            "best_threshold": thresh,
-            "pr_auc":         pr_auc,
-            "roc_auc":        roc_auc,
-            "accuracy": accuracy,
-            "precision": precision,
-            "recall": recall,
-            "num_examples":   int(len(valloader.dataset)),
+            "loss":         loss,
+            "f1":           f1,
+            "threshold":    thresh,
+            "pr_auc":       pr_auc,
+            "roc_auc":      roc_auc,
+            "accuracy":     accuracy,
+            "precision":    precision,
+            "recall":       recall,
+            "num_examples": int(len(valloader.dataset)),
         }
 
     def _build_loss(self, valloader):

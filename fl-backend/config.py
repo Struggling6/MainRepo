@@ -52,6 +52,7 @@ class CNNTransformerConfig:
 class TransformerConfig:
     name:           str   = "transformer"
     batch_size:   int     = 64
+    context_length: int   = 168
     d_model:        int   = 128
     nhead:          int   = 4
     num_layers:     int   = 2
@@ -222,7 +223,7 @@ class PatchTSTConfig():
     norm_type:           Literal["batchnorm", "layernorm"] = "batchnorm"
     is_encoder_decoder:  bool  = False
     share_embedding:     bool  = True
-    pooling_type:        str   = "mean",
+    pooling_type:        str   = "mean"
     pos_weight_cap:      float = 10.0
     loss_fn:             str   = "BCEWithLogitsLoss"
     num_classes:         int   = 1
@@ -403,7 +404,7 @@ class EvaluationConfig:
     test_path:    Path         = Path("datasets/LEAD/train_features_clean.csv")
     target:       str          = "anomaly"
     batch_size:   int          = 64
-    threshold:    float        = 0.5   # decision threshold — override with best_thresh from training
+    threshold:    float        = 0.5   # decision threshold — overridden by the trained `threshold` metric
     input_dim:    int          = 0     # set after data loading
 
 

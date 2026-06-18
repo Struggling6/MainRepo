@@ -7,7 +7,6 @@ from captum.attr import IntegratedGradients
 from torch.utils.data import DataLoader
 
 from local_experiment import CONFIG, ExperimentConfig
-from data.registry import create_dataset_handler
 from interpretability.attribution_utils import (
     get_device,
     load_checkpoint_model,
@@ -29,7 +28,7 @@ class IntegratedGradientsRunner:
         max_batches: int | None = 1,
         target_class: int | None = None,
     ) -> Path:
-        handler = create_dataset_handler(self.config)
+        handler = self.config.data.build_handler(self.config)
         metadata = handler.get_metadata()
 
         trainloader, testloader = handler.get_dataloaders(
